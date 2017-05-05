@@ -15,6 +15,8 @@ from selenium.webdriver.common.by import By
 from dropbox.files import Dimensions
 
 
+passed_tag_list=['Pass','pass','PASS','PASSED','Passed','passed','true','TRUE','True','1','Success','success','SUCCESS',True]
+failed_tag_list=['Fail','fail','FAIL','Failed','failed','FAILED','false','False','FALSE','0',False]
 
 PATH = lambda p: os.path.abspath(
     os.path.join(os.path.dirname(__file__), p)
@@ -22,7 +24,9 @@ PATH = lambda p: os.path.abspath(
 
 
 global driver
-#driver = None
+driver = None
+if CommonUtil.Test_Shared_Variables('appium_driver'): # Check if driver is already set in shared variables
+    driver = CommonUtil.Get_Shared_Variables('appium_driver') # Retreive appium driver
 
 global WebDriver_Wait 
 WebDriver_Wait = 20
@@ -211,28 +215,21 @@ def launch_and_start_driver(package_name, activity_name):
         CommonUtil.ExecLog(sModuleInfo,"Trying to launch the app...",1)
         desired_caps = {}
         desired_caps['platformName'] = 'Android'
-        df = adbOptions.get_android_version()
-        #df = "4.4.2"
+        df = adbOptions.get_android_version().strip()
         CommonUtil.ExecLog(sModuleInfo,df,1)
-        #adbOptions.kill_adb_server()
         desired_caps['platformVersion'] = df
-        df = adbOptions.get_device_model()
-        #df = "Android"
+        df = adbOptions.get_device_model().strip()
         CommonUtil.ExecLog(sModuleInfo,df,1)
-        #adbOptions.kill_adb_server()
 
         desired_caps['deviceName'] = df
-        desired_caps['appPackage'] = package_name
-        desired_caps['appActivity'] = activity_name
-        #desired_caps['appPackage'] = 'com.assetscience.androidprodiagnostics'
-        #desired_caps['appActivity'] = 'com.assetscience.recell.device.android.prodiagnostics.MainActivity'
-        driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps)
-        wait(10)
+        desired_caps['appPackage'] = package_name.strip()
+        desired_caps['appActivity'] = activity_name.strip()
         global driver
-        #deletelater = WebDriverWait(driver, WebDriver_Wait)
-        #print deletelater
+        if driver == None: # Only create a new appium instance if we haven't already (may be done by install_and_start_driver())
+            driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps)
+            CommonUtil.Set_Shared_Variables('appium_driver', driver) # Save driver instance to make available to other modules
         CommonUtil.ExecLog(sModuleInfo,"Launched the app successfully.",1)
-        wait(3)
+
         return "passed"
     except Exception, e:
         CommonUtil.ExecLog(sModuleInfo, "Exception: %s" % e, 3)
@@ -242,14 +239,27 @@ def launch_and_start_driver(package_name, activity_name):
         CommonUtil.ExecLog(sModuleInfo, "Unable to start WebDriver. %s"%Error_Detail, 3)
         return "failed"
         
-        
-def close():
+def teardown_appium():
+    ''' Teardown of appium instance '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Starting Appium cleanup.",1)
+    try:
+        global driver
+        driver.quit() # Tell appium to shutdown instance
+        driver = None # Clear driver variable, so next run will be fresh
+        CommonUtil.Set_Shared_Variables('appium_driver', '') # Clear the driver from shared variables
+        CommonUtil.ExecLog(sModuleInfo,"Appium cleaned up successfully.",1)
+        return 'passed'
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+def close_application():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         CommonUtil.ExecLog(sModuleInfo,"Trying to close the app",1)
         driver.close_app()
         CommonUtil.ExecLog(sModuleInfo,"Closed the app successfully",1)
-        driver.quit()
         return "passed"
     except Exception, e:
         exc_type, exc_obj, exc_tb = sys.exc_info()        
@@ -316,23 +326,26 @@ def install(app_location, app_package, app_activity):
         return "failed"
 
 
-def install_and_start_driver(app_location):
+def install_and_start_driver(app_location, app_activity=''):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         CommonUtil.ExecLog(sModuleInfo,"Trying to install and then launch the app...",1)
         desired_caps = {}
         desired_caps['platformName'] = 'Android'
-        df = adbOptions.get_android_version()
+        df = adbOptions.get_android_version().strip()
         CommonUtil.ExecLog(sModuleInfo,df,1)
         #adbOptions.kill_adb_server()
         desired_caps['platformVersion'] = df
-        df = adbOptions.get_device_model()
+        df = adbOptions.get_device_model().strip()
         CommonUtil.ExecLog(sModuleInfo,df,1)
         #adbOptions.kill_adb_server()
         desired_caps['deviceName'] = df
-        desired_caps['app'] = PATH(app_location)
-        driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps)
+        desired_caps['app'] = PATH(app_location).strip()
+        if app_activity: # If user passed an Activity name, add it to the capabilities to override the default
+            desired_caps['appActivity'] = app_activity 
         global driver
+        driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps)
+        CommonUtil.Set_Shared_Variables('appium_driver', driver) # Save driver instance to make available to other modules
         CommonUtil.ExecLog(sModuleInfo,"Installed and launched the app successfully.",1)
         time.sleep(10)
         driver.implicitly_wait(5)
@@ -392,27 +405,12 @@ def reset():
         return "failed"
     
     
-def go_back():
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    try:
-        CommonUtil.ExecLog(sModuleInfo,"Trying to go back...",1)
-        driver.back()
-        CommonUtil.ExecLog(sModuleInfo,"Went back successfully",1)
-        return "passed"
-    except Exception, e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()        
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
-        CommonUtil.ExecLog(sModuleInfo, "Unable to go back. %s"%Error_Detail, 3)
-        return "failed"
-
-    
 def wait(_time):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         CommonUtil.ExecLog(sModuleInfo,"Starting waiting for %s seconds.."%_time,1)
-        driver.implicitly_wait(_time)
-        time.sleep(_time)
+        driver.implicitly_wait(float(_time)) # Instructs appium not to timeout while we wait (it has a 60 second timeout by default)
+        time.sleep(_time) # Stop here the specified amount of time
         CommonUtil.ExecLog(sModuleInfo,"Waited successfully",1)
         return "passed"
     except Exception, e:
@@ -895,134 +893,24 @@ def Element_Validation(All_Elements_Found):#, index):
         CommonUtil.ExecLog(sModuleInfo, "Unable to get the element.  Error: %s"%(Error_Detail), 3)
         return "failed"
 
-
-# Performs a series of action or logical decisions based on user input
-def Sequential_Actions(step_data):
+def Sleep(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Sleep", 1)
     try:
-        logic_row = []
-        for each in step_data:
-            # finding what to do for each dataset
-            if each[0][1] == "action":
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                result = Action_Handler(each[0][0], each[1], each[0][2])
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                if result == [] or result == "failed":
-                    return "failed"
-            elif each[1][1] == "action":
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                result = Action_Handler(each[1][0], each[0], each[1][2])
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                if result == [] or result == "failed":
-                    return "failed"
-            elif each[0][1] == "logic":
-                logic_decision = ""
-                logic_row.append(each[1])
-                if len(logic_row) == 2:
-                    element_step_data = each[0:len(step_data[0]) - 2:1]
-                    returned_step_data_list = Validate_Step_Data(element_step_data)
-                    if(returned_step_data_list == []) or (returned_step_data_list == "failed"):
-                        return "failed"
-                    else:
-                        try:
-                            Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1],
-                                                  returned_step_data_list[2], returned_step_data_list[3],
-                                                  returned_step_data_list[4])
-                            if Element == 'failed':
-                                logic_decision = "false"
-                            else:
-                                logic_decision = "true"
-                        except Exception, errMsg:
-                            errMsg = "Could not find element in the by the criteria..."
-                            Exception_Info(sModuleInfo, errMsg)
-                else:
-                    continue
-
-                for conditional_steps in logic_row:
-                    if logic_decision in conditional_steps:
-                        print conditional_steps[2]
-                        list_of_steps = conditional_steps[2].split(",")
-                        for each_item in list_of_steps:
-                            data_set_index = int(each_item) - 1
-                            Sequential_Actions([step_data[data_set_index]])
-                        return "passed"
-
-            else:
-                CommonUtil.ExecLog(sModuleInfo,
-                                   "The sub-field information is incorrect. Please provide accurate information on the data set(s).",
-                                   3)
-                return "failed"
-        return "passed"
-
-    except Exception, e:
-        CommonUtil.ExecLog(sModuleInfo, "Exception: %s" % e, 3)
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
-            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
-        print "%s" % Error_Detail
-        CommonUtil.ExecLog(sModuleInfo, "Error: %s" % Error_Detail, 3)
-        return "failed"
-
-
-# Handles actions for the sequential logic, based on the input from the mentioned function
-def Action_Handler(action_name, action_step_data=False, action_value=False):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    try:
-        """ Need to add: long hold, pinch to zoom, """
-        
-        if action_name == "click":
-            result = Click_Element(action_step_data[0], action_step_data[2])
-            if result == "failed":
-                return "failed"
-        elif action_name == "text":
-            result = Set_Text(action_step_data[0], action_step_data[2], action_value)
-            if result == "failed":
-                return "failed"
-        elif action_name == "text_search":
-            result = Set_Text_Enter(action_step_data[0], action_step_data[2], action_value)
-            if result == "failed":
-                return "failed"
-        elif action_name == "wait":
-            result = Wait(action_value)
-            if result == "failed":
-                return "failed"
-        elif action_name == "swipe":
-            result = Swipe()
-            if result == "failed":
-                return "failed"
-        elif action_name == "tap":
-            result = Tap(action_step_data[0], action_step_data[2])
-            if result == "failed":
-                return "failed"
-        elif action_name == "go_back":
-            result = Go_Back()
-            if result == "failed":
-                return "failed"
-        elif action_name == "enter":
-            result = SendKey_Enter()
-            if result == "failed":
-                return "failed"
-        elif action_name == "validate full text" or action_name == "validate partial text":
-            result = Validate_Text(action_step_data)
-            if result == "failed":
-                return "failed"
-        else:
+        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
             CommonUtil.ExecLog(sModuleInfo,
-                               "The action you entered is incorrect. Please provide accurate information on the data set(s).",
-                               3)
+                                   "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
+                                   3)
             return "failed"
+        else:
+            tuple = step_data[0][0]
+            seconds = int(tuple[2])
+            CommonUtil.ExecLog(sModuleInfo, "Sleeping for %s seconds" % seconds, 1)
+            time.sleep(seconds)
+            return "passed"
 
-    except Exception, e:
-        CommonUtil.ExecLog(sModuleInfo, "Exception: %s" % e, 3)
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
-            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
-        print "%s" % Error_Detail
-        CommonUtil.ExecLog(sModuleInfo, "Error: %s" % Error_Detail, 3)
-        return "failed"
-
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
 
 def Exception_Info(sModuleInfo, errMsg):
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1070,7 +958,7 @@ def Wait(time_to_wait):
         CommonUtil.ExecLog(sModuleInfo, "Starting waiting for %s seconds.." % time_to_wait, 1)
         #function_data = Validate_Step_Data(step_data)
         driver.implicitly_wait(float(time_to_wait))
-        time.sleep(float(time_to_wait))
+        #time.sleep(float(time_to_wait))
         CommonUtil.ExecLog(sModuleInfo, "Waited successfully", 1)
         return "passed"
     except Exception, e:
@@ -1082,11 +970,15 @@ def Wait(time_to_wait):
         return "failed"
 
 
-def Swipe():
+def Swipe(x_start, y_start, x_end, y_end, duration = 1000):
+    ''' Perform single swipe gesture with provided start and end positions '''
+    # duration in mS - how long the gesture should take
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
     try:
         CommonUtil.ExecLog(sModuleInfo, "Starting to swipe the screen...", 1)
-        driver.swipe(100, 500, 100, 100, 800)
+        driver.swipe(x_start, y_start, x_end, y_end, duration)
         CommonUtil.ExecLog(sModuleInfo, "Swiped the screen successfully", 1)
         return "passed"
     except Exception, e:
@@ -1097,6 +989,147 @@ def Swipe():
         CommonUtil.ExecLog(sModuleInfo, "Unable to swipe. %s" % Error_Detail, 3)
         return "failed"
 
+def swipe_handler(action_value):
+    ''' Swipe screen based on user input '''
+    # Functions: General swipe (up/down/left/right), multiple swipes (X coordinate (from-to), Y coordinate (from-to), stepsize)
+    # action_value: comma delimited string containing swipe details
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Starting swipe handler", 1)
+
+    # Get screen size for calculations
+    window_size = get_window_size()
+    if window_size == 'failed':
+        return 'failed'
+    w = int(window_size['width'])
+    h = int(window_size['height'])
+
+    # Sanitize input
+    action_value = str(action_value) # Convert to string
+    action_value = action_value.replace(' ','') # Remove spaces
+    action_value = action_value.lower() # Convert to lowercase
+    
+    # Specific swipe dimensions given - just pass to swipe()
+    if action_value.count(',') == 3:
+        CommonUtil.ExecLog(sModuleInfo, "Swipe type: Single", 1)
+        x1, y1, x2, y2 = action_value.split(',')
+        Swipe(int(x1), int(y1), int(x2), int(y2))
+    
+    # Check for and handle simple gestures (swipe up/down/left/right), and may have a set number of swipes to exceute
+    elif action_value.count(',') == 0 or action_value.count(',') == 1:
+        # Process number of swipes as well
+        if action_value.count(',') == 1:
+            action_value, count = action_value.split(',')
+            count = int(count)
+        else:
+            count = 1
+        CommonUtil.ExecLog(sModuleInfo, "Swipe type: Basic %s with a count of %d" % (action_value, count), 1)
+            
+        # Check for direction and calculate accordingly
+        if action_value == 'up':
+            x1 = 50 * w / 100 # Middle horizontal
+            x2 = x1 # Midle horizontal
+            y1 = 75 * h / 100 # 75% down 
+            y2 = 1 # To top
+        elif action_value == 'down':
+            x1 = 50 * w / 100 # Middle horizontal
+            x2 = x1 # Midle horizontal
+            y1 = 25 * h / 100 # 25% down 
+            y2 = h - 1 # To bottom
+        elif action_value == 'left':
+            x1 = 90 * w / 100 # Start 90% on right
+            x2 = 10 * w / 100 # End 10% on left
+            y1 = 50 * h / 100 # Middle vertical 
+            y2 = y1 # Middle vertical
+        elif action_value == 'right':
+            x1 = 10 * w / 100 # Start 10% on left
+            x2 = 90 * w / 100 # End 90% on right
+            y1 = 50 * h / 100 # Middle vertical
+            y2 = y1 # Middle vertical
+
+        # Perform swipe as many times as specified, or once if not specified 
+        for i in range(0, count):
+            driver.swipe(x1, y1, x2, y2)
+            wait(1) # Small sleep, so action animation (if any) can complete
+        
+    # Handle a series of almost identical gestures (swipe horizontally at different locations for example)
+    elif action_value.count(',') == 2:
+        # Split input into separate parameters
+        horizontal, vertical, stepsize = action_value.split(',')
+        CommonUtil.ExecLog(sModuleInfo, "Swipe type: Multiple", 1)
+        
+        # Stepsize - How far to skip
+        if stepsize.isdigit(): # Stepsize given in pixels
+            stepsize = int(stepsize)
+        elif '%' in stepsize: # Stepsize given as a percentage
+            stepsize = int(stepsize.replace('%', '')) # Convert to integer
+            stepsize = stepsize * h / 100 # Convert from percentage to pixels
+        elif stepsize == 'none':
+            stepsize = 1
+        elif stepsize == 'small':
+            stepsize = 50
+        elif stepsize == 'medium':
+            stepsize = 100
+        elif stepsize == 'large' or stepsize == 'big':
+            stepsize = 250
+        
+        # Horizontal - Start and end
+        xstart, xstop = horizontal.split('-')
+        if xstart.isdigit(): # X given in pixels
+            xstart = int(xstart)
+            xstop = int(xstop)
+        elif '%' in horizontal: # X given in percentage
+            xstart = int(xstart.replace('%', '')) # Convert to integer
+            xstart = xstart * w / 100 # Convert from percentage to pixels
+            xstop = int(xstop.replace('%', '')) # Convert to integer
+            xstop = xstop * w / 100 # Convert from percentage to pixels
+            if xstart <= 0: # driver.swipe fails if we are outside the boundary, so correct any values necessary
+                xstart = 1
+            if xstop >= w:
+                xstop = w - 1
+        elif horizontal == 'left-right': # Replace descriptive words with default values for them (FROM-TO)
+            xstart = 1
+            xstop = w - 1
+        elif horizontal == 'right-left': # Replace descriptive words with default values for them (FROM-TO)
+            xstart = w - 1
+            xstop = 1
+        
+        # Vertical - Start and end
+        ystart, ystop = vertical.split('-')
+        if ystart.isdigit(): # X given in pixels
+            ystart = int(ystart)
+            ystop = int(ystop)
+        elif '%' in vertical: # X given in percentage
+            ystart = int(ystart.replace('%', '')) # Convert to integer
+            ystart = ystart * h / 100 # Convert from percentage to pixels
+            ystop = int(ystop.replace('%', '')) # Convert to integer
+            ystop = ystop * h / 100 # Convert from percentage to pixels
+            if ystart <= 0: # driver.swipe fails if we are outside the boundary, so correct any values necessary
+                ystart = 1
+            if ystop >= h:
+                ystop = h - 1
+        elif vertical == 'top-bottom': # Replace descriptive words with default values for them (FROM-TO)
+            ystart = 1
+            ystop = h - 1
+        elif vertical == 'bottom-top': # Replace descriptive words with default values for them (FROM-TO)
+            ystart = h - 1
+            ystop = 1
+            stepsize *= -1 # Convert stepsize to negative, so range() works as expected
+    
+        # Perform swipe given computed dimensions above
+        for y in range(ystart, ystop, stepsize): # For each row, assuming stepsize, swipe and move to next row
+            result = Swipe(xstart, y, xstop, y) # Swipe screen - y must be the same for horizontal swipes
+            if result == 'failed':
+                return 'failed'
+
+    # Invalid value
+    else:
+        CommonUtil.ExecLog(sModuleInfo, "The swipe data you entered is incorrect. Please provide accurate information on the data set(s).", 3) 
+        return 'failed'
+
+    # Swipe complete
+    CommonUtil.ExecLog(sModuleInfo, "Swipe completed successfully", 1)    
+    return 'passed'
 
 def Tap(element_parameter, element_value):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -1201,9 +1234,169 @@ def Validate_Text(step_data):
         return "failed"
 
 
+#Validating text from an element given information regarding the expected text
+def Save_Text(step_data, variable_name):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Save Text", 1)
+    try:
+        if ((1 < len(step_data[0][0]) >= 5)):
+            CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+            return "failed"
+        else:
+            for each in step_data:
+                element_step_data = Get_Element_Step_Data_Appium([step_data])
+                returned_step_data_list = Validate_Step_Data(element_step_data)
+                if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
+                    return "failed"
+                else:
+                    try:
+                        Element = Get_Element_Appium(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
+                        break
+
+                    except Exception:
+                        errMsg = "Could not get element based on the information provided."
+                        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+            list_of_element_text = Element.text.split('\n')
+            visible_list_of_element_text = ""
+            for each_text_item in list_of_element_text:
+                if each_text_item != "":
+                    visible_list_of_element_text+=each_text_item
+
+            result = CommonUtil.Set_Shared_Variables(variable_name, visible_list_of_element_text)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo, "Value of Variable '%s' could not be saved!!!", 3)
+                return "failed"
+            else:
+                CommonUtil.Show_All_Shared_Variables()
+                return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+#Validating text from an element given information regarding the expected text
+def Compare_Variables(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Compare Variables", 1)
+    try:
+        element_step_data = Get_Element_Step_Data_Appium([step_data])
+        if ((element_step_data == []) or (element_step_data == "failed")):
+            return "failed"
+        else:
+            pass_count = 0
+            fail_count = 0
+            variable_list1 = []
+            variable_list2 = []
+            result = []
+            for each_step_data_item in step_data:
+                if each_step_data_item[1]!="action":
+                    if '%|' in each_step_data_item[0].strip():
+                        previous_name = each_step_data_item[0].strip()
+                        new_name = CommonUtil.get_previous_response_variables_in_strings(each_step_data_item[0].strip())
+                        tuple1 = ('Variable',"'%s'"%previous_name,new_name)
+                    else:
+                        tuple1 = ('Text','',each_step_data_item[0].strip())
+                    variable_list1.append(tuple1)
+
+                    if '%|' in each_step_data_item[2].strip():
+                        previous_name = each_step_data_item[2].strip()
+                        new_name = CommonUtil.get_previous_response_variables_in_strings(each_step_data_item[2].strip())
+                        tuple2 = ('Variable',"'%s'"%previous_name,new_name)
+                    else:
+                        tuple2 = ('Text','',each_step_data_item[2].strip())
+                    variable_list2.append(tuple2)
+
+
+            for i in range(0,len(variable_list1)):
+                if variable_list1[i][2] == variable_list2[i][2]:
+                    result.append(True)
+                    pass_count+=1
+                else:
+                    result.append(False)
+                    fail_count+=1
+
+            CommonUtil.ExecLog(sModuleInfo,"###Variable Comaparison Results###",1)
+            CommonUtil.ExecLog(sModuleInfo,"Matched Variables: %d"%pass_count,1)
+            CommonUtil.ExecLog(sModuleInfo, "Not Matched Variables: %d" % fail_count, 1)
+
+            for i in range(0, len(variable_list1)):
+                if result[i] == True:
+                    CommonUtil.ExecLog(sModuleInfo,"Item %d. %s %s - %s :: %s %s - %s : Matched"%(i+1,variable_list1[i][0],variable_list1[i][1],variable_list1[i][2],variable_list2[i][0],variable_list2[i][1],variable_list2[i][2]),1)
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "Item %d. %s %s - %s :: %s %s - %s : Not Matched" % (i + 1, variable_list1[i][0], variable_list1[i][1], variable_list1[i][2], variable_list2[i][0],variable_list2[i][1], variable_list2[i][2]),3)
+
+            if fail_count > 0:
+                CommonUtil.ExecLog(sModuleInfo,"Error: %d item(s) did not match"%fail_count,3)
+                return "failed"
+            else:
+                return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
 '''
    Moving all locate, Click and text interaction function under one 
 '''
+    
+def read_screen_heirarchy():
+    ''' Read the XML string of the device's GUI and return it '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    try:
+        data = driver.page_source # Read screen and get xml formatted text
+        CommonUtil.ExecLog(sModuleInfo,"Read screen heirarchy successfully",1)
+        if data:
+            return data
+        else:
+            return False
+    except:
+        CommonUtil.ExecLog(sModuleInfo,"Read screen heirarchy unsuccessfully",3)
+        return False
+
+def tap_location(positions):
+    ''' Tap the provided position using x,y cooridnates '''
+    # positions: list containing x,y coordinates
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        driver.tap(positions) # Tap the location (must be in list format)
+        CommonUtil.ExecLog(sModuleInfo,"Tapped on location successfully",1)
+        return 'passed'
+    except:
+        CommonUtil.ExecLog(sModuleInfo,"Tapped on location unsuccessfully",3)
+        return 'failed'
+    
+def get_element_location_by_id(_id):
+    ''' Find and return an element's x,y coordinates '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    try:
+        positions = []
+        elem = locate_element_by_id(driver, _id) # Get element object for given id
+        location = elem.location # Get element x,y coordinates
+        positions.append((location['x'], location['y'])) # Put them on an array - Needs to be in this format for dirver.tap()
+        CommonUtil.ExecLog(sModuleInfo,"Retreived location successfully",1)
+        return positions # Return array
+    except:
+        CommonUtil.ExecLog(sModuleInfo,"Retreived location unsuccessfully",3)
+        return 'failed'
+        
+
+def get_window_size():
+    ''' Read the device's LCD resolution / screen size '''
+    # Returns a dictionary of width and height
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    try:
+        return driver.get_window_size() # Get window resolution in dictionary
+        CommonUtil.ExecLog(sModuleInfo,"Read window size successfully",1)
+    except:
+        CommonUtil.ExecLog(sModuleInfo,"Read window size unsuccessfully",1)
+        return 'failed'
+    
+    
 #location
 
 
@@ -1831,57 +2024,41 @@ def Get_Element_Step_Data_Appium(step_data):
         return "failed"
 
 
-#Performs a series of action or logical decisions based on user input
 def Sequential_Actions_Appium(step_data):
+    ''' Main Sequential Actions functino - Performs logical decisions based on user input '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:            
-        for each in step_data:
+        for each in step_data: # For each data set within step data
             logic_row=[]
-            for row in each:
-                if ((row[1] == "element parameter") or (row[1] == "reference parameter") or (row[1] == "relation type") or (row[1] == "element parameter 1 of 2") or (row[1] == "element parameter 2 of 2")):     ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement                
+            for row in each: # For each row of the data set
+                # Don't process these items right now, but also dont' fail
+                if ((row[1] == "element parameter") or (row[1] == "reference parameter") or (row[1] == "relation type") or (row[1] == "element parameter 1 of 2") or (row[1] == "element parameter 2 of 2")):
                     continue
-                
+                # If middle column = action, call action handler
                 elif row[1]=="action":
-                    CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row", 1)
-                    result = Action_Handler_Appium([each],row[0])
-                    if result == [] or result == "failed":
+                    CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row: %s" % str(row), 1)
+                    result = Action_Handler_Appium(each,row[0]) # Pass data set, and action_name to action handler
+                    if result == [] or result == "failed": # Check result of action handler
                         return "failed"
                     
+                # If middle column = conditional action, evaluate data set
                 elif row[1]=="conditional action":
-                    CommonUtil.ExecLog(sModuleInfo, "Checking the logical conditional action to be performed in the conditional action row", 1)
+                    CommonUtil.ExecLog(sModuleInfo, "Checking the logical conditional action to be performed in the conditional action row: %s" % str(row), 1)
                     logic_decision=""
                     logic_row.append(row)
-                    if len(logic_row)==2:
-                        #element_step_data = each[0:len(step_data[0])-2:1]
-                        element_step_data = Get_Element_Step_Data_Appium([each])
-                        returned_step_data_list = Validate_Step_Data(element_step_data) 
-                        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
-                            return "failed"
-                        else:
-                            try:
-                                Element = Get_Element_Appium(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
-                                if Element == 'failed':
-                                    logic_decision = "false"
-                                else:
-                                    logic_decision = "true"                                        
-                            except Exception, errMsg:
-                                errMsg = "Could not find element in the by the criteria..."
-                                Exception_Info(sModuleInfo, errMsg)            
-                    else:
-                        continue
-
-                    for conditional_steps in logic_row:
-                        if logic_decision in conditional_steps:
-                            print conditional_steps[2]
-                            list_of_steps = conditional_steps[2].split(",")
-                            for each_item in list_of_steps:
-                                data_set_index = int(each_item) - 1
-                                Sequential_Actions_Appium([step_data[data_set_index]])
-                            return "passed"
+                    
+                    # Only run this when we have two conditional actions for this data set (a true and a false preferably)
+                    if len(logic_row) == 2:
+                        CommonUtil.ExecLog(sModuleInfo, "Found 2 conditional actions - moving ahead with them", 1)
+                        return Conditional_Action_Handler(step_data, each, row, logic_row) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
                 
+                # Middle column not listed above, so data set is wrong
                 else:
                     CommonUtil.ExecLog(sModuleInfo, "The sub-field information is incorrect. Please provide accurate information on the data set(s).", 3)
                     return "failed"                 
+        
+        # No failures, return pass
         return "passed"
 
     except Exception, e:
@@ -1891,38 +2068,137 @@ def Sequential_Actions_Appium(step_data):
         print "%s"%Error_Detail
         return "failed"
     
+def Conditional_Action_Handler(step_data, each, row, logic_row):
+    ''' Process conditional actions, called only by Sequential_Actions() '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    element_step_data = Get_Element_Step_Data_Appium([each]) # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
+    returned_step_data_list = Validate_Step_Data(element_step_data) # Make sure the element step data we got back from above is good
+    if ((returned_step_data_list == []) or (returned_step_data_list == "failed")): # Element step data is bad, so fail
+        CommonUtil.ExecLog(sModuleInfo, "Element data is bad: %s" % str(element_step_data), 3)
+        return "failed"
+    else: # Element step data is good, so continue
+        # Check if element from data set exists on device
+        try:
+            Element = Get_Element_Appium(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
+            if Element == 'failed': # Element doesn't exist, proceed with the step data following the fail/false path
+                logic_decision = "false"
+            else: # Any other return means we found the element, proceed with the step data following the pass/true pass
+                logic_decision = "true"
+        except Exception, errMsg: # Element doesn't exist, proceed with the step data following the fail/false path
+            errMsg = "Could not find element in the by the criteria..."
+            Exception_Info(sModuleInfo, errMsg)
+            logic_decision = "false"
+                    
+        # Process the path as defined above (pass/fail)
+        for conditional_steps in logic_row: # For each conditional action from the data set
+            CommonUtil.ExecLog(sModuleInfo, "Processing conditional action: %s" % str(conditional_steps), 1)
+            if logic_decision in conditional_steps: # If we have a result from the element check above (true/false)
+                list_of_steps = conditional_steps[2].split(",") # Get the data set numbers for this conditional action and put them in a list
+                for each_item in list_of_steps: # For each data set number we need to process before finishing
+                    CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
+                    data_set_index = int(each_item) - 1 # data set number, -1 to offset for data set numbering system
+                    Sequential_Actions_Appium([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+                return "passed"
+
+    # Shouldn't get here, but just in case
+    return 'passed'
 
 #Handles actions for the sequential logic, based on the input from the mentioned function
 def Action_Handler_Appium(action_step_data, action_name):
+    ''' Handle Sub-Field=Action from step data, called only by Sequential_Actions() '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    # Put data set values in friendly variables
+    action_field, action_subfield, action_value = ('','','')
+    related_field, related_subfield, related_value = ('','','')
+    for row in action_step_data:
+        if row[0] == action_name: # Action line
+            action_field = row[0]
+            action_subfield = row[1]
+            action_value = row[2]
+        elif ((row[1] == "element parameter") or (row[1] == "reference parameter") or (row[1] == "relation type") or (row[1] == "element parameter 1 of 2") or (row[1] == "element parameter 2 of 2")): # Related information line
+            related_field = row[0]
+            related_subfield = row[1]
+            related_value = row[2]
+            
+    # Perform an action based on Field from step data
     try:
-        if action_name =="click":
-            result = Click_Element_Appium(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif action_name == "wait":
-            result = Wait(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif action_name == "swipe":
-            result = Swipe_Appium(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif action_name == "tap":
-            result = Tap_Appium(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif (action_name == "Android keystroke" or action_name == "iOS keystroke"):
-            result = Keystroke_Appium(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif (action_name == "validate full text" or action_name == "validate partial text"):
-            result = Validate_Text_Appium(action_step_data)
-            if result == "failed":
-                return "failed"
+        # Handle shared variable string
+        if action_value != False:
+            if "%|" in action_value and "|%" in action_value: # If string contains these characters, it's a shared variable
+                CommonUtil.ExecLog(sModuleInfo, "Shared Variable: %s" % action_value, 1)
+                action_value = action_value.replace("%|", "") # Strip special variable characters
+                action_value = action_value.replace("|%", "")
+                action_value = CommonUtil.Get_Shared_Variables(action_value) # Get the string for this shared variable
+                if action_value == 'failed':
+                    CommonUtil.ExecLog(sModuleInfo, "Invalid shared variable", 3)
+                    return "failed"
+
+        # Multiple row actions
+        if action_name == "click": # Click an element
+            result = Click_Element(related_field, related_value)
+        elif action_name == "text": # Enter text string into element
+            result = Set_Text(related_field, related_value, action_value)
+        elif action_name == "text search": # Enter text string and enter key (for fields that don't have a button)
+            result = Set_Text_Enter(related_field, related_value, action_value)
+        elif action_name == "wait": # Wait until element is available/enabled
+            result = Wait(action_value) # !!! Lucas: I think this needs the element, and WAit() has the line needed to wait on an element commented out
+        elif action_name == "tap": # Tap an element
+            result = Tap(related_field, related_value)
+        elif action_name == "enter": # Press enter key #!!!To be replaced with Keystroke_Appium()
+            result = SendKey_Enter()
+        elif action_name == "validate full text" or action_name == "validate partial text": # Test if text string exists
+            result = Validate_Text(action_step_data)
+        elif action_name == "save text": # Save text string
+            result = Save_Text([action_step_data],action_value)
+        elif action_name == "compare variable": # Compare two "shared" variables
+            result = Compare_Variables(action_step_data)
+        elif action_name == "step result": # Result from step data the user wants to specify (passed/failed)
+            if action_value in failed_tag_list: # Convert user specified pass/fail into standard result
+                result = 'failed'
+            else:
+                result = 'passed'
+        elif action_name == "install": # Install and execute application
+            result = install_and_start_driver(action_value, related_value) # file location, activity_name(optional)
+        elif action_name == "launch": # Launch program and get appium driver instance
+            result = launch_and_start_driver(action_value, related_value) # Package name, Activity name
+        elif action_name == "get location":
+            position = get_element_location_by_id(related_value) # Get x,y coordinates of the pass button
+            if position != 'failed':
+                result = CommonUtil.Set_Shared_Variables(action_value, position)
+            else:
+                result = 'passed'
+
+        # Single row actions
+        elif action_name == "sleep": # Sleep a specific amount of time
+            result = wait(int(action_value))
+        elif action_name == "swipe": # Swipe screen
+            result = swipe_handler(action_value)
+        elif action_name == "go back": # Press back button #!!!To be replaced with Keystroke_Appium()
+            result = Go_Back()
+        elif action_name == "close": # Close foreground application
+            result = close_application()
+        elif action_name == "uninstall": # Uninstall application
+            result = remove(action_value)
+        elif action_name == 'teardown': # Cleanup Appium instance
+            result = teardown_appium()
+        elif action_name == 'keypress': # Press hardware, software or virtual key
+            result = Android_Keystroke_Key_Mapping(action_value) # To be replaced with handler dependent on android/ios
+        elif action_name == "tap location":
+            result = tap_location(action_value)
+
+        # Anything else is an invalid action
         else:
             CommonUtil.ExecLog(sModuleInfo, "The action you entered is incorrect. Please provide accurate information on the data set(s).", 3)
             return "failed" 
+        
+        # Check result of the above if() statement
+        if result == "failed":
+            return "failed"
+
         
     except Exception, e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -2156,72 +2432,55 @@ def Enter_Text_Appium(step_data):
         return "failed"
 
 
-def Swipe_Appium(step_data):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Swipe_Appium", 1)
-    try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
-            CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
-            return "failed"
-        else:
-            swipe_direction = step_data[0][0][2]
-            if swipe_direction == 'down':
-                CommonUtil.ExecLog(sModuleInfo,"Swiping down!",1)
-                result = driver.swipe(100, 500, 100, 100, 800)
-                CommonUtil.ExecLog(sModuleInfo, "Swiped the screen down successfully", 1)
-                time.sleep(3)
-            elif swipe_direction == 'up':
-                CommonUtil.ExecLog(sModuleInfo,"Swiping up!",1)
-                result = driver.swipe(100, 100, 100, 500, 800)
-                CommonUtil.ExecLog(sModuleInfo, "Swiped the screen up successfully", 1)
-                time.sleep(3)
-            elif swipe_direction == 'left':
-                CommonUtil.ExecLog(sModuleInfo,"Swiping left!",1)
-                result = driver.swipe(100, 300, 500, 300, 800)
-                CommonUtil.ExecLog(sModuleInfo, "Swiped the screen left successfully", 1)
-                time.sleep(3)
-            elif swipe_direction == 'right':
-                CommonUtil.ExecLog(sModuleInfo,"Swiping right!",1)
-                result = driver.swipe(500, 300, 100, 300, 800)
-                CommonUtil.ExecLog(sModuleInfo, "Swiped the screen right successfully", 1)
-                time.sleep(3)    
-            else:
-                CommonUtil.ExecLog(sModuleInfo, "Swiping was not successful", 3)
-                result = "failed"
-
-        return result
-    except Exception, e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()        
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
-        CommonUtil.ExecLog(sModuleInfo, "Failed to swipe.  Error: %s"%(Error_Detail), 3)
-        return "failed"
-
-
 def Android_Keystroke_Key_Mapping(keystroke):
+    ''' Provides a friendly interface to invoke key events '''
+    # Keycodes: https://developer.android.com/reference/android/view/KeyEvent.html
+
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Android_Keystroke_Key_Mapping", 1)
-    try:
-        if keystroke == "RETURN":
-            driver.keyevent(66)
-        elif keystroke == "GO BACK":
-            driver.back()
-        elif keystroke == "SPACE":
-            driver.keyevent(62)
-        elif keystroke == "BACKSPACE":
-            driver.keyevent(67)
-        elif keystroke == "CALL":
-            driver.keyevent(5)            
-        elif keystroke == "END CALL":
-            driver.keyevent(6)
-                                     
-    except Exception, e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()        
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
-        CommonUtil.ExecLog(sModuleInfo, "Could not press enter for your element.  Error: %s"%(Error_Detail), 3)
-        return "failed"    
+    CommonUtil.ExecLog(sModuleInfo, "Starting Android key event handling for %s" % keystroke, 1)
     
+    # Sanitize input
+    keystroke = keystroke.strip()
+    keystroke = keystroke.lower()
+    keystroke = keystroke.replace('_', ' ')
+    
+    try:
+        if keystroke == "return":
+            driver.keyevent(66)
+        elif keystroke == "go back":
+            driver.back()
+        elif keystroke == "spacebar":
+            driver.keyevent(62)
+        elif keystroke == "backspace":
+            driver.keyevent(67)
+        elif keystroke == "call": # Press call connect, or starts phone program if not already started
+            driver.keyevent(5)
+        elif keystroke == "end call":
+            driver.keyevent(6)
+        elif keystroke == "home":
+            driver.keyevent(3)
+        elif keystroke == "mute":
+            driver.keyevent(164)
+        elif keystroke == "volume down":
+            driver.keyevent(25)
+        elif keystroke == "volume up":
+            driver.keyevent(24)
+        elif keystroke == "wake":
+            driver.keyevent(224)
+        elif keystroke == "power":
+            driver.keyevent(26)
+        elif keystroke == "app switch": # Task switcher / overview screen
+            driver.keyevent(187)
+        elif keystroke == "page down":
+            driver.keyevent(93)
+        elif keystroke == "page up":
+            driver.keyevent(92)
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Unsupported key event: %s" % keystroke, 3)
+
+        return 'passed'
+    except Exception, e:
+        return CommonUtil.Exception_Handler(sys.exc_info())
 
 """MINAR: PLEASE CHECK IF THIS IS POSSIBLE FOR AN iOS"""
 def iOS_Keystroke_Key_Mapping(keystroke):
@@ -2365,5 +2624,4 @@ def Validate_Text_Appium(step_data):
             exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
         CommonUtil.ExecLog(sModuleInfo, "Could not compare text as requested.  Error: %s" % (Error_Detail), 3)
         return "failed"
-'===================== ===x=== Sequential Actions Section Ends ===x=== ======================'    
-    
+'===================== ===x=== Sequential Actions Section Ends ===x=== ======================'
