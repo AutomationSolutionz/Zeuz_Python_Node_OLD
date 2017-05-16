@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # -*- coding: cp1252 -*-
 '''
 Created on May 15, 2016
@@ -494,6 +495,15 @@ def Sequential_Actions(step_data,file_attachment):
                     result = Action_Handler([each], row[0], file_attachment)
                     if result == [] or result == "failed":
                         return "failed"
+
+                # If middle column = optional action, call action handler, but always return a pass
+                elif row[1] == "optional action":
+                    CommonUtil.ExecLog(sModuleInfo,"Checking the optional action to be performed in the action row: %s" % str(row), 1)
+                    result = Action_Handler(each, row[0] , file_attachment)  # Pass data set, and action_name to action handler
+                    if result == 'failed':
+                        CommonUtil.ExecLog(sModuleInfo, "Optional action failed. Returning pass anyway", 2)
+                    result = 'passed'
+
                 else:
                     CommonUtil.ExecLog(sModuleInfo,
                                        "The sub-field information is incorrect. Please provide accurate information on the data set(s).",
