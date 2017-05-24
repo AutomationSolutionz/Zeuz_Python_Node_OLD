@@ -24,6 +24,7 @@ from Framework.Utilities import CommonUtil
 
 passed_tag_list=['Pass','pass','PASS','PASSED','Passed','passed','true','TRUE','True','1','Success','success','SUCCESS']
 failed_tag_list=['Fail','fail','FAIL','Failed','failed','FAILED','false','False','FALSE','0']
+skipped_tag_list=['skip','SKIP','Skip','skipped','SKIPPED','Skipped']
 
 '============================= Sequential Action Section Begins=============================='
 
@@ -74,7 +75,15 @@ def Action_Handler(action_step_data, action_row):
             result = Shared_Resources.Initialize_List(action_step_data)
             if result == "failed":
                 return "failed"
-        elif (str(action_name).lower().strip().startswith('insert into list')):
+        elif action_name == "step result":
+            result = Step_Result(action_step_data)
+            if result in failed_tag_list: # Convert user specified pass/fail into standard result
+                return 'failed'
+            elif result in passed_tag_list:
+                return 'passed'
+            elif result in skipped_tag_list:
+                return 'skipped'
+        elif action_name == "insert into list":
             fields_to_be_saved = action_row[2]
             result = Insert_Into_List(action_step_data, fields_to_be_saved)
             if result == "failed":
@@ -193,20 +202,11 @@ def Insert_Into_List(step_data, fields_to_be_saved):
             list_name = ''
             key = ''
             value = ''
+            full_input_key_value_name = ''
 
             for each_step_data_item in step_data[0]:
                 if each_step_data_item[1]=="action":
                     full_input_key_value_name = each_step_data_item[2]
-                    full_input_action_name = each_step_data_item[0]
-
-            temp_list = full_input_action_name.split(':')
-            if len(temp_list) == 1:
-                CommonUtil.ExecLog(sModuleInfo,
-                                   "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                                   3)
-                return "failed"
-            else:
-                list_name = str(temp_list[1]).strip()
 
             temp_list = full_input_key_value_name.split(',')
             if len(temp_list) == 1:
@@ -215,11 +215,9 @@ def Insert_Into_List(step_data, fields_to_be_saved):
                                    3)
                 return "failed"
             else:
-                key_string = temp_list[0]
-                value_string = temp_list[1]
-
-                key = str(key_string).split(':')[1].strip()
-                value = str(value_string).split(':')[1].strip()
+                list_name = temp_list[0].split(':')[1].strip()
+                key = temp_list[1].split(':')[1].strip()
+                value = temp_list[2].split(':')[1].strip()
 
             result = Shared_Resources.Set_List_Shared_Variables(list_name,key, value)
             if result in failed_tag_list:
@@ -246,18 +244,23 @@ def Insert_Into_List(step_data, fields_to_be_saved):
                     for each_step_data_item in step_data[0]:
                         if each_step_data_item[1] == "action":
                             key = each_step_data_item[2]
-                            full_input_action_name = each_step_data_item[0]
 
                     # get list name from full input_string
 
-                    temp_list = full_input_action_name.split(':')
+                    temp_list = key.split(',')
                     if len(temp_list) == 1:
                         CommonUtil.ExecLog(sModuleInfo,
                                            "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
                                            3)
                         return "failed"
                     else:
-                        list_name = str(temp_list[1]).strip()
+                        list_name = str(temp_list[0]).split(':')[1].strip()
+
+                    fields_to_be_saved = ''
+                    for i in range(1, len(temp_list)):
+                        fields_to_be_saved += temp_list[i]
+                        if i != len(temp_list)-1:
+                            fields_to_be_saved+=","
 
                     return_result = handle_rest_call(returned_step_data_list, fields_to_be_saved, True, list_name)
 
@@ -301,19 +304,27 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
         status_code = int(result.status_code)
         Shared_Resources.Set_Shared_Variables('status_code',result.status_code)
         CommonUtil.ExecLog(sModuleInfo,'Post Call returned status code: %d'%status_code,1)
-        if status_code >=400:
-            CommonUtil.ExecLog(sModuleInfo,'Post Call Returned Bad Response',3)
-            return "failed"
-        else:
-            CommonUtil.ExecLog(sModuleInfo, 'Post Call Returned Response Successfully', 1)
-            CommonUtil.ExecLog(sModuleInfo,"Received Response: %s"%result.json(),1)
-            if not save_into_list:
-                save_fields_from_rest_call(result.json(), fields_to_be_saved)
-            else:
-                if list_name == "":
-                    CommonUtil.ExecLog(sModuleInfo,"List name not defined!",3)
+        try:
+            if result.json():
+                if status_code >=400:
+                    CommonUtil.ExecLog(sModuleInfo,'Post Call Returned Bad Response',3)
                     return "failed"
-                insert_fields_from_rest_call_into_list(result.json(), fields_to_be_saved, list_name)
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, 'Post Call Returned Response Successfully', 1)
+                    CommonUtil.ExecLog(sModuleInfo,"Received Response: %s"%result.json(),1)
+                    if not save_into_list:
+                        save_fields_from_rest_call(result.json(), fields_to_be_saved)
+                    else:
+                        if list_name == "":
+                            CommonUtil.ExecLog(sModuleInfo,"List name not defined!",3)
+                            return "failed"
+                        insert_fields_from_rest_call_into_list(result.json(), fields_to_be_saved, list_name)
+                    return "passed"
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo,"REST Call did not respond in json format",1)
+            CommonUtil.ExecLog(sModuleInfo,"Saving REST Call Response Text", 1)
+            response_text = result.text
+            Shared_Resources.Set_Shared_Variables('response_text', response_text)
             return "passed"
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -339,7 +350,14 @@ def Get_Response(step_data, fields_to_be_saved):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-
+def Get_Element(returned_step_data_list, fields_to_be_saved):
+        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+        CommonUtil.ExecLog(sModuleInfo, "Function: Get_Response", 1)
+        try:
+            return_result = handle_rest_call(returned_step_data_list, fields_to_be_saved)
+            return return_result
+        except Exception:
+            return CommonUtil.Exception_Handler(sys.exc_info())
 
 # Method to sleep for a particular duration
 def Sleep(step_data):
@@ -362,21 +380,20 @@ def Step_Result(step_data):
     CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
     try:
         if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
-            CommonUtil.ExecLog(sModuleInfo,
-                               "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                               3)
+            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             result = "failed"
         else:
             step_result = step_data[0][0][2]
             if step_result == 'pass':
                 result = "passed"
+            elif step_result == 'skip':
+                result = 'skipped'
             elif step_result == 'fail':
                 result = "failed"
-
+        print result
         return result
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
-
 
 # Performs a series of action or conditional logical action decisions based on user input
 def Sequential_Actions(step_data):
@@ -402,6 +419,8 @@ def Sequential_Actions(step_data):
                         result = Action_Handler(new_data_set, row)
                     if result in failed_tag_list:
                         return "failed"
+                    elif result in skipped_tag_list:
+                        return "skipped"
 
                 # If middle column = optional action, call action handler, but always return a pass
                 elif row[1] == "optional action":
@@ -414,39 +433,41 @@ def Sequential_Actions(step_data):
 
                 elif row[1] == "body" or row[1] == "header" or row[1] == "headers":
                     continue
-                elif row[1] == "conditional action":
-                    CommonUtil.ExecLog(sModuleInfo,
-                                       "Checking the logical conditional action to be performed in the conditional action row",
-                                       1)
-                    logic_decision = ""
+                elif row[1]=="conditional action":
+                    CommonUtil.ExecLog(sModuleInfo, "Checking the logical conditional action to be performed in the conditional action row", 1)
+                    logic_decision=""
                     logic_row.append(row)
-                    if len(logic_row) == 2:
-                        # element_step_data = each[0:len(step_data[0])-2:1]
-                        new_data_set = Shared_Resources.Handle_Step_Data_Variables([each])
-                        if new_data_set in failed_tag_list:
-                            return_result = 'failed'
-
-                        return_result = Get_Response(new_data_set, 'all')
-                        if return_result == 'failed':
-                            logic_decision = "false"
+                    if len(logic_row)==2:
+                        #element_step_data = each[0:len(step_data[0])-2:1]
+                        element_step_data = Get_Element_Step_Data([each])
+                        returned_step_data_list = Validate_Step_Data(element_step_data)
+                        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
+                            return "failed"
                         else:
-                            logic_decision = "true"
-
+                            try:
+                                Element = Get_Element(returned_step_data_list, "all")
+                                if Element == 'failed':
+                                    logic_decision = "false"
+                                else:
+                                    logic_decision = "true"
+                            except Exception, errMsg:
+                                errMsg = "Could not find element in the by the criteria..."
+                                return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
                     else:
                         continue
 
                     for conditional_steps in logic_row:
                         if logic_decision in conditional_steps:
                             print conditional_steps[2]
-                            print logic_decision
                             list_of_steps = conditional_steps[2].split(",")
                             for each_item in list_of_steps:
                                 data_set_index = int(each_item) - 1
                                 cond_result = Sequential_Actions([step_data[data_set_index]])
                                 if cond_result == "failed":
                                     return "failed"
+                                elif cond_result == "skipped":
+                                    return "skipped"
                             return "passed"
-
                 else:
                     CommonUtil.ExecLog(sModuleInfo,
                                        "The sub-field information is incorrect. Please provide accurate information on the data set(s).",
