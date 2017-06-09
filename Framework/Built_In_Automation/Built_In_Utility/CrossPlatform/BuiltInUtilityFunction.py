@@ -6,21 +6,25 @@ Created on May 15, 2016
 '''
 
 import sys
+import datetime
 
 sys.path.append("..")
 import time
 import inspect
 import zipfile
 import string
-
+from Framework.Utilities import ConfigModule
 import filecmp
 import random
+import requests
 from Framework.Utilities import CommonUtil
 from sys import platform as _platform
 
-passed_tag_list = ['Pass', 'pass', 'PASS', 'PASSED', 'Passed', 'passed', 'true', 'TRUE', 'True', '1', 'Success','success', 'SUCCESS', True]
+passed_tag_list = ['Pass', 'pass', 'PASS', 'PASSED', 'Passed', 'passed', 'true', 'TRUE', 'True', '1', 'Success',
+                   'success', 'SUCCESS', True]
 failed_tag_list = ['Fail', 'fail', 'FAIL', 'Failed', 'failed', 'FAILED', 'false', 'False', 'FALSE', '0', False]
-
+skipped_tag_list=['skip','SKIP','Skip','skipped','SKIPPED','Skipped']
+from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
 import os, subprocess, shutil
 
 add_sanitization = True
@@ -55,13 +59,23 @@ def CreateFolder(folderPath, forced=True):
         CommonUtil.ExecLog(sModuleInfo, "Create Folder %s" % folderPath, 1)
         if os.path.isdir(folderPath):
             if forced == False:
-                #print "folder already exists"
+                # print "folder already exists"
                 CommonUtil.ExecLog(sModuleInfo, "Folder already exists", 1)
-                return True
+                return "passed"
             DeleteFolder(folderPath)
         os.makedirs(folderPath)
-        CommonUtil.ExecLog(sModuleInfo, "Creating folder %s is complete" % folderPath, 1)
-        return True
+        CommonUtil.ExecLog(sModuleInfo, "Checking whether folder is created properly", 1)
+        # after performing os.makedirs() we have to check that if the folder with new name exists in correct location.
+        # if the folder exists in correct position then return passed
+        # if the folder doesn't exist in correct position then return failed
+        if os.path.isdir(folderPath):
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of create folder function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "folder exists... create folder function is done properly", 1)
+            return "passed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of create file function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... create folder function is not done properly", 3)
+            return "failed"
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -80,10 +94,10 @@ def CreateFile(sFilePath):
         CommonUtil.ExecLog(sModuleInfo, "Create File %s" % sFilePath, 1)
         if os.path.isfile(sFilePath):
             CommonUtil.ExecLog(sModuleInfo, "File already exists", 1)
-            #print "File already exists"
+            # print "File already exists"
             return False
         else:
-            #print "Creating new file"
+            # print "Creating new file"
             CommonUtil.ExecLog(sModuleInfo, "Creating new file", 1)
             newfile = open(sFilePath, 'w')
             newfile.close()
@@ -124,6 +138,7 @@ def RenameFile(file_to_be_renamed, new_name_of_the_file):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+
 # function to move file a to b
 def MoveFile(file_to_be_moved, new_name_of_the_file):
     """
@@ -149,10 +164,11 @@ def MoveFile(file_to_be_moved, new_name_of_the_file):
             CommonUtil.ExecLog(sModuleInfo, "Returning result of move file function", 1)
             CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... move function is not done properly", 3)
             return "failed"
-        CommonUtil.ExecLog(sModuleInfo, "Moving file %s to %s complete" % (file_to_be_renamed, new_name_of_the_file),1)
+        CommonUtil.ExecLog(sModuleInfo, "Moving file %s to %s complete" % (file_to_be_renamed, new_name_of_the_file), 1)
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 # function to rename folder a to b
 def RenameFolder(folder_to_be_renamed, new_name_of_the_folder):
@@ -183,6 +199,7 @@ def RenameFolder(folder_to_be_renamed, new_name_of_the_folder):
         return result
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 # function to move folder a to b
 def MoveFolder(folder_to_be_moved, new_name_of_the_folder):
@@ -236,7 +253,7 @@ def UnZip(file_to_be_unzipped, location_where_to_unzip):
             return result
         else:
             CommonUtil.ExecLog(sModuleInfo, "can't unzip file as it doesn't exist", 3)
-            return False
+            return "failed"
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -273,15 +290,28 @@ def ZipFile(file_to_be_zipped, location_where_to_zip):
     CommonUtil.ExecLog(sModuleInfo, "Function: Zip File", 1)
     try:
         CommonUtil.ExecLog(sModuleInfo, "Zipping file %s to %s" % (file_to_be_zipped, location_where_to_zip), 1)
+
         if os.path.isfile(file_to_be_zipped):
+
             list1 = file_to_be_zipped.split('/')
             list2 = location_where_to_zip.split('/')
             value = file_to_be_zipped[:len(file_to_be_zipped) - len(list1[len(list1) - 1])]
             os.chdir(value)
-            result = zipfile.ZipFile(list2[len(list2) - 1], mode='w').write(list1[len(list1) - 1])
-            CommonUtil.ExecLog(sModuleInfo, "Returning result of zip file function", 1)
+            zipfile.ZipFile(list2[len(list2) - 1], mode='w').write(list1[len(list1) - 1])
+            CommonUtil.ExecLog(sModuleInfo, "Checking whether file is zipped properly", 1)
+            # after performing zipfile() we have to check that if the file with new name exists in correct location.
+            # if the file exists in correct position then return passed
+            # if the file doesn't exist in correct position then return failed
+            if os.path.isfile(location_where_to_zip):
+                CommonUtil.ExecLog(sModuleInfo, "Returning result of zip file function", 1)
+                CommonUtil.ExecLog(sModuleInfo, "file exists... zip function is done properly", 1)
+                return "passed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Returning result of zip file function", 1)
+                CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... zip function is not done properly", 3)
+                return "failed"
             CommonUtil.ExecLog(sModuleInfo,"Zipping file %s to %s is complete" % (file_to_be_zipped, location_where_to_zip), 1)
-            return result
+
         else:
             CommonUtil.ExecLog(sModuleInfo, "can't zip file as file doesn't exist", 3)
             return False
@@ -302,8 +332,8 @@ def ZipFile_for_windows(file_to_be_zipped, location_where_to_zip):
     try:
         CommonUtil.ExecLog(sModuleInfo, "Zipping file %s to %s" % (file_to_be_zipped, location_where_to_zip), 1)
         if os.path.isfile(file_to_be_zipped):
-            list1 = file_to_be_zipped.split('//')
-            list2 = location_where_to_zip.split('//')
+            list1 = file_to_be_zipped.split('\\')
+            list2 = location_where_to_zip.split('\\')
             value = file_to_be_zipped[:len(file_to_be_zipped) - len(list1[len(list1) - 1])]
             os.chdir(value)
             result = zipfile.ZipFile(list2[len(list2) - 1], mode='w').write(list1[len(list1) - 1])
@@ -347,11 +377,20 @@ def ZipFolder(dir_to_be_zipped, location_where_to_zip):
                     if f not in location_where_to_zip:
                         zip.write(fullpath, archive_name, zipfile.ZIP_DEFLATED)
 
-            result = zip.close()
-            CommonUtil.ExecLog(sModuleInfo, "Returning result of zip folder function", 1)
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Zipping folder %s to %s is complete" % (dir_to_be_zipped, location_where_to_zip), 1)
-            return result
+            zip.close()
+            CommonUtil.ExecLog(sModuleInfo, "Checking whether folder is zipped properly", 1)
+            # after performing zip.close() we have to check that if the file with new name exists in correct location.
+            # if the file exists in correct position then return passed
+            # if the file doesn't exist in correct position then return failed
+            if os.path.isfile(location_where_to_zip):
+                CommonUtil.ExecLog(sModuleInfo, "Returning result of zip folder function", 1)
+                CommonUtil.ExecLog(sModuleInfo, "file exists... zip function is done properly", 1)
+                return "passed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Returning result of zip folder function", 1)
+                CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... zip function is not done properly", 3)
+                return "failed"
+            CommonUtil.ExecLog(sModuleInfo,"Zipping folder %s to %s is complete" % (dir_to_be_zipped, location_where_to_zip), 1)
 
         else:
             CommonUtil.ExecLog(sModuleInfo, "can't zip folder as folder doesn't exist", 3)
@@ -467,19 +506,18 @@ def empty_trash(trash_path):
             elif sys.argv[1] == '-l' or sys.argv[1] == '-L':
                 os.system("ls -al")
         flag = 0
-        for dir, sub_dirs, files in os.walk(trash_path):      #checking if trash is empty or not
+        for dir, sub_dirs, files in os.walk(trash_path):  # checking if trash is empty or not
             if not files:
                 CommonUtil.ExecLog(sModuleInfo, "Trying to find files/folders in trash", 1)
             else:
-                flag=1    # Trash is not empty. Trash will be cleared if flag is changed to 1
-        if flag==1:
+                flag = 1  # Trash is not empty. Trash will be cleared if flag is changed to 1
+        if flag == 1:
             CommonUtil.ExecLog(sModuleInfo, "Files/folders found in trash.... So trying to empty it", 1)
-            result = os.system("rm -rf *")  #Empty Trash
+            result = os.system("rm -rf *")  # Empty Trash
 
         else:
             CommonUtil.ExecLog(sModuleInfo, "------Trash is empty already------", 1)
-            return "passed"   #return "failed" if trash is already cleared
-
+            return "passed"  # return "failed" if trash is already cleared
 
         CommonUtil.ExecLog(sModuleInfo, "Emptying trash %s is complete" % trash_path, 1)
 
@@ -561,15 +599,15 @@ def empty_recycle_bin():
         recycle_bin = winshell.recycle_bin()
         List_recycle = list(recycle_bin)
         flag = 0
-        if len(List_recycle) > 0:  #checking if trash is empty or not
-            flag=1        # Trash is not empty. Trash will be cleared if flag is changed to 1
+        if len(List_recycle) > 0:  # checking if trash is empty or not
+            flag = 1  # Trash is not empty. Trash will be cleared if flag is changed to 1
         if flag == 1:
             CommonUtil.ExecLog(sModuleInfo, "Files/folders found in recycle bin.... So trying to empty it", 1)
-            result = winshell.recycle_bin().empty(confirm=False, show_progress=False, sound=False)       #Empty Trash
+            result = winshell.recycle_bin().empty(confirm=False, show_progress=False, sound=False)  # Empty Trash
 
         else:
             CommonUtil.ExecLog(sModuleInfo, "------Recycle Bin is empty already------", 1)
-            return "passed"   #return "failed" if trash is already cleared
+            return "passed"  # return "failed" if trash is already cleared
 
         CommonUtil.ExecLog(sModuleInfo, "Returning result of empty recycle bin function", 1)
         CommonUtil.ExecLog(sModuleInfo, "Emptying recycle bin is complete", 1)
@@ -594,8 +632,8 @@ def run_win_cmd(cmd):
             result.append(line)
         errcode = process.returncode
         for line in result:
-            #print(line)
-            CommonUtil.ExecLog(sModuleInfo, "%s" %line, 1)
+            # print(line)
+            CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
         if errcode is not None:
             CommonUtil.ExecLog(sModuleInfo, 'cmd %s failed, see above for details' % cmd, 3)
             raise Exception('cmd %s failed, see above for details', cmd)
@@ -667,6 +705,95 @@ def random_string_generator(pattern='nluc', size=10):
             return 'failed'
         else:
             return ''.join(random.choice(chars) for _ in range(size))
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+#Method to download file using url
+def download_file_using_url(file_url, location_of_file):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Download File Using Url ", 1)
+    try:
+        ''' Setting stream parameter to True will cause the download of response headers only and the connection remains open.
+          This avoids reading the content all at once into memory for large responses.
+         A fixed chunk will be loaded each time while r.iter_content is iterated.'''
+        r = requests.get(file_url, stream=True)
+
+        list_the_parts_of_url = file_url.split("/") #get file name from the url
+
+        file_name = location_of_file + list_the_parts_of_url[len(list_the_parts_of_url) - 1] #complete file location
+
+        with open(file_name, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024):
+
+            # writing one chunk at a time to pdf file
+                if chunk:
+                    f.write(chunk)
+        # after performing the download operation we have to check that if the file with new name exists in correct location.
+        # if the file exists in correct position then return passed
+        # if the file doesn't exist in correct position then return failed
+        if os.path.isfile(file_name):
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of download file using url function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "file exists... downloading file using url function is done properly", 1)
+            return "passed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of download file using url function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... downloading file using url function is not done properly", 3)
+            return "failed"
+        CommonUtil.ExecLog(sModuleInfo, "Download file using url %s is complete" % file_name, 1)
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+#Method to download and unzip file
+def download_and_unzip_file(file_url, location_of_file):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Download and Unzip file", 1)
+    try:
+        ''' Setting stream parameter to True will cause the download of response headers only and the connection remains open.
+          This avoids reading the content all at once into memory for large responses.
+         A fixed chunk will be loaded each time while r.iter_content is iterated.'''
+        r = requests.get(file_url, stream=True)
+
+        list_the_parts_of_url = file_url.split("/") #get file name from the url
+
+        file_name = location_of_file + list_the_parts_of_url[len(list_the_parts_of_url) - 1] #complete file location
+
+        with open(file_name, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024):
+
+            # writing one chunk at a time to pdf file
+                if chunk:
+                    f.write(chunk)
+        # after performing the download operation we have to check that if the file with new name exists in correct location.
+        # if the file exists in correct position then return passed
+        # if the file doesn't exist in correct position then return failed
+        if os.path.isfile(file_name):
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of download file using url function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "file exists... downloading file using url function is done properly", 1)
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Returning result of download file using url function", 1)
+            CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... downloading file using url function is not done properly", 3)
+            return "failed"
+
+        unzip_location = location_of_file + "latest_directory"
+        CommonUtil.ExecLog(sModuleInfo, "Creating the directory '%s' " % unzip_location, 1)
+        result1 = CreateFolder(unzip_location)
+        if result1 in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Can't not create folder '%s' " % unzip_location, 3)
+            return "failed"
+        CommonUtil.ExecLog(sModuleInfo, "Folder '%s' is created " % unzip_location, 1)
+        CommonUtil.ExecLog(sModuleInfo, "Unzipping file '%s' to '%s'" % (file_name, unzip_location), 1)
+        result = UnZip(file_name,unzip_location)
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Can't not unzip file '%s' to '%s'" % (file_name, unzip_location), 3)
+            return "failed"
+        CommonUtil.ExecLog(sModuleInfo, "Unzipping file '%s' to '%s' is complete" % (file_name, unzip_location), 1)
+        CommonUtil.ExecLog(sModuleInfo, "Saving directory location to shared resources" , 1)
+        Shared_Resources.Set_Shared_Variables("latest_directory", unzip_location)
+        Shared_Resources.Show_All_Shared_Variables()
+        return "passed"
+
+
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -750,7 +877,8 @@ escape_dict = {
     '\a': r'\a',
 }
 
-#code to generate raw string
+
+# code to generate raw string
 def raw(text):
     """Returns a raw string representation of text"""
     new_string = ''
@@ -775,9 +903,9 @@ def Copy_File_or_Folder(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][0][0]).strip()  # location of the file/folder to be copied
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location where to copy the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to copy
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be copied
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to copy the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to copy
             if file_or_folder.lower() == 'file':
                 # copy file "from_path" to "to_path"
                 result = copy_file(from_path, to_path)
@@ -785,7 +913,7 @@ def Copy_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo,"Could not copy file '%s' to the destination '%s'" % (from_path, to_path), 3)
                     return "failed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo,"File '%s' copied to the destination '%s' successfully" % (from_path, to_path),1)
+                    CommonUtil.ExecLog(sModuleInfo,"File '%s' copied to the destination '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             elif file_or_folder.lower() == 'folder':
                 # copy folder "from_path" to "to_path"
@@ -802,9 +930,9 @@ def Copy_File_or_Folder(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of the file/folder to be copied
-            to_path = raw(str(step_data[0][0][2]).strip())  # location where to copy the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to copy
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be copied
+            to_path = raw(str(step_data[1][2]).strip())  # location where to copy the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to copy
             if file_or_folder.lower() == 'file':
                 # copy file "from_path" to "to_path"
                 result = copy_file(from_path, to_path)
@@ -821,10 +949,10 @@ def Copy_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo,"Could not copy folder '%s' to the destination '%s'" % (from_path, to_path), 3)
                     return "failed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo,"Folder '%s' copied to the destination '%s' successfully" % (from_path, to_path),1)
+                    CommonUtil.ExecLog(sModuleInfo,"Folder '%s' copied to the destination '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
                 return 'failed'
 
                 # return result
@@ -840,8 +968,8 @@ def Delete_File_or_Folder(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            path = get_home_folder() + str(step_data[0][0][0]).strip()  # path of the file/folder to be deleted
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to delete
+            path = get_home_folder() + str(step_data[0][2]).strip()  # path of the file/folder to be deleted
+            file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to delete
             if file_or_folder.lower() == 'file':
                 # delete file "path"
                 result = DeleteFile(path)
@@ -861,13 +989,13 @@ def Delete_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo, "Folder '%s' deleted successfully" % (path), 1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
                 return 'failed'
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            path = raw(str(step_data[0][0][0]).strip())  # path of the file/folder to be deleted
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to delete
+            path = raw(str(step_data[0][2]).strip())  # path of the file/folder to be deleted
+            file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to delete
             if file_or_folder.lower() == 'file':
                 # delete file "path"
                 result = DeleteFile(path)
@@ -893,14 +1021,75 @@ def Delete_File_or_Folder(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+# Method to create file/folder
+def Create_File_or_Folder(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Create File or Folder", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            path = get_home_folder() + str(step_data[0][2]).strip()  # path of the file/folder to be created
+            file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to create
+            if file_or_folder.lower() == 'file':
+                # create file "path"
+                result = CreateFile(path)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
+                    return "passed"
+            elif file_or_folder.lower() == 'folder':
+                # create folder "path"
+                result = CreateFolder(path)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
+                    return "passed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
+                return 'failed'
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            path = raw(str(step_data[0][2]).strip())  # path of the file/folder to be created
+            file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to create
+            if file_or_folder.lower() == 'file':
+                # create file "path"
+                result = CreateFile(path)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
+                    return "passed"
+            elif file_or_folder.lower() == 'folder':
+                # create folder "path"
+                result = CreateFolder(path)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
+                    return "passed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                return 'failed'
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 # Method to find file
 def Find_File(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Find File", 1)
     try:
-        path = get_home_folder() + str(step_data[0][0][0]).strip()
-        file_or_folder = str(step_data[0][1][2]).strip()
+        path = get_home_folder() + str(step_data[0][0]).strip()
+        file_or_folder = str(step_data[1][2]).strip()
         if file_or_folder.lower() == 'file':
             # find file "path"
             result = find(path)
@@ -912,7 +1101,7 @@ def Find_File(step_data):
                 return "passed"
 
         else:
-            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return 'failed'
 
     except Exception:
@@ -928,7 +1117,7 @@ def Empty_Trash(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
             path = get_home_folder() + '/.local/share/Trash'  # location of trash for linux
-            #print path
+            # print path
 
             result = empty_trash(path)
             if result in failed_tag_list:
@@ -960,7 +1149,7 @@ def Get_User_Name(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
             path = get_home_folder()  # get the path of the home directory
-            list_elemnet = path.split("/")  # list the parts of path by spliting it by "/"
+            list_elemnet = path.split("/")  # list the parts of path by splitting it by "/"
             name = list_elemnet[len(list_elemnet) - 1]  # name of the user
             if name in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find user name '%s'" % (name), 3)
@@ -972,7 +1161,66 @@ def Get_User_Name(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
             CommonUtil.ExecLog(sModuleInfo, "Could not find user name as it is windows", 3)
-            return "failed"
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+# Method to add log
+def Add_Log(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Add Log", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            log_info = str(step_data[0][0]).strip() #get the log level info from the step data
+            list = log_info.split(" ") # log level in step data is given as log_1/log_2/log_3 , so to get the level split it by "_"
+            Comment = str(step_data[0][2]).strip()  # get the comment
+            LogLevel = int(list[1]) #get the level
+            CommonUtil.ExecLog(sModuleInfo, "%s" % Comment, LogLevel)
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            log_info = str(step_data[0][0]).strip() #get the log level info from the step data
+            list = log_info.split("_") # log level in step data is given as log_1/log_2/log_3 , so to get the level split it by "_"
+            Comment = str(step_data[0][2]).strip()   # get the comment
+            LogLevel = int(list[1]) #get the level
+            CommonUtil.ExecLog(sModuleInfo, "%s" % Comment, LogLevel)
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+# Method to Calculate
+def Calculate(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Calculate", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            statement = str(step_data[0][2]).strip()  # get the statement for math function
+            # list the parts of statement by splitting it by "="
+            list = statement.split("=")
+            direc = {}
+            # eval() funtion is used to evaluate a string
+            # eval()  does the auto calculation from a string.
+            CommonUtil.ExecLog(sModuleInfo, "Evaluating the string for the statement %s" % statement, 1)
+            #print list
+            direc[list[0]] = eval(list[1])  # save the variable in the directory
+            CommonUtil.ExecLog(sModuleInfo, "current directory %s" % direc, 1)
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            statement = str(step_data[0][2]).strip()  # get the statement for math function
+            # list the parts of statement by splitting it by "="
+            list = statement.split("~")
+            direc = {}
+            # eval() funtion is used to evaluate a string
+            # eval()  does the auto calculation from a string.
+            CommonUtil.ExecLog(sModuleInfo, "Evaluating the string for the statement %s" % statement, 1)
+            direc[list[0]] = eval(list[1])  # save the variable in the directory
+            CommonUtil.ExecLog(sModuleInfo, "current directory %s" % direc, 1)
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -985,7 +1233,7 @@ def Run_Sudo_Command(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            command = str(step_data[0][0][0]).strip()
+            command = str(step_data[0][0]).strip()
             result = run_cmd(command)
             if result in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
@@ -1001,7 +1249,6 @@ def Run_Sudo_Command(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-
 # Method to Run Command
 def Run_Command(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -1010,7 +1257,7 @@ def Run_Command(step_data):
         if _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            command = str(step_data[0][0][0]).strip()
+            command = str(step_data[0][0]).strip()
             result = run_win_cmd(command)
             if result in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
@@ -1032,8 +1279,8 @@ def Get_Home_Directory(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
             path = get_home_folder()
-            #print path
-            CommonUtil.ExecLog(sModuleInfo, "Home Directory Path is '%s'"%(path), 1)
+            # print path
+            CommonUtil.ExecLog(sModuleInfo, "Home Directory Path is '%s'" % (path), 1)
             if path in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find home directory '%s'" % (path), 3)
                 return "failed"
@@ -1044,7 +1291,7 @@ def Get_Home_Directory(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
             CommonUtil.ExecLog(sModuleInfo, "Could not find home directory as it is windows", 3)
-            return "failed"
+            return "passed"
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -1059,7 +1306,7 @@ def Get_Current_Desktop(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
             path = get_home_folder() + "/Desktop"  # concate home folder path with "/Desktop"
-            #print path
+            # print path
             CommonUtil.ExecLog(sModuleInfo, "Desktop Path is '%s'" % (path), 1)
             if path in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find desktop '%s'" % (path), 3)
@@ -1070,8 +1317,9 @@ def Get_Current_Desktop(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            path = os.path.join(os.environ["HOMEPATH"], "Desktop")
-            #print path
+            #path = os.path.join(os.environ["HOMEPATH"], "Desktop")
+            path = get_home_folder() + "\Desktop"
+            # print path
             CommonUtil.ExecLog(sModuleInfo, "Desktop Path is '%s'" % (path), 1)
             if path in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find desktop '%s'" % (path), 3)
@@ -1091,8 +1339,8 @@ def Get_Current_Documents(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            path = get_home_folder() + "/Documents"  # concate home folder path with "/Documents"
-            #print path
+            path = get_home_folder() + "\Documents"  # concate home folder path with "/Documents"
+            # print path
             CommonUtil.ExecLog(sModuleInfo, "Documents Path is '%s'" % (path), 1)
             if path in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find Documents '%s'" % (path), 3)
@@ -1103,8 +1351,9 @@ def Get_Current_Documents(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            path = os.path.join(os.environ["HOMEPATH"], "Documents")
-            #print path
+            #path = os.path.join(os.environ["HOMEPATH"], "Documents")
+            path = get_home_folder()+"/Documents"
+            # print path
             CommonUtil.ExecLog(sModuleInfo, "Documents Path is '%s'" % (path), 1)
             if path in failed_tag_list:
                 CommonUtil.ExecLog(sModuleInfo, "Could not find Documents '%s'" % (path), 3)
@@ -1121,8 +1370,8 @@ def Create_File(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Create File", 1)
     try:
-        path = get_home_folder() + str(step_data[0][0][2]).strip()
-        file_or_folder = str(step_data[0][1][2]).strip()
+        path = get_home_folder() + str(step_data[0][2]).strip()
+        file_or_folder = str(step_data[1][2]).strip()
         if file_or_folder.lower() == 'file':
             # create file "path"
             result = CreateFile(path)
@@ -1134,7 +1383,7 @@ def Create_File(step_data):
                 return "passed"
 
         else:
-            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+            CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             return 'failed'
 
     except Exception:
@@ -1149,9 +1398,9 @@ def Compare_File(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][0][0]).strip()  # location of file path to be compared
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location of file path to be compared
-            file_or_folder = str(step_data[0][1][2]).strip()
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of file path to be compared
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location of file path to be compared
+            file_or_folder = str(step_data[2][2]).strip()
             if file_or_folder.lower() == 'file':
                 # compare file "from_path" and "to_path"
                 result = CompareFile(from_path, to_path)
@@ -1168,13 +1417,13 @@ def Compare_File(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            #print step_data[0][0][0]
-            #print str(step_data[0][0][0])
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of file path to be compared
-            #print  from_path
-            to_path = raw(str(step_data[0][0][2]).strip())  # location of file path to be compared
-            #print to_path
-            file_or_folder = str(step_data[0][1][2]).strip()
+            # print step_data[0][0][0]
+            # print str(step_data[0][0][0])
+            from_path = raw(str(step_data[0][2]).strip())  # location of file path to be compared
+            # print  from_path
+            to_path = raw(str(step_data[1][2]).strip())  # location of file path to be compared
+            # print to_path
+            file_or_folder = str(step_data[2][2]).strip()
             if file_or_folder.lower() == 'file':
                 # compare file "from_path" and "to_path"
                 result = CompareFile(from_path, to_path)
@@ -1186,7 +1435,7 @@ def Compare_File(step_data):
                     return "passed"
 
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
                 return 'failed'
 
     except Exception:
@@ -1201,9 +1450,9 @@ def Rename_File_or_Folder(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][0][0]).strip()  # location of the file/folder to be renamed
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location where to rename the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to rename
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be renamed
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to rename the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to rename
             if file_or_folder.lower() == 'file':
                 # rename file "from_path" to "to_path"
                 result = RenameFile(from_path, to_path)
@@ -1224,14 +1473,14 @@ def Rename_File_or_Folder(step_data):
                                        1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
                 return 'failed'
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of the file/folder to be renamed
-            to_path = raw(str(step_data[0][0][2]).strip())  # location where to rename the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to rename
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be renamed
+            to_path = raw(str(step_data[1][2]).strip())  # location where to rename the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to rename
             if file_or_folder.lower() == 'file':
                 # rename file "from_path" to "to_path"
                 result = RenameFile(from_path, to_path)
@@ -1248,11 +1497,10 @@ def Rename_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo, "Could not rename folder '%s' to '%s'" % (from_path, to_path), 3)
                     return "failed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' renamed to '%s' successfully" % (from_path, to_path),
-                                       1)
+                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' renamed to '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
                 return 'failed'
 
     except Exception:
@@ -1267,16 +1515,16 @@ def Zip_File_or_Folder(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][0][0]).strip()  # location of the file/folder to be zipped
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location where to zip the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to zip
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be zipped
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to zip the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to zip
             if file_or_folder.lower() == 'file':
                 result = ZipFile(from_path, to_path)
                 if result in failed_tag_list:
                     CommonUtil.ExecLog(sModuleInfo, "Can't not zip file '%s' to '%s'" % (from_path, to_path), 3)
                     return "failed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo, "File '%s' renamed to '%s' successfully" % (from_path, to_path), 1)
+                    CommonUtil.ExecLog(sModuleInfo, "File '%s' zipped to '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             elif file_or_folder.lower() == 'folder':
                 result = ZipFolder(from_path, to_path)
@@ -1287,14 +1535,14 @@ def Zip_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo, "Folder '%s' zipped to '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
                 return 'failed'
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of the file/folder to be zipped
-            to_path = raw(str(step_data[0][0][2]).strip())  # location where to zip the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to zip
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be zipped
+            to_path = raw(str(step_data[1][2]).strip())  # location where to zip the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to zip
             if file_or_folder.lower() == 'file':
                 result = ZipFile_for_windows(from_path, to_path)
                 if result in failed_tag_list:
@@ -1312,7 +1560,7 @@ def Zip_File_or_Folder(step_data):
                     CommonUtil.ExecLog(sModuleInfo, "Folder '%s' zipped to '%s' successfully" % (from_path, to_path), 1)
                     return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
                 return 'failed'
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -1327,8 +1575,8 @@ def Unzip_File_or_Folder(step_data):
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
             from_path = get_home_folder() + str(
-                step_data[0][0][0]).strip()  # location of the file/folder to be unzipped
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location where to unzip the file/folder
+                step_data[0][2]).strip()  # location of the file/folder to be unzipped
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to unzip the file/folder
 
             result = UnZip(from_path, to_path)
             if result in failed_tag_list:
@@ -1343,8 +1591,8 @@ def Unzip_File_or_Folder(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of the file/folder to be unzipped
-            to_path = raw(str(step_data[0][0][2]).strip())  # location where to unzip the file/folder
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be unzipped
+            to_path = raw(str(step_data[1][2]).strip())  # location where to unzip the file/folder
 
             result = UnZip(from_path, to_path)
             if result in failed_tag_list:
@@ -1369,9 +1617,9 @@ def Move_File_or_Folder(step_data):
         if _platform == "linux" or _platform == "linux2":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][0][0]).strip()  # location of the file/folder to be moved
-            to_path = get_home_folder() + str(step_data[0][0][2]).strip()  # location where to move the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to move
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be moved
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to move the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to move
             if file_or_folder.lower() == 'file':
                 # move file "from_path to "to_path"
                 result = MoveFile(from_path, to_path)
@@ -1396,9 +1644,9 @@ def Move_File_or_Folder(step_data):
         elif _platform == "win32":
             # linux
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
-            from_path = raw(str(step_data[0][0][0]).strip())  # location of the file/folder to be moved
-            to_path = raw(str(step_data[0][0][2]).strip())  # location where to move the file/folder
-            file_or_folder = str(step_data[0][1][2]).strip()  # get if it is file/folder to move
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be moved
+            to_path = raw(str(step_data[1][2]).strip())  # location where to move the file/folder
+            file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to move
             if file_or_folder.lower() == 'file':
                 # move file "from_path" to "to_path"
                 result = MoveFile(from_path, to_path)
@@ -1424,16 +1672,187 @@ def Move_File_or_Folder(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
+def TimeStamp(format):
+    """
+    :param format: name of format ex: string , integer
+    :return:
+    ========= Instruction: ============
+    Function Description:
+    This function is used to create a Time Stamp.
+    It will return current Day-Month-Date-Hour:Minute:Second-Year all in one string
+    OR
+    It will return current YearMonthDayHourMinuteSecond all in a integer.
+    Parameter Description:
+    - string: this returns a readable string for the current date and time format
+        Example:
+        TimeStamp = TimeStamp("string") = Fri-Jan-20-10:20:31-2012
+    - integer: this returns a readable string for the current date and time format
+        Example:
+        TimeStamp = TimeStamp("integer") = 2012120102051
+    ======= End of Instruction: =========
+    """
+    if format == "string":
+        TimeStamp = datetime.datetime.now().ctime().replace(' ', '-').replace('--', '-')
+    elif format == "integer":
+        TimeStamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+
+    elif format == "utc":
+        TimeStamp = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
+    elif format == "utcstring":
+        TimeStamp = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+    else:
+        TimeStamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')
+
+    return TimeStamp
+
+# Copy/paste file to zeuz log uploader
+def Upload(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Copy/paste file to zeuz log uploader", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be copied\
+            temp_ini_file = get_home_folder() + "/Desktop/AutomationLog/temp_config.ini"
+            list = from_path.split("/")
+            to_path = ConfigModule.get_config_value('sectionOne', 'test_case_folder', temp_ini_file) +"/"+ list[len(list) - 1]  # location where to copy the file/folder
+
+            result = copy_file(from_path, to_path)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo,
+                                   "Could not copy file '%s' to the log uploader '%s'" % (from_path, to_path), 3)
+                return "failed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo,
+                                   "File '%s' copied to the log uploader '%s' successfully" % (from_path, to_path), 1)
+                return "passed"
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            from_path = raw(str(step_data[0][0]).strip())  # location of the file/folder to be copied
+            temp_ini_file = get_home_folder() + raw("\Desktop\AutomationLog\temp_config.ini")
+            list = from_path.split("\\")
+            to_path = ConfigModule.get_config_value('sectionOne', 'test_case_folder', temp_ini_file) + "\\" + list[len(list) - 1]
+
+            result = copy_file(from_path, to_path)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo,
+                                   "Could not copy file '%s' to the log uploader '%s'" % (from_path, to_path), 3)
+                return "failed"
+            else:
+                CommonUtil.ExecLog(sModuleInfo,
+                                   "File '%s' copied to the log uploader '%s' successfully" % (from_path, to_path), 1)
+                return "passed"
+
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+
+
+temp_config = os.path.join(os.path.join(get_home_folder(), os.path.join('Desktop', os.path.join('AutomationLog',ConfigModule.get_config_value('Temp', '_file')))))
+
+
+def TakeScreenShot(step_data):
+    """
+    Takes screenshot and saves it as jpg file
+    name is the name of the file to be saved appended with timestamp
+    #TakeScreenShot("TestStepName")
+    """
+    # file Name don't contain \/?*"<>|
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Take Screen Shot", 1)
+
+    try:
+        ImageName = 'image'
+        image_folder = get_home_folder()
+        # ImageFolder = Global.TCLogFolder + os.sep + "Screenshots"
+        ImageFolder = image_folder  # location of the folder where the screen shot should be saved
+        if os.name == 'posix':
+            """
+            ImageFolder = FileUtil.ConvertWinPathToMac(ImageFolder)
+            path = ImageFolder + os.sep + TimeStamp("utc") + "_" + ImageName + ".png"
+
+            newpath = ImageFolder + os.sep + TimeStamp("utc") + "_" + ImageName + ".jpg"
+            path = path.replace(" ", "_")
+            newpath = newpath.replace(" ", "_")
+            os.system("screencapture \"" + path + "\"")
+            #reduce size of image
+            os.system("sips -s format jpeg -s formatOptions 30 " + path + " -o " + newpath)
+            os.system("rm " + path)
+            """
+
+            # linux working copy
+
+            full_location = ImageFolder + os.sep + TimeStamp("utc") + "_" + ImageName + '.png'  # location of the file where the screen shot should be saved
+            CommonUtil.ExecLog(sModuleInfo, "file location is %s" % full_location, 1)
+            # os.system("import -window root %s"%full_location)
+
+            try:
+                from gi.repository import Gdk
+
+            except ImportError:
+                CommonUtil.ExecLog(sModuleInfo,'could not import python package needed for screenshot...installing package "gi"', 1)
+                os.system('pip install gi')
+
+            # set the root window as the window we want for screenshot
+            window = Gdk.get_default_root_window()
+            # get dimensions of the window
+            x, y, width, height = window.get_geometry()
+
+            # print 'taking screenshot...'
+            CommonUtil.ExecLog(sModuleInfo, 'taking screenshot...', 1)
+            # take screenshot
+            img = Gdk.pixbuf_get_from_window(window, x, y, width, height)
+
+            if img:
+                from PIL import Image
+                img.savev(full_location, "png", (), ())
+                file1 = full_location
+                file2 = full_location
+                size = 800, 450
+
+                im = Image.open(file1)
+                im.thumbnail(size, Image.ANTIALIAS)
+                im.save(file2, "JPEG")
+                CommonUtil.ExecLog(sModuleInfo, 'screenshot saved as: "%s"' % full_location, 1)
+                # print 'screenshot saved as: "%s"' % full_location
+            else:
+                # print "unable to take screenshot..."
+                CommonUtil.ExecLog(sModuleInfo, "unable to take screenshot...", 1)
+
+
+
+        elif os.name == 'nt':
+            # windows working copy
+            from PIL import ImageGrab
+            from PIL import Image
+            path = ImageFolder + os.sep + TimeStamp("utc") + "_" + ImageName + ".jpg"  # location of the file where the screen shot should be saved
+            img = ImageGrab.grab()
+            basewidth = 1200
+            wpercent = (basewidth / float(img.size[0]))
+            hsize = int((float(img.size[1]) * float(wpercent)))
+            img = img.resize((basewidth, hsize), Image.ANTIALIAS)
+            img.save(path, 'JPEG')
+            CommonUtil.ExecLog(sModuleInfo, 'screenshot saved as: "%s"' % path, 1)
+
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
 # Method to sleep for a particular duration
 def Sleep(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Sleep", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
-            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+        if ((len(step_data) != 1)):
+            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
-            tuple = step_data[0][0]
+            tuple = step_data[0]
             seconds = int(tuple[2])
             CommonUtil.ExecLog(sModuleInfo, "Sleeping for %s seconds" % seconds, 1)
             time.sleep(seconds)
@@ -1443,14 +1862,192 @@ def Sleep(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
+# Method to save text
+def Save_Text(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Save Text", 1)
+    try:
+        result = Shared_Resources.Set_Shared_Variables(step_data[1][2],
+                                                       int(step_data[0][2]))  # setting the shared variables
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Value of Variable '%s' could not be saved!!!", 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Showing saved variables", 1)
+            Shared_Resources.Show_All_Shared_Variables()
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+# Method to download file
+def Download_file(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Download File", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            url =  str(step_data[0][2]).strip()  # url to be downloaded
+            file_location =  str(step_data[1][2]).strip()  # location where to download the file/folder
+            if file_location == "":
+                #if no location is given
+                file_location = get_home_folder()+"/Downloads/" # download to the Downloads folder
+                result = download_file_using_url(url,file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is done" % (url, file_location), 1)
+                    return "passed"
+            else:
+                # if location to download is given
+                file_location = get_home_folder() + file_location +"/"
+                result = download_file_using_url(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is done" % (url, file_location), 1)
+                    return "passed"
+
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            url = str(step_data[0][2]).strip()  # url to be downloaded
+            file_location = str(step_data[1][2]).strip()  # location where to download the file/folder
+            # if no location is given
+            if file_location == "":
+                file_location = raw(get_home_folder() + "\Downloads"+"\\") # download to the Downloads folder
+                result = download_file_using_url(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is done" % (url, file_location), 1)
+                    return "passed"
+            else:
+                # if location to download is given
+                file_location = raw(get_home_folder() + file_location+ '\\')
+                result = download_file_using_url(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,
+                                       "Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,
+                                       "Download from url '%s' to location '%s' is done" % (url, file_location), 1)
+                    return "passed"
+
+                # return result
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+# Method to download file and unzip
+def Download_File_and_Unzip(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Download File and Unzip", 1)
+    try:
+        if _platform == "linux" or _platform == "linux2":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+            url =  str(step_data[0][2]).strip()  # url to be downloaded
+            file_location =  str(step_data[1][2]).strip()  # location where to download the file/folder
+            if file_location == "":
+                #if no location is given
+                file_location = get_home_folder()+"/Downloads/" # download to the Downloads folder
+                result = download_and_unzip_file(url,file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Downloading from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is done" % (url, file_location), 1)
+                    return "passed"
+            else:
+                # if location to download is given
+                file_location = get_home_folder() + file_location +"/"
+                result = download_and_unzip_file(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is done" % (url, file_location), 1)
+                    return "passed"
+
+        elif _platform == "win32":
+            # linux
+            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
+            url = str(step_data[0][2]).strip()  # url to be downloaded
+            file_location = str(step_data[1][2]).strip()  # location where to download the file/folder
+            # if no location is given
+            if file_location == "":
+                file_location = raw(get_home_folder() + "\Downloads"+"\\") # download to the Downloads folder
+                result = download_and_unzip_file(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is done" % (url, file_location), 1)
+                    return "passed"
+            else:
+                # if location to download is given
+                file_location = raw(get_home_folder() + file_location+ '\\')
+                result = download_and_unzip_file(url, file_location)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo,
+                                       "Download from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
+                    return "failed"
+                else:
+                    CommonUtil.ExecLog(sModuleInfo,
+                                       "Download from url '%s' to location '%s' and unzipping is done" % (url, file_location), 1)
+                    return "passed"
+
+                # return result
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+#Method to return pass or fail for the step outcome
+def Step_Result(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
+    try:
+        if ((1 < len(step_data) >= 5)):
+            CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
+            result = "failed"
+        else:
+            step_result = step_data[0][2]
+            if step_result == 'pass':
+                result = "passed"
+            elif step_result == 'skip':
+                result = 'skipped'
+            elif step_result == 'fail':
+                result = "failed"
+
+        return result
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
 # Handles actions for the sequential logic, based on the input from the mentioned function
 def Action_Handler(action_step_data, action_name):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Action_Handler", 1)
     try:
+        print action_name
         if action_name == "skip":
             # skip the sanitization
             return "passed"
+        elif action_name == "math":
+            result = Calculate(action_step_data)  # math function
+            if result == "failed":
+                return "failed"
+        elif action_name == "upload":
+            result = Upload(action_step_data)  # copy/paste file to zeuz log uploader
+            if result == "failed":
+                return "failed"
+        elif action_name == "save text":
+            result = Save_Text(action_step_data)  # save text
+            if result == "failed":
+                return "failed"
         elif action_name == "copy":
             result = Copy_File_or_Folder(action_step_data)  # copy file/folder
             if result == "failed":
@@ -1460,7 +2057,7 @@ def Action_Handler(action_step_data, action_name):
             if result == "failed":
                 return "failed"
         elif action_name == "create":
-            result = Create_File(action_step_data)  # create file
+            result = Create_File_or_Folder(action_step_data)  # create file
             if result == "failed":
                 return "failed"
         elif action_name == "find":
@@ -1515,13 +2112,38 @@ def Action_Handler(action_step_data, action_name):
             result = Run_Command(action_step_data)  # run admin command
             if result == "failed":
                 return "failed"
+        elif action_name == "log 1" or action_name == 'log 2' or action_name == 'log 3':
+            result = Add_Log(action_step_data)  # add logging
+            if result == "failed":
+                return "failed"
+        elif action_name == "take screen shot":
+            result = TakeScreenShot(action_step_data)  # take screen shot
+            if result == "failed":
+                return "failed"
+        elif action_name == "download":
+            result = Download_file(action_step_data)  # download file
+            if result == "failed":
+                return "failed"
+        elif action_name == "download and unzip":
+            result = Download_File_and_Unzip(action_step_data)  # download file
+            if result == "failed":
+                return "failed"
         elif action_name == "sleep":
             result = Sleep(action_step_data)
             if result == "failed":
                 return "failed"
+        elif action_name == "step result":
+            result = Step_Result(action_step_data)
+            if result in failed_tag_list: # Convert user specified pass/fail into standard result
+                return 'failed'
+            elif result in passed_tag_list:
+                return 'passed'
+            elif result in skipped_tag_list:
+                return 'skipped'
+
 
         else:
-            CommonUtil.ExecLog(sModuleInfo,"The action you entered is incorrect. Please provide accurate information on the data set(s).",3)
+            CommonUtil.ExecLog(sModuleInfo, "The action you entered is incorrect. Please provide accurate information on the data set(s).",3)
             return "failed"
 
     except Exception:
@@ -1534,7 +2156,7 @@ def Get_Path_Step_Data(step_data):
     CommonUtil.ExecLog(sModuleInfo, "Function: Get_Element_Step_Data", 1)
     try:
         element_step_data = []
-        for each in step_data[0]:
+        for each in step_data:
             # if each[1]=="":
             #             if (each[1]!="action" or each[1]!="logic"):
             #                 element_step_data.append(each)
@@ -1566,7 +2188,8 @@ def Validate_Path_Step_Data(step_data):
     except Exception:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
+        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
+            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
         CommonUtil.ExecLog(sModuleInfo, "Could not find the new page element requested.  Error: %s" % (Error_Detail), 3)
         return "failed"
 
@@ -1587,24 +2210,27 @@ def Sequential_Actions(step_data):
             for row in each:
                 # finding what to do for each dataset
                 # if len(row)==5 and row[1] != "":     ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement
-                if ((row[
-                         1] == "path")):  ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement
+                if (row[1] == "path" or row[1] == "value" or row[
+                    1] == "element parameter"):  ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement
                     continue
 
                 elif row[1] == "action":
                     # finding the action to be performed
                     CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row", 1)
                     # handle the action
-                    result = Action_Handler([each], row[0])
+                    new_data_set = Shared_Resources.Handle_Step_Data_Variables([each])
+                    if new_data_set in failed_tag_list:
+                        return 'failed'
+                    result = Action_Handler(new_data_set[0], row[0])
                     if result == [] or result == "failed":
                         return "failed"
                 elif row[1] == "conditional action":
-                    CommonUtil.ExecLog(sModuleInfo,"Checking the logical conditional action to be performed in the conditional action row",1)
+                    CommonUtil.ExecLog(sModuleInfo,"Checking the logical conditional action to be performed in the conditional action row", 1)
                     logic_decision = ""
                     logic_row.append(row)
                     if len(logic_row) == 2:
                         # element_step_data = each[0:len(step_data[0])-2:1]
-                        path_step_data = Get_Path_Step_Data([each])
+                        path_step_data = Get_Path_Step_Data(each)
                         returned_step_data_list = Validate_Path_Step_Data(path_step_data)
                         if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
                             return "failed"
@@ -1625,7 +2251,7 @@ def Sequential_Actions(step_data):
                     # handle the conditional action
                     for conditional_steps in logic_row:
                         if logic_decision in conditional_steps:
-                            #print conditional_steps[2]
+                            # print conditional_steps[2]
                             list_of_steps = conditional_steps[2].split(",")
                             for each_item in list_of_steps:
                                 data_set_index = int(each_item) - 1
@@ -1644,7 +2270,5 @@ def Sequential_Actions(step_data):
 
 
 '===================== ===x=== Sequential Action Section Ends ===x=== ======================'
-
-
 
 

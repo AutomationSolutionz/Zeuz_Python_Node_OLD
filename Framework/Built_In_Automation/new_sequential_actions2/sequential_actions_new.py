@@ -3,6 +3,14 @@
     Function: Handles incoming step data and distributes it to the specified functions
 '''
 
+### TODO ###
+'''
+-Create a list of accepted Fields for element parameter, or all accepted fields for action_support, then verify before doing anything
+--After that, can move the if action_support, and the ELSE statement out of sequential_actions(), so the verification of data is done in one place
+-Conditional action sections for rest and appium need to be merged somehow
+'''
+### TODO ###
+
 import inspect, sys
 from Framework.Utilities import CommonUtil
 import common_functions as common # Functions that are common to all modules
@@ -10,8 +18,8 @@ from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionShared
 
 
 # Dictionary of supported actions and their respective modules
-actions = { # Numbers are arbitrary, and are not used anywhere. Name and module must be lower case.
-    200: {'module': 'appium', 'name': 'step result', 'function': 'step_result'},
+# Rules: Action NAME must be lower case, no underscores, single spaces, no trailing whitespace. Module names must match those used in load_sa_modules()
+actions = { # Numbers are arbitrary, and are not used anywhere
     100: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     101: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
     102: {'module': 'appium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
@@ -33,6 +41,67 @@ actions = { # Numbers are arbitrary, and are not used anywhere. Name and module 
     118: {'module': 'appium', 'name': 'teardown', 'function': 'teardown_appium'},
     119: {'module': 'appium', 'name': 'keypress', 'function': 'Keystroke_Appium'},
     120: {'module': 'appium', 'name': 'tap location', 'function': 'tap_location'},
+    200: {'module': 'appium', 'name': 'reset', 'function': 'reset_application'},
+    121: {'module': 'rest', 'name': 'save response', 'function': 'Get_Response'},
+    122: {'module': 'rest', 'name': 'compare variable', 'function': 'Compare_Variables'},
+    123: {'module': 'rest', 'name': 'compare list', 'function': 'Compare_Lists'},
+    124: {'module': 'rest', 'name': 'sleep', 'function': 'Sleep'},
+    125: {'module': 'rest', 'name': 'initialize list', 'function': 'Initialize_List'},
+    126: {'module': 'rest', 'name': 'step result', 'function': 'Step_Result'},
+    127: {'module': 'rest', 'name': 'insert into list', 'function': 'Insert_Into_List'},
+    128: {'module': 'selenium', 'name': 'click', 'function': 'Click_Element'},
+    129: {'module': 'selenium', 'name': 'click and hold', 'function': 'Click_and_Hold_Element'},
+    130: {'module': 'selenium', 'name': 'context click', 'function': 'Context_Click_Element'},
+    131: {'module': 'selenium', 'name': 'double click', 'function': 'Double_Click_Element'},
+    132: {'module': 'selenium', 'name': 'move to element', 'function': 'Move_To_Element'},
+    133: {'module': 'selenium', 'name': 'hover', 'function': 'Hover_Over_Element'},
+    134: {'module': 'selenium', 'name': 'keystroke keys', 'function': 'Keystroke_For_Element'},
+    135: {'module': 'selenium', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
+    136: {'module': 'selenium', 'name': 'text', 'function': 'Enter_Text_In_Text_Box'},
+    137: {'module': 'selenium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
+    138: {'module': 'selenium', 'name': 'sleep', 'function': 'Sleep'},
+    139: {'module': 'selenium', 'name': 'initialize list', 'function': 'Initialize_List'},
+    140: {'module': 'selenium', 'name': 'validate full text', 'function': 'Validate_Text'},
+    141: {'module': 'selenium', 'name': 'validate partial text', 'function': 'Validate_Text'},
+    142: {'module': 'selenium', 'name': 'save text', 'function': 'Save_Text'},
+    143: {'module': 'selenium', 'name': 'compare variable', 'function': 'Compare_Variables'},
+    144: {'module': 'selenium', 'name': 'compare list', 'function': 'Compare_Lists'},
+    145: {'module': 'selenium', 'name': 'insert into list', 'function': 'Insert_Into_List'},
+    146: {'module': 'selenium', 'name': 'scroll', 'function': 'Scroll'},
+    147: {'module': 'selenium', 'name': 'step result', 'function': 'Step_Result'},
+    148: {'module': 'selenium', 'name': 'deselect all', 'function': 'Select_Deselect'},
+    149: {'module': 'selenium', 'name': 'select by visible text', 'function': 'Select_Deselect'},
+    150: {'module': 'selenium', 'name': 'deselect by visible text', 'function': 'Select_Deselect'},
+    151: {'module': 'selenium', 'name': 'select by value', 'function': 'Select_Deselect'},
+    152: {'module': 'selenium', 'name': 'deselect by value', 'function': 'Select_Deselect'},
+    153: {'module': 'selenium', 'name': 'select by index', 'function': 'Select_Deselect'},
+    154: {'module': 'selenium', 'name': 'deselect by index', 'function': 'Select_Deselect'},
+    155: {'module': 'utility', 'name': 'math', 'function': 'Calculate'},
+    156: {'module': 'utility', 'name': 'upload', 'function': 'Upload'},
+    157: {'module': 'utility', 'name': 'save text', 'function': 'Save_Text'},
+    158: {'module': 'utility', 'name': 'copy', 'function': 'Copy_File_or_Folder'},
+    159: {'module': 'utility', 'name': 'delete', 'function': 'Delete_File_or_Folder'},
+    160: {'module': 'utility', 'name': 'create', 'function': 'Create_File_or_Folder'},
+    161: {'module': 'utility', 'name': 'find', 'function': 'Find_File'},
+    162: {'module': 'utility', 'name': 'rename', 'function': 'Rename_File_or_Folder'},
+    163: {'module': 'utility', 'name': 'move', 'function': 'Move_File_or_Folder'},
+    164: {'module': 'utility', 'name': 'zip', 'function': 'Zip_File_or_Folder'},
+    165: {'module': 'utility', 'name': 'unzip', 'function': 'Unzip_File_or_Folder'},
+    166: {'module': 'utility', 'name': 'compare', 'function': 'Compare_File'},
+    167: {'module': 'utility', 'name': 'empty', 'function': 'Empty_Trash'},
+    168: {'module': 'utility', 'name': 'user name', 'function': 'Get_User_Name'},
+    169: {'module': 'utility', 'name': 'current documents', 'function': 'Get_Current_Documents'},
+    170: {'module': 'utility', 'name': 'current desktop', 'function': 'Get_Current_Desktop'},
+    171: {'module': 'utility', 'name': 'home directory', 'function': 'Get_Home_Directory'},
+    172: {'module': 'utility', 'name': 'run sudo', 'function': 'Run_Sudo_Command'},
+    173: {'module': 'utility', 'name': 'run command', 'function': 'Run_Command'},
+    174: {'module': 'utility', 'name': 'download', 'function': 'Download_file'},
+    175: {'module': 'utility', 'name': 'sleep', 'function': 'Sleep'},
+    176: {'module': 'utility', 'name': 'step result', 'function': 'Step_Result'},
+    177: {'module': 'utility', 'name': 'log 2', 'function': 'Add_Log'},
+    178: {'module': 'utility', 'name': 'log 3', 'function': 'Add_Log'},
+    179: {'module': 'utility', 'name': 'log 1', 'function': 'Add_Log'},
+    180: {'module': 'utility', 'name': 'download and unzip', 'function': 'Download_File_and_Unzip'}
 }
 
 # List of support for the actions
@@ -42,10 +111,18 @@ action_support = [
     'relation type',
     'element parameter 1 of 2',
     'element parameter 2 of 2',
+    'method',
+    'url',
+    'body',
+    'header',
+    'headers',
+    'compare',
+    'path',
+    'value'
 ]
 
 # Recall dependency, if not already set
-dependency = 'Android' #{'Mobile OS':'Android'} #!!! Will be updated by sequential_actions_appium() in the future
+dependency = {'Mobile':'Android'} # !!! TEMP - Set to None for production
 if sr.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = sr.Get_Shared_Variables('dependency') # Retreive appium driver
 
@@ -65,23 +142,35 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
     elif module == 'rest':
         global rest
         from Framework.Built_In_Automation.Web.REST import BuiltInFunctions as rest
+    elif module == 'utility':
+        global utility
+        from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as utility
     else:
         CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
         return 'failed'
     return 'passed'
 
 
-def Sequential_Actions(step_data, dependency = '', file_attachment = ''):
+def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = '', _temp_q = ''):
     ''' Main Sequential Actions function - Performs logical decisions based on user input '''
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Starting Sequential Actions", 1)
     
+    # Set dependency, file_attachemnt as global variables
+    global dependency, file_attachment
+    if _dependency != {}:
+        dependency = _dependency
+        sr.Set_Shared_Variables('dependency', _dependency)
+    if _file_attachment != '':
+        file_attachment = _file_attachment
+        sr.Set_Shared_Variables('file_attachment', _file_attachment)
+    
     # Prepare step data for processing
     if common.verify_step_data(step_data) in common.failed_tag_list: # Verify step data is in correct format
         CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
         return "failed"
-    step_data = common.sanitize(step_data) # Sanitize Field and Sub-Field
+    step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
     
     try:            
         for data_set in step_data: # For each data set within step data
@@ -131,15 +220,16 @@ def Sequential_Actions(step_data, dependency = '', file_attachment = ''):
 
  
 
-def Conditional_Action_Handler(step_data, each, row, logic_row):
+def Conditional_Action_Handler(step_data, data_set, row, logic_row):
     ''' Process conditional actions, called only by Sequential_Actions() '''
      
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
 
-    module = row[1].split(' ')[0]    
-    if module:
+    module = row[1].split(' ')[0]
+    load_sa_modules(module)
+    if module == 'appium':
         Get_Element_Step_Data_Appium = getattr(eval(module), 'Get_Element_Step_Data_Appium')
-        element_step_data = Get_Element_Step_Data_Appium([each]) # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
+        element_step_data = Get_Element_Step_Data_Appium([data_set]) # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
         Validate_Step_Data = getattr(eval(module), 'Validate_Step_Data')
         returned_step_data_list = Validate_Step_Data(element_step_data) # Make sure the element step data we got back from above is good
         if ((returned_step_data_list == []) or (returned_step_data_list == "failed")): # Element step data is bad, so fail
@@ -167,8 +257,144 @@ def Conditional_Action_Handler(step_data, each, row, logic_row):
                     for each_item in list_of_steps: # For each data set number we need to process before finishing
                         CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
                         data_set_index = int(each_item) - 1 # data set number, -1 to offset for data set numbering system
-                        result = Sequential_Actions([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+                        
+                        if step_data[data_set_index] == data_set: # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
+                            result = Sequential_Actions(step_data) # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                        else: # Normal process - most conditional actions will come here
+                            result = Sequential_Actions([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
                     return result # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
+    elif module == 'rest':
+        Get_Element_Step_Data = getattr(eval(module), 'Get_Element_Step_Data')
+        element_step_data = Get_Element_Step_Data(
+            [data_set])  # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
+        Validate_Step_Data = getattr(eval(module), 'Validate_Step_Data')
+        returned_step_data_list = Validate_Step_Data(
+            element_step_data[0])  # Make sure the element step data we got back from above is good
+        if ((returned_step_data_list == []) or (
+            returned_step_data_list == "failed")):  # Element step data is bad, so fail
+            CommonUtil.ExecLog(sModuleInfo, "Element data is bad: %s" % str(element_step_data), 3)
+            return "failed"
+        else:  # Element step data is good, so continue
+            # Check if element from data set exists on device
+            try:
+                Get_Response = getattr(eval(module), 'Get_Response')
+                Element = Get_Response(element_step_data[0])
+                if Element == 'failed':  # Element doesn't exist, proceed with the step data following the fail/false path
+                    logic_decision = "false"
+                else:  # Any other return means we found the element, proceed with the step data following the pass/true pass
+                    logic_decision = "true"
+            except Exception:  # Element doesn't exist, proceed with the step data following the fail/false path
+                CommonUtil.ExecLog(sModuleInfo, "Could not find element in the by the criteria...", 3)
+                logic_decision = "false"
+                return CommonUtil.Exception_Handler(sys.exc_info())
+
+            # Process the path as defined above (pass/fail)
+            for conditional_steps in logic_row:  # For each conditional action from the data set
+                CommonUtil.ExecLog(sModuleInfo, "Processing conditional action: %s" % str(conditional_steps), 1)
+                if logic_decision in conditional_steps:  # If we have a result from the element check above (true/false)
+                    list_of_steps = conditional_steps[2].split(
+                        ",")  # Get the data set numbers for this conditional action and put them in a list
+                    for each_item in list_of_steps:  # For each data set number we need to process before finishing
+                        CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
+                        data_set_index = int(
+                            each_item) - 1  # data set number, -1 to offset for data set numbering system
+
+                        if step_data[
+                            data_set_index] == data_set:  # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
+                            result = Sequential_Actions(
+                                step_data)  # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                        else:  # Normal process - most conditional actions will come here
+                            result = Sequential_Actions([step_data[
+                                                             data_set_index]])  # Recursively call this function until all called data sets are complete
+                    return result  # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
+    elif module == 'selenium':
+        Get_Element_Step_Data = getattr(eval(module), 'Get_Element_Step_Data')
+        element_step_data = Get_Element_Step_Data(
+            data_set)  # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
+        Validate_Step_Data = getattr(eval(module), 'Validate_Step_Data')
+        returned_step_data_list = Validate_Step_Data(
+            [element_step_data[0]])  # Make sure the element step data we got back from above is good
+        if ((returned_step_data_list == []) or (
+            returned_step_data_list == "failed")):  # Element step data is bad, so fail
+            CommonUtil.ExecLog(sModuleInfo, "Element data is bad: %s" % str(element_step_data), 3)
+            return "failed"
+        else:  # Element step data is good, so continue
+            # Check if element from data set exists on device
+            try:
+                Get_Element = getattr(eval(module), 'Get_Element')
+                Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
+                if Element == 'failed':  # Element doesn't exist, proceed with the step data following the fail/false path
+                    logic_decision = "false"
+                else:  # Any other return means we found the element, proceed with the step data following the pass/true pass
+                    logic_decision = "true"
+            except Exception:  # Element doesn't exist, proceed with the step data following the fail/false path
+                CommonUtil.ExecLog(sModuleInfo, "Could not find element in the by the criteria...", 3)
+                logic_decision = "false"
+                return CommonUtil.Exception_Handler(sys.exc_info())
+
+            # Process the path as defined above (pass/fail)
+            for conditional_steps in logic_row:  # For each conditional action from the data set
+                CommonUtil.ExecLog(sModuleInfo, "Processing conditional action: %s" % str(conditional_steps), 1)
+                if logic_decision in conditional_steps:  # If we have a result from the element check above (true/false)
+                    list_of_steps = conditional_steps[2].split(
+                        ",")  # Get the data set numbers for this conditional action and put them in a list
+                    for each_item in list_of_steps:  # For each data set number we need to process before finishing
+                        CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
+                        data_set_index = int(
+                            each_item) - 1  # data set number, -1 to offset for data set numbering system
+
+                        if step_data[
+                            data_set_index] == data_set:  # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
+                            result = Sequential_Actions(
+                                step_data)  # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                        else:  # Normal process - most conditional actions will come here
+                            result = Sequential_Actions([step_data[
+                                                             data_set_index]])  # Recursively call this function until all called data sets are complete
+                    return result  # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
+    elif module == 'utility':
+        Get_Path_Step_Data = getattr(eval(module), 'Get_Path_Step_Data')
+        element_step_data = Get_Path_Step_Data(
+            data_set)  # Pass data set as a list, and get back anything that's not an "action" or "conditional action"
+        Validate_Path_Step_Data = getattr(eval(module), 'Validate_Path_Step_Data')
+        returned_step_data_list = Validate_Path_Step_Data(
+            [element_step_data[0]])  # Make sure the element step data we got back from above is good
+        if ((returned_step_data_list == []) or (
+            returned_step_data_list == "failed")):  # Element step data is bad, so fail
+            CommonUtil.ExecLog(sModuleInfo, "Element data is bad: %s" % str(element_step_data), 3)
+            return "failed"
+        else:  # Element step data is good, so continue
+            # Check if element from data set exists on device
+            try:
+                find = getattr(eval(module), 'find')
+                Element = find(returned_step_data_list[0])
+                if Element == False:
+                    logic_decision = "false"
+                else:
+                    logic_decision = "true"
+            except Exception:  # Element doesn't exist, proceed with the step data following the fail/false path
+                CommonUtil.ExecLog(sModuleInfo, "Could not find element in the by the criteria...", 3)
+                logic_decision = "false"
+                return CommonUtil.Exception_Handler(sys.exc_info())
+
+            # Process the path as defined above (pass/fail)
+            for conditional_steps in logic_row:  # For each conditional action from the data set
+                CommonUtil.ExecLog(sModuleInfo, "Processing conditional action: %s" % str(conditional_steps), 1)
+                if logic_decision in conditional_steps:  # If we have a result from the element check above (true/false)
+                    list_of_steps = conditional_steps[2].split(
+                        ",")  # Get the data set numbers for this conditional action and put them in a list
+                    for each_item in list_of_steps:  # For each data set number we need to process before finishing
+                        CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
+                        data_set_index = int(
+                            each_item) - 1  # data set number, -1 to offset for data set numbering system
+
+                        if step_data[
+                            data_set_index] == data_set:  # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
+                            result = Sequential_Actions(
+                                step_data)  # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                        else:  # Normal process - most conditional actions will come here
+                            result = Sequential_Actions([step_data[
+                                                             data_set_index]])  # Recursively call this function until all called data sets are complete
+                    return result  # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
     else:
         CommonUtil.ExecLog(sModuleInfo, "The conditional action you entered is incorrect. Please provide accurate information on the data set(s).", 3)
         return "failed"
@@ -187,15 +413,18 @@ def Action_Handler(_data_set, action_row):
     action_subfield = action_row[1]
     action_value = action_row[2]
 
-    # Get module and function for this action    
-    module, function = get_module_and_function(action_name, action_subfield) # New, get the module to execute
-    CommonUtil.ExecLog(sModuleInfo, "Function identified as function: %s in module: %s" % (function, module), 1)
-
-    if module in common.failed_tag_list or module == '' or function == '': # New, make sure we have a function
-        CommonUtil.ExecLog(sModuleInfo, "The action you entered is incorrect. Please provide accurate information on the data set(s).", 3)
-        if function == '': # A little more information for the user
-            CommonUtil.ExecLog(sModuleInfo, "You probably didn't add the module as part of the action. Eg: appium action", 2)
-        return "failed"
+    # Get module and function for this action
+    module = ''
+    function = ''
+    if action_name != 'step result': # Step result is handle here becaue it's common to all functions - we use this line because we don't want to process it as a module
+        module, function = get_module_and_function(action_name, action_subfield) # New, get the module to execute
+        CommonUtil.ExecLog(sModuleInfo, "Function identified as function: %s in module: %s" % (function, module), 1)
+    
+        if module in common.failed_tag_list or module == '' or function == '': # New, make sure we have a function
+            CommonUtil.ExecLog(sModuleInfo, "The action you entered is incorrect. Please provide accurate information on the data set(s).", 3)
+            if function == '': # A little more information for the user
+                CommonUtil.ExecLog(sModuleInfo, "You probably didn't add the module as part of the action. Eg: appium action", 2)
+            return "failed"
 
     # Strip the "optional" keyword, and module, so functions work properly (result of optional action is handled by sequential_actions)
     data_set = []
@@ -216,6 +445,8 @@ def Action_Handler(_data_set, action_row):
         if action_name == "step result": # Result from step data the user wants to specify (passed/failed)
             if action_value in common.failed_tag_list: # Convert user specified pass/fail into standard result
                 return 'failed'
+            elif action_value in common.skipped_tag_list:
+                return 'skipped'
             elif action_value in common.passed_tag_list:
                 return 'passed'
             else:
@@ -260,7 +491,7 @@ def get_module_and_function(action_name, action_sub_field):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-def shared_variable_to_value(data_set): #!!! Should be moved to Shared_Variable.py
+def shared_variable_to_value(data_set):
     ''' Look for any Shared Variable strings in step data, convert them into their values, and return '''
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -273,21 +504,11 @@ def shared_variable_to_value(data_set): #!!! Should be moved to Shared_Variable.
                 if row[i] != False: # !!!! Probbly not needed
                     while "%|" in data_row[i] and "|%" in data_row[i]: # If string contains these characters, it's a shared variable
                         CommonUtil.ExecLog(sModuleInfo, "Shared Variable: %s" % row[i], 1)
-                        left_index = data_row[i].index('%|') # Get index of left marker
-                        right_index = data_row[i].index('|%') # Get index of right marker
-                        var = data_row[i][left_index:right_index + 2] # Copy entire shared variable
-                        var_clean = var[2:len(var)-2] # Remove markers
-                        data_row[i] = data_row.replace(var, sr.Get_Shared_Variables(var_clean)) # Get the string for this shared variable 
-                        if data_row[i] == 'failed':
+                        data_row[i] = sr.get_previous_response_variables_in_strings(data_row[i])# replace just the variable name with it's value (has to be in string format)
+                        if data_row[i] == 'failed': #!!!this won't work if there's extra strings around the shared variable 
                             CommonUtil.ExecLog(sModuleInfo, "Invalid shared variable", 3)
                             return "failed"
             new_data.append(tuple(data_row)) # Convert row from list to tuple, and append to new data_set
-        return new_data
+        return new_data # Return parsed data_set
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-if __name__ == '__main__':
-    step_data = [ [ ( 'app_activity' , 'element parameter' , 'com.assetscience.recell.device.android.prodiagnostics.gui.aftersalesRMA.AftersalesRMAPairingActivity' , False , False , '' ) , ( 'launch' , 'appium action' , 'com.assetscience.vodafone.prod' , False , False , '' ) ] ]
-    Sequential_Actions(step_data)
-

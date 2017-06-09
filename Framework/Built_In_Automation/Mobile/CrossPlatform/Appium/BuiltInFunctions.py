@@ -3,6 +3,7 @@
 # Android environment
 from appium import webdriver
 import os, sys, time, inspect, json
+import subprocess,re
 from Framework.Utilities import CommonUtil, FileUtilities
 from Framework.Built_In_Automation.Mobile.Android.adb_calls import adbOptions
 from appium.webdriver.common.touch_action import TouchAction
@@ -27,7 +28,7 @@ if Shared_Resources.Test_Shared_Variables('appium_driver'): # Check if driver is
     driver = Shared_Resources.Get_Shared_Variables('appium_driver') # Retreive appium driver
 
 # Recall dependency, if not already set
-dependency = 'Android' #{'Mobile OS':'Android'} #!!! Will be updated by sequential_actions_appium() in the future
+dependency = {'Mobile':'Android'} #!!! TEMP - Replace with None for production
 if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive appium driver
  
@@ -188,28 +189,43 @@ def launch_application(data_set):
     try:
         package_name = '' # Name of application package
         activity_name = '' # Name of application activity
+        package_only = False
         for row in data_set: # Find required data
-            if row[0] == 'launch' and row[1] == 'action':
-                package_name = row[2]
-            elif row[0] == 'app_activity' and row[1] == 'element parameter':
-                activity_name = row[2]
-        if package_name == '' or activity_name == '':
-            CommonUtil.ExecLog(sModuleInfo,"Could not find package or activity name", 3)
+            if row[0] == 'package' and row[1] == 'element parameter':
+                if dependency['Mobile'].lower() == 'android':
+                    package_name, activity_name = get_program_names(row[2]) # Android only to match a partial package name if provided by the user
+                else:
+                    package_name = row[2] # IOS package name
+                package_only = True
+                    
+            if not package_only:
+                if row[0] == 'launch' and row[1] == 'action':
+                    package_name = row[2]
+                elif row[0] == 'app activity' and row[1] == 'element parameter':
+                    activity_name = row[2]
+        
+        if package_name == '':
+            CommonUtil.ExecLog(sModuleInfo,"Could not find package name", 3)
+            return 'failed'
+        elif dependency['Mobile'].lower() == 'android' and activity_name == '':
+            CommonUtil.ExecLog(sModuleInfo,"Could not find activity name", 3)
             return 'failed'
     except Exception:
         errMsg = "Unable to parse data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
+    # Launch application
     try:
         if driver == None: # Only create a new appium instance if we haven't already (may be done by install_and_start_driver())
             result = start_appium_driver(package_name, activity_name)
             if result == 'failed':
                 return 'failed'
         
+        CommonUtil.ExecLog(sModuleInfo,"Sending driver call.",1)
         driver.launch_app() # Launch program configured in the Appium capabilities
-        CommonUtil.ExecLog(sModuleInfo,"Launched the app successfully.",1)
+        CommonUtil.ExecLog(sModuleInfo,"Launched the application successfully.",1)
         return "passed"
-    except Exception, e:
+    except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 def start_appium_driver(package_name = '', activity_name = '', filename = ''):
@@ -223,10 +239,12 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
         if driver == None:
             # Setup capabilities
             desired_caps = {}
-            desired_caps['platformName'] = dependency # Set platform name
+            desired_caps['platformName'] = dependency['Mobile'] # Set platform name
             desired_caps['autoLaunch'] = 'false' # Do not launch application
+            desired_caps['fullReset'] = 'false' # Do not clear application cache when complete
+            desired_caps['sendKeyStrategy'] = 'setValue' #!!! Needed for send_keys?
             
-            if dependency == 'Android':
+            if dependency['Mobile'].lower() == 'android':
                 CommonUtil.ExecLog(sModuleInfo,"Setting up with Android",1)
                 desired_caps['platformVersion'] = adbOptions.get_android_version().strip()
                 desired_caps['deviceName'] = adbOptions.get_device_model().strip()
@@ -236,16 +254,14 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
                     desired_caps['appActivity'] = activity_name.strip()
                 if filename and package_name == '': # User must specify package or file, not both. Specifying filename instructs Appium to install
                     desired_caps['app'] = PATH(filename).strip()
-            elif dependency == 'IOS':
+            elif dependency['Mobile'].lower() == 'ios':
                 CommonUtil.ExecLog(sModuleInfo,"Setting up with IOS",1)
-                desired_caps['platformVersion'] = '' # Read version
-                desired_caps['deviceName'] = '' # Read model
+                desired_caps['platformVersion'] = '10.3' # Read version #!!! Temporarily hard coded
+                desired_caps['deviceName'] = 'iPhone' # Read model (only needs to be unique if using more than one)
                 desired_caps['bundleId'] = package_name
-                desired_caps['udid'] = '' # Read UDID
-                CommonUtil.ExecLog(sModuleInfo, "IOS not yet supported", 3)
-                return 'failed'
+                desired_caps['udid'] = 'auto' # Device unique identifier - use auto if using only one phone
             else:
-                CommonUtil.ExecLog(sModuleInfo, "Invalid dependency: " + dependency, 3)
+                CommonUtil.ExecLog(sModuleInfo, "Invalid dependency: %s" % str(dependency), 3)
                 return 'failed'
             CommonUtil.ExecLog(sModuleInfo,"Capabilities: %s" % str(desired_caps),1)
             
@@ -254,7 +270,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
             driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps) # Create instance
             if driver: # Make sure we get the instance
                 Shared_Resources.Set_Shared_Variables('appium_driver', driver) # Save driver instance to make available to other modules
-                CommonUtil.ExecLog(sModuleInfo,"Launched the app successfully.",1)
+                CommonUtil.ExecLog(sModuleInfo,"Appium driver created successfully.",1)
                 return "passed"
             else: # Error during setup, reset
                 driver = None
@@ -263,11 +279,11 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
         else: # Driver is already setup, don't do anything
             CommonUtil.ExecLog(sModuleInfo,"Driver already configured, not re-doing",1)
             return 'passed'
-    except Exception, e:
+    except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
     
     
-def teardown_appium():
+def teardown_appium(data_set):
     ''' Teardown of appium instance '''
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -282,7 +298,9 @@ def teardown_appium():
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-def close_application():
+def close_application(data_set):
+    ''' Exit the application '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         CommonUtil.ExecLog(sModuleInfo,"Trying to close the app",1)
@@ -290,7 +308,21 @@ def close_application():
         CommonUtil.ExecLog(sModuleInfo,"Closed the app successfully",1)
         return "passed"
     except Exception:
-        errMsg = "Unable to close the driver."
+        errMsg = "Unable to close the application."
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    
+def reset_application(data_set):
+    ''' Resets / clears the application cache '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        CommonUtil.ExecLog(sModuleInfo,"Trying to reset the app",1)
+        driver.reset() # Reset / clear application cache
+        CommonUtil.ExecLog(sModuleInfo,"Reset the app successfully",1)
+        return "passed"
+    except Exception:
+        errMsg = "Unable to Reset the application."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
     
     
@@ -309,7 +341,7 @@ def install_application(data_set): #app_location, activity_name=''
         for row in data_set: # Find required data
             if row[0] == 'install' and row[1] == 'action':
                 app_location = row[2]
-            elif row[0] == 'app_activity' and row[1] == 'element parameter': # Optional parameter
+            elif row[0] == 'app activity' and row[1] == 'element parameter': # Optional parameter
                 activity_name = row[2]
         if app_location == '':
             CommonUtil.ExecLog(sModuleInfo,"Could not find file location", 3)
@@ -339,15 +371,25 @@ def uninstall_application(data_set):
     
     # Parse data set
     try:
-        app_package = data_set[0][2]
+        sample_package = False
+        app_package = ''
+        for row in data_set:
+            if row[0].strip() == 'package':
+                app_package,app_activity = get_program_names(row[2].strip())
+                app_activity=app_package+app_activity
+                sample_package = True
+        if not sample_package:
+            app_package = data_set[0][2]
     except Exception:
         errMsg = "Unable to parse data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
     try:
-        CommonUtil.ExecLog(sModuleInfo,"Trying to remove app with package name %s..."%app_package,1)
+        CommonUtil.ExecLog(sModuleInfo,"Trying to remove app with package name %s"%app_package,1)
         #if driver.is_app_installed(app_package):
             #CommonUtil.ExecLog(sModuleInfo,"App is installed. Now removing...",1)
+        if driver == None:
+            start_appium_driver(app_package,app_activity)
         driver.remove_app(app_package)
         CommonUtil.ExecLog(sModuleInfo,"App is removed successfully.",1)
         return "passed"
@@ -389,19 +431,19 @@ def Get_Single_Element(parameter, value, parent=False):
                 All_Elements = driver.find_element_by_name(value)
             elif parameter == "id":
                 All_Elements = driver.find_element_by_id(value)
-            elif parameter == "accessibility_id":
+            elif parameter == "accessibility id":
                 All_Elements = driver.find_element_by_accessibility_id(value)
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = driver.find_element_by_class_name(value)
             elif parameter == "xpath":
                 #All_Elements = driver.find_element_by_xpath(value)
                 All_Elements == driver.find_element_by_xpath("//*[@%s='%s']" % (parameter, value))
-            elif parameter == "android_uiautomator_text":
+            elif parameter == "android uiautomator text":
                 All_Elements == driver.find_element_by_android_uiautomator('new UiSelector().text(' + value + ')')
-            elif parameter == "android_uiautomator_description":
+            elif parameter == "android uiautomator description":
                 All_Elements == driver.find_element_by_android_uiautomator(
                     'new UiSelector().description(' + value + ')')
-            elif parameter == "ios_uiautomation":
+            elif parameter == "ios uiautomation":
                 All_Elements == driver.find_element_by_ios_uiautomation('.elements()[0]')
             else:
                 All_Elements == driver.find_element_by_xpath("//*[@%s='%s']"%(parameter, value))
@@ -411,19 +453,19 @@ def Get_Single_Element(parameter, value, parent=False):
                 All_Elements = driver.find_element_by_xpath("//*[@text='%s']" % value)
             elif parameter == "id":
                 All_Elements = driver.find_element_by_id(value)
-            elif parameter == "accessibility_id":
+            elif parameter == "accessibility id":
                 All_Elements = driver.find_element_by_accessibility_id(value)
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = driver.find_element_by_class_name(value)
             elif parameter == "xpath":
                 #All_Elements = driver.find_element_by_xpath(value)
                 All_Elements == driver.find_element_by_xpath("//*[@%s='%s']" % (parameter, value))
-            elif parameter == "android_uiautomator_text":
+            elif parameter == "android uiautomator text":
                 All_Elements == driver.find_element_by_android_uiautomator('new UiSelector().text(' + value + ')')
-            elif parameter == "android_uiautomator_description":
+            elif parameter == "android uiautomator description":
                 All_Elements == driver.find_element_by_android_uiautomator(
                     'new UiSelector().description(' + value + ')')
-            elif parameter == "ios_uiautomation":
+            elif parameter == "ios uiautomation":
                 All_Elements == driver.find_element_by_ios_uiautomation('.elements()[0]')
             else:
                 All_Elements == driver.find_element_by_xpath("//*[@%s='%s']"%(parameter,value))
@@ -446,30 +488,30 @@ def Get_All_Elements(parameter, value, parent=False):
                 All_Elements = driver.find_elements_by_name(value)
             elif parameter == "id":
                 All_Elements = driver.find_elements_by_id(value)
-            elif parameter == "accessibility_id":
+            elif parameter == "accessibility id":
                 All_Elements = driver.find_elements_by_accessibility_id(value)
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = driver.find_elements_by_class_name(value)
             elif parameter == "xpath":
                 All_Elements = driver.find_elements_by_xpath(value)
-            elif parameter == "android_uiautomator_text":
+            elif parameter == "android uiautomator text":
                 All_Elements == driver.find_elements_by_android_uiautomator('new UiSelector().text('+value+')')
-            elif parameter == "android_uiautomator_description":
+            elif parameter == "android uiautomator description":
                 All_Elements == driver.find_elements_by_android_uiautomator('new UiSelector().description('+value+')')
         elif parent == True:
             if parameter == "name":
                 All_Elements = driver.find_elements_by_name(value)
             elif parameter == "id":
                 All_Elements = driver.find_elements_by_id(value)
-            elif parameter == "accessibility_id":
+            elif parameter == "accessibility id":
                 All_Elements = driver.find_elements_by_accessibility_id(value)
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = driver.find_elements_by_class_name(value)
             elif parameter == "xpath":
                 All_Elements = driver.find_elements_by_xpath(value)
-            elif parameter == "android_uiautomator_text":
+            elif parameter == "android uiautomator text":
                 All_Elements == driver.find_elements_by_android_uiautomator('new UiSelector().text('+value+')')
-            elif parameter == "android_uiautomator_description":
+            elif parameter == "android uiautomator description":
                 All_Elements == driver.find_elements_by_android_uiautomator('new UiSelector().description('+value+')')
 
         return All_Elements
@@ -538,6 +580,7 @@ def Element_Validation(All_Elements_Found):#, index):
         if All_Elements_Found == []:
             CommonUtil.ExecLog(sModuleInfo, "Could not find your element by given parameters and values", 3)
             return "failed"
+        # If only one element found
         elif len(All_Elements_Found) == 1:
             for each_elem in All_Elements_Found:
                 #Case 1: Found only one invisible element - pass with warning
@@ -553,14 +596,16 @@ def Element_Validation(All_Elements_Found):#, index):
                     return "failed"
             return return_element[0]
 
-        elif len(All_Elements_Found) > 1:
+        # If max 5 elements found
+        elif len(All_Elements_Found) > 1 and len(All_Elements_Found) <= 5:
             CommonUtil.ExecLog(sModuleInfo, "Found more than one element by given parameters and values, validating visible and invisible elements. Total number of elements found: %s"%(len(All_Elements_Found)), 2)
+            # If at least one is_displayed() elements, add that in visible elements list, else add that in invisible elements list
             for each_elem in All_Elements_Found:
                 if each_elem.is_displayed() == True:
                     all_visible_elements.append(each_elem)
                 else:
                     all_invisible_elements.append(each_elem)
-            #sequential logic - if at least one is_displayed() elements, show that, else allow invisible elements
+            # If at least one is_displayed() elements, show that, else allow invisible elements
             if len(all_visible_elements) > 0:
                 CommonUtil.ExecLog(sModuleInfo, "Found at least one visible element for given parameters and values, returning the first one or by the index specified", 2)
                 return_element = all_visible_elements
@@ -569,6 +614,24 @@ def Element_Validation(All_Elements_Found):#, index):
                 return_element = all_invisible_elements
             return return_element[0]#[index]
 
+        # If more that 5 elements found
+        elif len(All_Elements_Found) > 5:
+            CommonUtil.ExecLog(sModuleInfo, "Found more than ten element by given parameters and values, validating visible and invisible elements. Total number of elements found: %s"%(len(All_Elements_Found)), 2)
+            # If at least one is_displayed() elements, add that in visible elements list, else add that in invisible elements list
+            for each_elem in All_Elements_Found:
+                if each_elem.is_displayed() == True:
+                    all_visible_elements.append(each_elem)
+                else:
+                    all_invisible_elements.append(each_elem)
+            # If at least one is_displayed() elements, show that, else allow invisible elements
+            if len(all_visible_elements) > 0:
+                CommonUtil.ExecLog(sModuleInfo, "Found at least one visible element for given parameters and values, returning the first one or by the index specified", 2)
+                return_element = all_visible_elements
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Did not find a visible element, however, invisible elements present", 2)
+                return_element = all_invisible_elements
+            return return_element
+        
         else:
             CommonUtil.ExecLog(sModuleInfo, "Could not find element by given parameters and values", 3)
             return "failed"
@@ -812,10 +875,9 @@ def Validate_Text(data_set):
             return "failed"
         else:
             dimension = driver.get_window_size('current')
-            print dimension
             
             for each in data_set[0]:
-                if each[0] == "current_page":
+                if each[0] == "current page":
                     try:
                         Element = Get_Element_Appium('tag', 'html')
                         break
@@ -944,7 +1006,7 @@ def Compare_Variables(data_set):
         if ((element_step_data == []) or (element_step_data == "failed")):
             return "failed"
         else:
-            Shared_Resources.Compare_Variables([data_set])
+            return Shared_Resources.Compare_Variables([data_set])
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -976,7 +1038,9 @@ def tap_location(data_set):
 
     # Parse data set
     try:
-        positions = (data_set[0][2])
+        positions = []
+        posX, posY = data_set[0][2].replace(' ','').split(',')
+        positions.append((posX, posY)) # Put coordinates in a tuple inside of a list - must be this way for driver.tap
     except Exception:
         errMsg = "Unable to parse data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
@@ -1012,10 +1076,9 @@ def get_element_location_by_id(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
     try:
-        positions = []
         elem = locate_element_by_id(driver, _id) # Get element object for given id
         location = elem.location # Get element x,y coordinates
-        positions.append((location['x'], location['y'])) # Put them on an array - Needs to be in this format for dirver.tap()
+        positions = "%s,%s" % (location['x'], location['y']) # Save as a string - The function that uses this will need to put it in the format it needs
         CommonUtil.ExecLog(sModuleInfo,"Retreived location successfully",1)
         
         result = Shared_Resources.Set_Shared_Variables(action_value, positions) # Save position in shared variables
@@ -1141,7 +1204,9 @@ def Get_Element_Appium(element_parameter,element_value,reference_parameter=False
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         All_Elements_Found = []
+        # Get the element(s) if parent and/or child value not provided in the step data
         if reference_is_parent_or_child == False:
+            # Get the element(s) if parent value not provided in the step data
             if ((reference_parameter == False) and (reference_value == False)):
                 All_Elements = Get_All_Elements_Appium(element_parameter,element_value)     
                 if ((All_Elements == []) or (All_Elements == 'failed')):        
@@ -1161,6 +1226,7 @@ def Get_Element_Appium(element_parameter,element_value,reference_parameter=False
                 CommonUtil.ExecLog(sModuleInfo, "Could not find your element because you are missing at least one parameter", 3)
                 return "failed"
             
+        # Get the element(s) if child value not provided in the step data
         elif reference_is_parent_or_child == "parent":     
             CommonUtil.ExecLog(sModuleInfo, "Locating all parents elements", 1)   
             all_parent_elements = Get_All_Elements_Appium(reference_parameter,reference_value)#,"parent")
@@ -1172,6 +1238,7 @@ def Get_Element_Appium(element_parameter,element_value,reference_parameter=False
                         all_matching_elements.append(each_matching)
             All_Elements_Found = all_matching_elements
 
+        # Get the element(s) if parent value not provided in the step data
         elif reference_is_parent_or_child == "child":        
             all_parent_elements = Get_All_Elements_Appium(element_parameter,element_value)
             all_matching_elements = []
@@ -1189,7 +1256,7 @@ def Get_Element_Appium(element_parameter,element_value,reference_parameter=False
             CommonUtil.ExecLog(sModuleInfo, "Unable to run based on the current inputs, please check the inputs and re-enter values", 3)
             return "failed"
         
-        #this method returns all the elements found without validation
+        # This method returns all the elements found without validation
         if(get_all_unvalidated_elements!=False):
             return All_Elements_Found
         else:
@@ -1213,15 +1280,17 @@ def Get_All_Elements_Appium(parameter,value,parent=False):
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_id(value))
             elif parameter == "name":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_name(value))
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_class_name(value))
             elif parameter == "xpath":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_xpath(value))
-            elif parameter == "accessibility_id":
+            elif parameter == "current screen": # Read full screen text
+                All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_xpath("//*"))
+            elif parameter == "accessibility id":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_accessibility_id(value))    
-            elif parameter == "android_uiautomator":
+            elif parameter == "android uiautomator":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_android_uiautomator(value))    
-            elif parameter == "ios_uiautomation":
+            elif parameter == "ios uiautomation":
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_ios_uiautomation(value))    
             else:
                 All_Elements = WebDriverWait(driver, WebDriver_Wait).until(lambda driver: driver.find_elements_by_xpath("//*[@%s='%s']" %(parameter,value)))
@@ -1230,15 +1299,15 @@ def Get_All_Elements_Appium(parameter,value,parent=False):
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_id(value))
             elif parameter == "name":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_name(value))
-            elif parameter == "class_name":
+            elif parameter == "class name":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_class_name(value))
             elif parameter == "xpath":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_xpath(value))
-            elif parameter == "accessibility_id":
+            elif parameter == "accessibility id":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_accessibility_id(value))    
-            elif parameter == "android_uiautomator":
+            elif parameter == "android uiautomator":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_android_uiautomator(value))    
-            elif parameter == "ios_uiautomation":
+            elif parameter == "ios uiautomation":
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_ios_uiautomation(value))    
             else:
                 All_Elements = WebDriverWait(parent, WebDriver_Wait).until(lambda driver: driver.find_elements_by_xpath("//*[@%s='%s']" %(parameter,value)))    
@@ -1281,7 +1350,7 @@ def Sequential_Actions_Appium(step_data):
     if verify_step_data(step_data) in failed_tag_list:
         CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
         return "failed"
-
+    
     try:            
         for data_set in step_data: # For each data set within step data
             logic_row=[] # Initialize conditional action list
@@ -1358,7 +1427,12 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row):
                 for each_item in list_of_steps: # For each data set number we need to process before finishing
                     CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
                     data_set_index = int(each_item) - 1 # data set number, -1 to offset for data set numbering system
-                    result = Sequential_Actions_Appium([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+
+                    if step_data[data_set_index] == data_set: # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
+                        result = Sequential_Actions_Appium(step_data) # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                    else: # Normal process - most conditional actions will come here
+                            result = Sequential_Actions_Appium([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+
                 return result # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
 
     # Shouldn't get here, but just in case
@@ -1394,8 +1468,8 @@ def Action_Handler_Appium(_data_set, action_name):
             result = Wait_For_New_Element(data_set)
         elif action_name == "tap": # Tap an element
             result = Tap_Appium(data_set)
-        elif action_name == "validate full text" or action_name == "validate partial text": # Test if text string exists
-            result = Validate_Text(data_set)
+        elif action_name == "validate screen text" or action_name == "validate full text" or action_name == "validate partial text": # Test if text string exists
+            result = Validate_Text_Appium([data_set])
         elif action_name == "save text": # Save text string
             result = Save_Text(data_set)
         elif action_name == "compare variable": # Compare two "shared" variables
@@ -1421,11 +1495,11 @@ def Action_Handler_Appium(_data_set, action_name):
         elif action_name == "swipe": # Swipe screen
             result = swipe_handler(data_set)
         elif action_name == "close": # Close foreground application
-            result = close_application()
+            result = close_application(data_set)
         elif action_name == "uninstall": # Uninstall application
             result = uninstall_application(data_set)
         elif action_name == 'teardown': # Cleanup Appium instance
-            result = teardown_appium()
+            result = teardown_appium(data_set)
         elif action_name == 'keypress': # Press hardware, software or virtual key
             result = Keystroke_Appium(data_set) # To be replaced with handler dependent on android/ios
         elif action_name == "tap location":
@@ -1708,7 +1782,10 @@ def Enter_Text_Appium(data_set):
                     #text_value=step_data[0][len(step_data[0])-1][2]
                     Element.click() # Set focus to textbox
                     Element.clear() # Remove any text already existing
-                    Element.send_keys(text_value) # Enter the user specified text
+                    if dependency['Mobile'].lower() == 'ios':
+                        Element.set_value(text_value) # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
+                    else:
+                        Element.send_keys(text_value) # Enter the user specified text
                     driver.hide_keyboard() # Remove keyboard
                     CommonUtil.TakeScreenShot(sModuleInfo) # Capture screen
                     CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s"%text_value, 1)
@@ -1775,18 +1852,22 @@ def Android_Keystroke_Key_Mapping(keystroke):
 def iOS_Keystroke_Key_Mapping(keystroke):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: iOS_Keystroke_Key_Mapping", 1)
+    
+    CommonUtil.ExecLog(sModuleInfo, "IOS key events not yet supported" % keystroke, 3)
+    return 'failed'
+
     try:
-        if keystroke == "RETURN":
+        if keystroke == "return" or keystroke == 'enter':
             driver.keyevent(13)
-        #elif keystroke == "GO BACK":
-        #    driver.back()
-        elif keystroke == "SPACE":
+        elif keystroke == "go back" or keystroke == "back":
+            driver.back()
+        elif keystroke == "space":
             driver.keyevent(32)
-        elif keystroke == "BACKSPACE":
+        elif keystroke == "backspace":
             driver.keyevent(8)
-        elif keystroke == "CALL":
+        elif keystroke == "call":
             driver.keyevent(5)            
-        elif keystroke == "END CALL":
+        elif keystroke == "end call":
             driver.keyevent(6)
                                      
     except Exception:
@@ -1811,9 +1892,9 @@ def Keystroke_Appium(data_set):
 
     try:
         # Execute the correct key stroke handler for the dependency
-        if dependency == 'Android':
+        if dependency['Mobile'].lower() == 'android':
             result = Android_Keystroke_Key_Mapping(keystroke_value)
-        elif dependency == 'iOS':
+        elif dependency['Mobile'].lower() == 'ios':
             result = iOS_Keystroke_Key_Mapping(keystroke_value)
         else:
             result = 'failed'
@@ -1842,61 +1923,110 @@ def Validate_Text_Appium(data_set):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             return "failed"
         else:
+            Element = []
+            Elements = []
             for each in data_set[0]:
-                if each[0] == "current_page":
+                # Get all elements from current screen based on step_data
+                if each[0] == "current page":
                     try:
                         Element = Get_Element_Appium('tag', 'html')
                         break
                     except Exception:
                         errMsg = "Could not get element from the current page."
                         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+                    
+                # Get all elements from current screen based on step_data
+                elif each[0] == "current screen":
+                    try:
+                        Elements = Get_Element_Appium(each[0], '')
+                        break
+                    except Exception, e:
+                        errMsg = "Could not get element from the current screen."
+                        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg) 
+                    
                 else:
+                    # Get all the element step data(s) other than 'action' and 'conditional action'
                     element_step_data = Get_Element_Step_Data_Appium(data_set)
+                    # Get all the element step data's parameter and value
                     returned_step_data_list = Validate_Step_Data(element_step_data)
                     if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
                         return "failed"
                     else:
                         try:
+                            # Get single element from the device based on step_data
                             Element = Get_Element_Appium(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
                             break
                         except Exception:
                             errMsg = "Could not get element based on the information provided."
                             return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)           
  
+            # Get the 'action' parameter and 'value' from step data
             for each_step_data_item in data_set[0]:
                 if each_step_data_item[1]=="action":
-                    expected_text_data = each_step_data_item[2]
+                    expected_text_data = each_step_data_item[2].split('||') # Split the separator in case multiple string provided in the same data_set
                     validation_type = each_step_data_item[0]
-            #expected_text_data = step_data[0][len(step_data[0]) - 1][2]
-            list_of_element_text = Element.text.split('\n')
+            
             visible_list_of_element_text = []
-            for each_text_item in list_of_element_text:
-                if each_text_item != "":
-                    visible_list_of_element_text.append(each_text_item)
+            # Get the string for a single element
+            if Element != []:
+                list_of_element_text = Element.text.split('\n') # Extract the text element
+                visible_list_of_element_text = []
+                for each_text_item in list_of_element_text:
+                    if each_text_item != "":
+                        visible_list_of_element_text.append(each_text_item)
+
+            # Get all the strings for multiple elements
+            elif Elements != []:
+                for each_item in Elements:
+                    each_text_item = each_item.text # Extract the text element
+                    if each_text_item != '':
+                        visible_list_of_element_text.append(each_text_item)
              
-            #if step_data[0][len(step_data[0])-1][0] == "validate partial text":
+            # Validate the partial text/string provided in the step data with the text obtained from the device
             if validation_type == "validate partial text":
                 actual_text_data = visible_list_of_element_text
-                CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, 1)
-                CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 1)
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 1)
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %actual_text_data, 1)
                 for each_actual_text_data_item in actual_text_data:
-                    if expected_text_data in each_actual_text_data_item:
+                    if expected_text_data[0] in each_actual_text_data_item: # index [0] used to remove the unicode 'u' from the text string
                         CommonUtil.ExecLog(sModuleInfo, "The text has been validated by a partial match.", 1)
                         return "passed"
-                CommonUtil.ExecLog(sModuleInfo, "Unable to validate using partial match.", 3)
-                return "failed"
-            #if step_data[0][len(step_data[0])-1][0] == "validate full text":
+                    else:
+                        CommonUtil.ExecLog(sModuleInfo, "Unable to validate using partial match.", 3)
+                        return "failed"
+            
+            # Validate the full text/string provided in the step data with the text obtained from the device
             if validation_type == "validate full text":
                 actual_text_data = visible_list_of_element_text
-                CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, 1)
-                CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 1)
-                if (expected_text_data in actual_text_data):
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 1)
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %actual_text_data, 1)
+                if (expected_text_data[0] == actual_text_data[0]): # index [0] used to remove the unicode 'u' from the text string
                     CommonUtil.ExecLog(sModuleInfo, "The text has been validated by using complete match.", 1)
                     return "passed"
                 else:
                     CommonUtil.ExecLog(sModuleInfo, "Unable to validate using complete match.", 3)
                     return "failed"
-             
+
+            # Validate all the text/string provided in the step data with the text obtained from the device
+            if validation_type == "validate screen text":
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 1)
+                CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %visible_list_of_element_text, 1)
+                i = 0
+                for x in xrange(0, len(visible_list_of_element_text)): 
+                    if (visible_list_of_element_text[x] == expected_text_data[i]): # Validate the matching string
+                        CommonUtil.ExecLog(sModuleInfo, "The text element '%s' has been validated by using complete match." %visible_list_of_element_text[x], 1)
+                        i += 1
+                    else:
+                        visible_elem = [ve for ve in visible_list_of_element_text[x].split()]
+                        expected_elem = [ee for ee in expected_text_data[i].split()]
+                        for elem in visible_elem: # Validate the matching word
+                            if elem in expected_elem:
+                                CommonUtil.ExecLog(sModuleInfo, "Validate the element '%s' using element match." %elem, 1)
+                            else:
+                                CommonUtil.ExecLog(sModuleInfo, "Unable to validate the element '%s'. Check the element(s) in step_data(s) and/or in screen text." %elem, 1)
+                        if (visible_elem[0] in expected_elem):
+                            i += 1
+                            
             else:
                 CommonUtil.ExecLog(sModuleInfo, "Incorrect validation type. Please check step data", 3)
                 return "failed"
@@ -2015,3 +2145,37 @@ def Compare_Lists(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 '===================== ===x=== Sequential Actions Section Ends ===x=== ======================'
+
+
+def get_program_names(search_name):
+    print "Trying to find package and activity names"
+    # Find package name for the program that's already installed
+    cmd = 'adb shell pm list packages'
+    res = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE).communicate(0)
+    ary = str(res).split('\\r\\n')
+    p = re.compile('package(.*?' + search_name + '.*?)$')
+    package_name = ''
+    for line in ary:
+        m = p.search(str(line))
+        if m:
+            package_name = m.group(1)[1:]
+            break
+
+    # Launch program using only package name
+    print "Trying to launch", package_name
+    cmd = 'adb shell monkey -p ' + m.group(1)[1:] + ' -c android.intent.category.LAUNCHER 1'
+    res = subprocess.Popen(cmd.split(' '))
+    time.sleep(3)
+
+    # Get the activity name
+    cmd = 'adb shell dumpsys window windows'
+    res = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE).communicate(0)
+    m = re.search('CurrentFocus=.*?FocusedApp.*?ActivityRecord{\w+\s+\w+\s+(.*?)/(.*?)\s+', str(res))
+
+    # Return package and activity names
+    if m.group(1) != '' and m.group(2) != '':
+        print "Package name:", m.group(1)
+        print "Activity name:", m.group(2)
+        return m.group(1), m.group(2)
+    else:
+        return '', ''

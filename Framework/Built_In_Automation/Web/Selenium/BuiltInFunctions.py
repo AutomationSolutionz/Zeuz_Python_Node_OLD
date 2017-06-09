@@ -154,7 +154,7 @@ def Get_Element_Step_Data(step_data):
     CommonUtil.ExecLog(sModuleInfo, "Function: Get_Element_Step_Data", 1)
     try:
         element_step_data=[]
-        for each in step_data[0]:
+        for each in step_data:
             #if each[1]=="":
 #             if (each[1]!="action" or each[1]!="logic"):
 #                 element_step_data.append(each)
@@ -202,7 +202,7 @@ def Action_Handler(action_step_data, action_name):
             result = Hover_Over_Element(action_step_data)
             if result == "failed":
                 return "failed"
-        elif (action_name == "keystroke_keys" or action_name == "keystroke_chars"):
+        elif (action_name == "keystroke keys" or action_name == "keystroke chars"):
             result = Keystroke_For_Element(action_step_data)
             if result == "failed":
                 return "failed"
@@ -219,7 +219,7 @@ def Action_Handler(action_step_data, action_name):
             if result == "failed":
                 return "failed"
         elif action_name == "initialize list":
-            result = Shared_Resources.Initialize_List(action_step_data)
+            result = Initialize_List(action_step_data)
             if result == "failed":
                 return "failed"
         elif (action_name == "validate full text" or action_name == "validate partial text"):
@@ -267,18 +267,21 @@ def Action_Handler(action_step_data, action_name):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+def Initialize_List(data_set):
+    ''' Temporary wrapper until we can convert everything to use just data_set and not need the extra [] '''
+    return Shared_Resources.Initialize_List([data_set])
+
 #Method to enter texts in a text box; step data passed on by the user
 def Enter_Text_In_Text_Box(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Enter_Text_In_Text_Box", 1)
     try:
         #If there are no two separate data-sets, or if the first data-set is not between 1 to 3 items, or if the second data-set doesn't have only 1 item
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):# or (len(step_data[1]) != 1)):
+        if ((1 < len(step_data) >= 5)):# or (len(step_data[1]) != 1)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
             element_step_data=Get_Element_Step_Data(step_data)
-            #element_step_data = step_data[0][0:len(step_data[0])-1:1]
             returned_step_data_list = Validate_Step_Data(element_step_data)
             #returned_step_data_list = Validate_Step_Data(step_data[0])
             if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
@@ -286,7 +289,7 @@ def Enter_Text_In_Text_Box(step_data):
             else:
                 try:
                     Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
-                    for each in step_data[0]:
+                    for each in step_data:
                         if each[1]=="action":
                             text_value=each[2]
                         else:
@@ -313,25 +316,24 @@ def Keystroke_For_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Keystroke_For_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):# or (len(step_data[1]) != 1)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
-            #element_step_data = step_data[0][0:len(step_data[0])-1:1]
-            element_step_data = Get_Element_Step_Data(step_data)
+            element_step_data=Get_Element_Step_Data(step_data)
             returned_step_data_list = Validate_Step_Data(element_step_data)
             if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
                 return "failed"
             else:
                 try:
                     Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
-                    for each in step_data[0]:
+                    for each in step_data:
                         if each[1]=="action":
-                            if each[0]=="keystroke_keys":
+                            if each[0]=="keystroke keys":
                                 keystroke_value=(each[2]).upper()
                                 get_keystroke_value = getattr(Keys, keystroke_value)
                                 result = Element.send_keys(get_keystroke_value)
-                            elif each[0] == "keystroke_chars":
+                            elif each[0] == "keystroke chars":
                                 keystroke_value=(each[2])
                                 result = Element.send_keys(keystroke_value)
                             else:
@@ -374,12 +376,11 @@ def Click_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Click_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):# or (len(step_data[1]) != 1)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
-            #element_step_data = step_data[0][0:len(step_data[0])-1:1]
-            element_step_data = Get_Element_Step_Data(step_data)
+            element_step_data=Get_Element_Step_Data(step_data)
             returned_step_data_list = Validate_Step_Data(element_step_data)
             if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
                 return "failed"
@@ -404,7 +405,7 @@ def Click_and_Hold_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Click_and_Hold_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -435,7 +436,7 @@ def Context_Click_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Context_Click_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -465,7 +466,7 @@ def Double_Click_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Double_Click_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -496,7 +497,7 @@ def Move_To_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Move_To_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -526,7 +527,7 @@ def Hover_Over_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Hover_Over_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -557,7 +558,7 @@ def Wait_For_New_Element(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Wait_For_New_Page_Element", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):# or (len(step_data[1]) != 1)):
+        if ((1 < len(step_data) >= 5)):# or (len(step_data[1]) != 1)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -568,14 +569,14 @@ def Wait_For_New_Element(step_data):
                 return "failed"
             else:
                 try:
-                    for each in step_data[0]:
+                    for each in step_data:
                         if each[1]=="action":
                             timeout_duration = int(each[2])
 
                     start_time = time.time()
                     interval = 1
                     for i in range(timeout_duration):
-                        time.sleep(start_time + i*interval - time.time())
+                        time.sleep(time.time() + i*interval - start_time)
                         Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
                         if (Element == []):
                             continue
@@ -604,7 +605,7 @@ def Compare_Lists(step_data):
         if ((element_step_data == []) or (element_step_data == "failed")):
             return "failed"
         else:
-            return Shared_Resources.Compare_Lists(step_data)
+            return Shared_Resources.Compare_Lists([step_data])
     except:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -618,7 +619,7 @@ def Compare_Variables(step_data):
         if ((element_step_data == []) or (element_step_data == "failed")):
             return "failed"
         else:
-            return Shared_Resources.Compare_Variables(step_data)
+            return Shared_Resources.Compare_Variables([step_data])
     except:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -628,13 +629,13 @@ def Insert_Into_List(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Insert_Into_List", 1)
     try:
-        if len(step_data[0]) == 1: #will have to test #saving direct input string data
+        if len(step_data) == 1: #will have to test #saving direct input string data
             list_name = ''
             key = ''
             value = ''
             full_input_key_value_name = ''
 
-            for each_step_data_item in step_data[0]:
+            for each_step_data_item in step_data:
                 if each_step_data_item[1]=="action":
                     full_input_key_value_name = each_step_data_item[2]
 
@@ -657,8 +658,8 @@ def Insert_Into_List(step_data):
                 Shared_Resources.Show_All_Shared_Variables()
                 return "passed"
 
-        elif len(step_data[0]) > 1 and len(step_data[0]) <=5:
-            for each in step_data[0]:
+        elif 1 < len(step_data) <= 5:
+            for each in step_data:
                 element_step_data = Get_Element_Step_Data(step_data)
                 returned_step_data_list = Validate_Step_Data(element_step_data)
                 if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
@@ -674,7 +675,7 @@ def Insert_Into_List(step_data):
 
             list_name = ''
             key = ''
-            for each_step_data_item in step_data[0]:
+            for each_step_data_item in step_data:
                 if each_step_data_item[1] == "action":
                     key = each_step_data_item[2]
 
@@ -721,11 +722,11 @@ def Save_Text(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Save_Text", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             return "failed"
         else:
-            for each in step_data[0]:
+            for each in step_data:
                 element_step_data = Get_Element_Step_Data(step_data)
                 returned_step_data_list = Validate_Step_Data(element_step_data)
                 if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
@@ -739,7 +740,7 @@ def Save_Text(step_data):
                         errMsg = "Could not get element based on the information provided."
                         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
-            for each_step_data_item in step_data[0]:
+            for each_step_data_item in step_data:
                 if each_step_data_item[1]=="action":
                     variable_name = each_step_data_item[2]
 
@@ -765,11 +766,11 @@ def Validate_Text(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Validate_Text", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             return "failed"
         else:
-            for each in step_data[0]:
+            for each in step_data:
                 if each[0] == "current_page":
                     try:
                         Element = Get_Element('tag', 'html')
@@ -808,7 +809,7 @@ def Validate_Text(step_data):
 #                     except Exception:
 #                         errMsg = "Could not get element based on the information provided."
 #                         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-            for each_step_data_item in step_data[0]:
+            for each_step_data_item in step_data:
                 if each_step_data_item[1]=="action":
                     expected_text_data = each_step_data_item[2]
                     validation_type = each_step_data_item[0]
@@ -855,13 +856,13 @@ def Sleep(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Sleep", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo,
                                "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
                                3)
             return "failed"
         else:
-            tuple = step_data[0][0]
+            tuple = step_data[0]
             seconds = int(tuple[2])
             CommonUtil.ExecLog(sModuleInfo,"Sleeping for %s seconds"%seconds,1)
             time.sleep(seconds)
@@ -876,13 +877,13 @@ def Scroll(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Scroll", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo,
                                "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
                                3)
             return "failed"
         else:
-            tuple = step_data[0][0]
+            tuple = step_data[0]
             scroll_direction = tuple[2]
             if scroll_direction == 'down':
                 CommonUtil.ExecLog(sModuleInfo,"Scrolling down",1)
@@ -909,11 +910,11 @@ def Step_Result(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
             result = "failed"
         else:
-            step_result = step_data[0][0][2]
+            step_result = step_data[0][2]
             if step_result == 'pass':
                 result = "passed"
             elif step_result == 'skip':
@@ -930,7 +931,7 @@ def Select_Deselect(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
     try:
-        if ((len(step_data) != 1) or (1 < len(step_data[0]) >= 5)):
+        if ((1 < len(step_data) >= 5)):
             CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
             return "failed"
         else:
@@ -942,7 +943,7 @@ def Select_Deselect(step_data):
             else:
                 try:
                     Element = Get_Element(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
-                    for each in step_data[0]:
+                    for each in step_data:
                         if each[1]=="action":
                             if each[0]=="deselect all":
                                 CommonUtil.ExecLog(sModuleInfo, "Deselect all elements", 1)
@@ -1017,12 +1018,12 @@ def Sequential_Actions(step_data):
                 elif row[1]=="action":
                     CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row", 1)
                     if row[0] == 'compare variable':
-                        result = Action_Handler([each],row[0])
+                        result = Action_Handler(each,row[0])
                     else:
                         new_data_set = Shared_Resources.Handle_Step_Data_Variables([each])
                         if new_data_set in failed_tag_list:
                             return 'failed'
-                        result = Action_Handler(new_data_set,row[0])
+                        result = Action_Handler(new_data_set[0],row[0])
 
                     if result == [] or result == "failed":
                         return "failed"
@@ -1043,7 +1044,7 @@ def Sequential_Actions(step_data):
                     logic_row.append(row)
                     if len(logic_row)==2:
                         #element_step_data = each[0:len(step_data[0])-2:1]
-                        element_step_data = Get_Element_Step_Data([each])
+                        element_step_data = Get_Element_Step_Data(each)
                         returned_step_data_list = Validate_Step_Data(element_step_data)
                         if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
                             return "failed"
@@ -1137,14 +1138,14 @@ def Model_Actual_Data_Ignoring_Row(actual_data):
     try:
         Modeled_Data_Set = []
         row_count = 1
-        for each_row in actual_data:
+        for each_row in actual_data: # For each row in the table data
             column_count = 1
-            for each_column in each_row:
-                temp_data_model = ["column "+str(column_count)]
-                temp_data_model.append(each_column.strip())
+            for each_column in each_row: # For each column of this row
+                temp_data_model = ["column "+str(column_count)] # ??
+                temp_data_model.append(each_column.strip()) # Save the column
                 #temp_data_model.append("False")
                 #temp_data_model.append("False")
-                Modeled_Data_Set.append(temp_data_model)
+                Modeled_Data_Set.append(temp_data_model) # Add row to result array
                 column_count = column_count +1
             row_count = row_count+1
         return Modeled_Data_Set
@@ -1208,15 +1209,15 @@ def Model_Expected_Data_Ignoring_Row(expected_data):
     try:
         Modeled_Data_Set = []
         row_count = 1
-        for each_row in expected_data:
+        for each_row in expected_data: # For each row in step data (just the table data)
             column_count = 1
             temp_data_model = []
-            for each_column in each_row:
+            for each_column in each_row: # For each column on this row
                 if column_count <= 3:
                     if column_count == 2:
                         column_count = column_count + 1
                     else:
-                        temp_data_model.append(each_column.strip())
+                        temp_data_model.append(each_column.strip()) # Save column
                         column_count = column_count +1
                 else:
                     break
@@ -1297,54 +1298,99 @@ def Validate_Table_Helper(expected_table_data, actual_table_data, validation_opt
 
 #Validate table
 def Validate_Table(step_data):
+    '''
+    Text to read must come after validate table, and not be the last row
+    
+    '''
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
-        #element_step_data = Get_Element_Step_Data(step_data)
-        table_validate_index = 0
-        for each in step_data[0]:
-            if each[1]=="":
-                table_validate_index = table_validate_index + 1
-            else:
-                get_element_last_item = table_validate_index - 1
-                print get_element_last_item
-                break
+            
+        ''' *** TEMPORARY WORKAROUND TO MAKE TRY BLOCK WORK AS DESIGNED ***
+            REQUIRED FORMAT:
+                ...Element parameters...
+                Validate Table
+                ...Table data...
+                * relation type, can use a number in the "Field" field to represent the nTH element if more than one is matched
+                
+        '''
+        
+        # Convert tuples in step data to lists, to work with current implementation
+        new_step_data = []
+        for data_set in step_data:
+            new_data_set = []
+            for row in data_set:
+                new_data_set.append(list(row))
+            new_step_data.append(new_data_set)
+        step_data = new_step_data
 
-        if get_element_last_item == 0:
-            element_step_data = step_data[0][0]
-        else:
-            element_step_data = step_data[0][0:get_element_last_item:1]
-        ##print statement to be removed
-        print element_step_data
-        returned_step_data_list = Validate_Step_Data([element_step_data])
+        # Find relation type, and get the table number, if specified
+        preferred_match = 1
+        for row in range(len(step_data[0])):
+            if step_data[0][row][1] == 'relation type':
+                try:
+                    preferred_match = int(step_data[0][row][0]) # User specified a specific match - because there was more than one
+                    CommonUtil.ExecLog(sModuleInfo, 'Will use matching table number %d' % preferred_match, 1)
+                except:
+                    pass
+            
+        # Find validate table, which is the divider between element data and table data we want to verify
+        table_validate_index = ''
+        for row in range(len(step_data[0])):
+            if step_data[0][row][1] == 'validate table':
+                table_validate_index = row
+        if table_validate_index == '':
+            CommonUtil.ExecLog(sModuleInfo, 'Step data missing "validate table" action', 3)
+            return 'failed'
+
+        # Using location of validate table, everything above it is element data        
+        get_element_last_item = table_validate_index
+        element_step_data = step_data[0][0:get_element_last_item:1]
+        #element_step_data = Get_Element_Step_Data([step_data]) # Adds extra brackets around step data that creat an issue with validate 
+        
+        # Using location of validate table, everything below it is table data we want to verify
+        expected_table_step_data = step_data[0][table_validate_index + 1:len(step_data[0]):1]
+
+
+        # Validate step data - providing just the element data
+        returned_step_data_list = Validate_Step_Data(element_step_data)
         if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
             return "failed"
+
+        # Process and validate the table data
         else:
             try:
                 #oCompare = CompareModule()
-                expected_table_step_data = (step_data[0][table_validate_index+1:len(step_data[0])-1:1])
-                actual_table_dataset = Get_Table_Elements(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4])
+                #expected_table_step_data = (step_data[0][table_validate_index+1:len(step_data[0])-1:1])
+                actual_table_dataset = Get_Table_Elements(returned_step_data_list[0], returned_step_data_list[1], returned_step_data_list[2], returned_step_data_list[3], returned_step_data_list[4], preferred_match = preferred_match)
+                if actual_table_dataset in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not get table elements", 3)
+                    return 'failed'
 
                 try:
-                    validation_option=step_data[0][table_validate_index][2]
+                    validation_option=step_data[0][table_validate_index][2] # The "default" (case sensitive). Other type is not implemented
+
+                    # Process slightly differently depending on if the user wants to ignore a row or column, or match exactly                    
                     if (step_data[0][table_validate_index][0] == "exact"):
                         modelled_actual_table_step_data = Model_Actual_Data(actual_table_dataset)
                         modelled_expected_table_step_data = Model_Expected_Data(expected_table_step_data)
-                        Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
+                        result = Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
 
-                    elif step_data[0][table_validate_index][0]== "ignore_row":
+                    elif step_data[0][table_validate_index][0]== "ignore row":
                         modelled_actual_table_step_data = Model_Actual_Data_Ignoring_Row(actual_table_dataset)
                         modelled_expected_table_step_data = Model_Expected_Data_Ignoring_Row(expected_table_step_data)
-                        Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
+                        result = Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
 
-                    elif step_data[0][table_validate_index][0]== "ignore_column":
+                    elif step_data[0][table_validate_index][0]== "ignore column":
                         modelled_actual_table_step_data = Model_Actual_Data_Ignoring_Column(actual_table_dataset)
                         modelled_expected_table_step_data = Model_Expected_Data_Ignoring_Column(expected_table_step_data)
-                        Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
+                        result = Validate_Table_Helper(modelled_expected_table_step_data, modelled_actual_table_step_data, validation_option)
 
                     else:
                         CommonUtil.ExecLog(sModuleInfo, "The information in the table validation index is incorrect. Please provide the appropriate information", 3)
                         return "failed"
 
+                    if result in failed_tag_list:
+                        return 'failed'
                     #status = oCompare.compare([expected_table_step_data], [modelled_actual_table_step_data])
                     #print status
                 except Exception:
@@ -1354,7 +1400,7 @@ def Validate_Table(step_data):
             except Exception:
                 errMsg = "Unable to get table element. Please check if the correct information has been provided."
                 return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
+        return 'passed'
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(),None,"Could not find your element.")
 
@@ -1366,8 +1412,11 @@ def Validate_Table(step_data):
 
 '============================= Get Elements Section Begins =============================='
 
-def Get_Element(element_parameter,element_value,reference_parameter=False,reference_value=False,reference_is_parent_or_child=False,get_all_unvalidated_elements=False):
+def Get_Element(element_parameter,element_value,reference_parameter=False,reference_value=False,reference_is_parent_or_child=False,get_all_unvalidated_elements=False, preferred_match = 1):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    # preferred_match is used to find an element when there are multiple identical elements, and we have no other way to distinguish them
+    matches = 0
     try:
         All_Elements_Found = []
         if reference_is_parent_or_child == False:
@@ -1395,8 +1444,9 @@ def Get_Element(element_parameter,element_value,reference_parameter=False,refere
             all_parent_elements = Get_All_Elements(reference_parameter,reference_value)#,"parent")
             all_matching_elements = []
             for each_parent in all_parent_elements:
+                matches += 1
                 interested_elem = Get_All_Elements(element_parameter,element_value,each_parent) #can there be a problem when we send in each parent, or does this contain both param and value?
-                if interested_elem != "failed":
+                if interested_elem != "failed" and matches == preferred_match:
                     for each_matching in interested_elem:
                         all_matching_elements.append(each_matching)
             All_Elements_Found = all_matching_elements
@@ -1405,8 +1455,9 @@ def Get_Element(element_parameter,element_value,reference_parameter=False,refere
             all_parent_elements = Get_All_Elements(element_parameter,element_value)
             all_matching_elements = []
             for each_parent in all_parent_elements:
+                matches += 1
                 interested_elem = Get_All_Elements(reference_parameter,reference_value,each_parent)
-                if interested_elem != "failed":
+                if interested_elem != "failed" and matches == preferred_match:
                     all_matching_elements.append(each_parent)
             All_Elements_Found=all_matching_elements
 
@@ -1498,6 +1549,16 @@ def Get_All_Elements(parameter,value,parent=False):
 #Use two parameters on the same level to get a specific element
 #Called by: Get_Element
 def Get_Double_Matching_Elements(param_1, value_1, param_2, value_2):
+    '''
+    We need to simplify this function:
+    data set can look something like this:
+    field = name, type  
+    subfield = multiple element parameters 
+    value = continue, button
+    
+    driver.find_element_by_xpath('//*[contains(@name,'continue'][contains(@type,'button']')
+    
+    '''
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         #text, tagname,linktext/href,css,partiallinktext
@@ -1690,10 +1751,10 @@ def Get_Double_Matching_Elements(param_1, value_1, param_2, value_2):
         return "failed"
 
 
-def Get_Table_Elements(table_parameter,table_value, reference_parameter=False,reference_value=False,reference_is_parent_or_child=False,get_all_unvalidated_elements=False):
+def Get_Table_Elements(table_parameter,table_value, reference_parameter=False,reference_value=False,reference_is_parent_or_child=False,get_all_unvalidated_elements=False, preferred_match = 1):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
-        table = Get_Element(table_parameter, table_value,reference_parameter,reference_value,reference_is_parent_or_child)
+        table = Get_Element(table_parameter, table_value,reference_parameter,reference_value,reference_is_parent_or_child, preferred_match=preferred_match)
         all_rows = WebDriverWait(table, WebDriver_Wait).until(EC.presence_of_all_elements_located((By.XPATH, "*")))
         master_text_table = []
         for each_row_obj in all_rows:
@@ -1780,6 +1841,13 @@ def Element_Validation(All_Elements_Found):#, index):
 def Validate_Step_Data(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: Validate_Step_Data", 1)
+    
+    element_parameter = False
+    element_value = False
+    reference_parameter = False
+    reference_value = False
+    reference_is_parent_or_child = False
+    
     try:
         if (len(step_data)==1):
             element_parameter = step_data[0][0]
@@ -1987,6 +2055,4 @@ def Get_Plain_Text_Element(element_parameter, element_value, parent=False):
 
 def get_driver():
     return selenium_driver
-
-
 
