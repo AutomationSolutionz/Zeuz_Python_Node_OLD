@@ -11,7 +11,7 @@
 '''
 ### TODO ###
 
-import inspect, sys
+import inspect, sys, os
 from Framework.Utilities import CommonUtil
 import common_functions as common # Functions that are common to all modules
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
@@ -24,8 +24,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     101: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
     102: {'module': 'appium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
     103: {'module': 'appium', 'name': 'tap', 'function': 'Tap_Appium'},
-    104: {'module': 'appium', 'name': 'validate full text', 'function': 'Validate_Text'},
-    105: {'module': 'appium', 'name': 'validate partial text', 'function': 'Validate_Text'},
+    104: {'module': 'appium', 'name': 'validate full text', 'function': 'Validate_Text_Appium'},
+    105: {'module': 'appium', 'name': 'validate partial text', 'function': 'Validate_Text_Appium'},
     106: {'module': 'appium', 'name': 'save text', 'function': 'Save_Text'},
     107: {'module': 'appium', 'name': 'compare variable', 'function': 'Compare_Variables'},
     108: {'module': 'appium', 'name': 'initialize list', 'function': 'Initialize_List'},
@@ -101,7 +101,11 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     177: {'module': 'utility', 'name': 'log 2', 'function': 'Add_Log'},
     178: {'module': 'utility', 'name': 'log 3', 'function': 'Add_Log'},
     179: {'module': 'utility', 'name': 'log 1', 'function': 'Add_Log'},
-    180: {'module': 'utility', 'name': 'download and unzip', 'function': 'Download_File_and_Unzip'}
+    180: {'module': 'utility', 'name': 'download and unzip', 'function': 'Download_File_and_Unzip'},
+    181: {'module': 'utility', 'name': 'take screen shot', 'function': 'TakeScreenShot' },
+    182: {'module': 'selenium', 'name': 'open browser', 'function': 'Open_Browser_Wrapper'},
+    183: {'module': 'selenium', 'name': 'go to link', 'function': 'Go_To_Link'},
+    184: {'module': 'selenium', 'name': 'tear down browser', 'function': 'Tear_Down_Selenium'}
 }
 
 # List of support for the actions
@@ -149,9 +153,40 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
         CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
         return 'failed'
     return 'passed'
+# funtion to get the path of home folder in linux
+def get_home_folder():
+    """
+
+    :return: give the path of home folder
+    """
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Get Home Folder", 1)
+    try:
+        CommonUtil.ExecLog(sModuleInfo, "Returning the path of home folder", 1)
+        return os.path.expanduser("~")
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = '', _temp_q = ''):
+def Save_File():
+    len1=len(os.path.join('Desktop', 'Attachments'))
+    dir_to_search = os.path.join(get_home_folder(), os.path.join('Desktop', 'Attachments'))
+    len2=len(dir_to_search)
+    root_len = len(os.path.abspath(dir_to_search))
+
+    for root, dirs, files in os.walk(dir_to_search):
+        archive_root = os.path.abspath(root)[root_len:]
+        for f in files:
+
+
+            fullpath = os.path.join(root, f)
+            path = fullpath[(len2-len1-1):]
+            sr.Set_Shared_Variables(f,path)
+
+    print sr.Show_All_Shared_Variables()
+
+
+def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = {}, _temp_q = ''):
     ''' Main Sequential Actions function - Performs logical decisions based on user input '''
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -160,17 +195,21 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
     # Set dependency, file_attachemnt as global variables
     global dependency, file_attachment
     if _dependency != {}:
-        dependency = _dependency
-        sr.Set_Shared_Variables('dependency', _dependency)
-    if _file_attachment != '':
-        file_attachment = _file_attachment
-        sr.Set_Shared_Variables('file_attachment', _file_attachment)
+        dependency = _dependency # Save to global variable
+        sr.Set_Shared_Variables('dependency', _dependency) # Save in Shared Variables
     
+    if _file_attachment != '': # If a file attachment was passed
+        file_attachment = _file_attachment # Save as a global variable
+        sr.Set_Shared_Variables('file_attachment', _file_attachment) # Add entire file attachment dictionary to Shared Variables
+        for file_attachment_name in _file_attachment: # Add each attachment as it's own Shared Variable, so the user can easily refer to it
+            sr.Set_Shared_Variables(file_attachment_name, _file_attachment[file_attachment_name])
+    Save_File()
     # Prepare step data for processing
     if common.verify_step_data(step_data) in common.failed_tag_list: # Verify step data is in correct format
         CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
         return "failed"
     step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
+    step_data = common.adjust_element_parameters(step_data) # Parse any mobile platform related fields
     
     try:            
         for data_set in step_data: # For each data set within step data
