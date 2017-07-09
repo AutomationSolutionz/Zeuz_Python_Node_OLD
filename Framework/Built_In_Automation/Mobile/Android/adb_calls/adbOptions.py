@@ -3,7 +3,7 @@
 
 #Android Debug Bridge (ADB) options to get the android devices info connected via usb/wi-fi
 __author__='minar'
-import subprocess, inspect, os, sys
+import subprocess, inspect, os, sys, re
 from Framework.Utilities import CommonUtil
 
 def start_adb_server():
@@ -221,4 +221,22 @@ def get_package_name():
 
     except Exception:
         errMsg = "Unable to get Packages Name"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+def wake_android():
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        output = subprocess.check_output("adb shell wm size", shell=True) # Need size for swipe calculation
+        m = re.search('(\d+)x(\d+)', output) # Find w and h using regular expression
+        w, h = (m.group(1), m.group(2)) # Save w and h
+        spos = int(int(h) * 0.7) # Calculate 70% of height as starting position
+        epos = int(int(h) * 0.1) # Calculate 10% of height as ending position
+        centre = int(int(w) / 2) # Calculate centre of screen horizontally
+        output = subprocess.check_output("adb shell input keyevent KEYCODE_WAKEUP", shell=True) # Send wakeup command (puts us on lock screen)
+        output = subprocess.check_output("adb shell input touchscreen swipe %d %d %d %d" % (centre, spos, centre, epos), shell=True) # Send vertical swipe command (takes us to home screen)
+        CommonUtil.ExecLog(sModuleInfo, "Waking device", 1)
+        return output
+
+    except Exception:
+        errMsg = "Unable to wake device"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
