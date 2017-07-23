@@ -5,6 +5,7 @@ from appium import webdriver
 import os, sys, time, inspect, subprocess, re
 from Framework.Utilities import CommonUtil
 from Framework.Built_In_Automation.Mobile.Android.adb_calls import adbOptions
+from Framework.Built_In_Automation.Mobile.iOS import iosOptions
 from appium.webdriver.common.touch_action import TouchAction
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
@@ -16,11 +17,13 @@ PATH = lambda p: os.path.abspath(
 )
 
  # Appium directory/filename - May need to move to settings.conf
-appium_binary = None
-if os.name == 'posix':
+appium_binary = 'appium' # Default filename of appium, assume in the PATH
+if 'linux' in sys.platform:
     appium_binary = 'appium'
+elif 'win' in sys.platform:
+    appium_binary = os.path.join(os.getenv('ProgramFiles'), 'APPIUM\Appium.exe')
 else:
-    CommonUtil.ExecLog(__name__ + " : " + __file__, "Platform doesn't have an appium location defined: %s" % str(os.name), 3)
+    CommonUtil.ExecLog(__name__ + " : " + __file__, "Unrecognized platform. Assuming 'appium' is in the PATH" % str(os.name), 3)
     
 # Recall appium driver, if not already set - needed between calls in a Zeuz test case
 appium_driver = None
@@ -93,17 +96,22 @@ def start_appium_server():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
      
+    # Shutdown appium server if it's already running
     if Shared_Resources.Test_Shared_Variables('appium_server'): # Check if the appium server was previously run (likely not)
         appium_server = Shared_Resources.Get_Shared_Variables('appium_server') # Get the subprocess object
         try:
             appium_server.kill() # Kill the server
         except:
             pass
+        
+    # Execute appium server
     try:
         appium_server = subprocess.Popen([appium_binary], stdout=subprocess.PIPE, stderr=subprocess.STDOUT) # Start the appium server
     except Exception, returncode: # Couldn't run server
-        CommonUtil.ExecLog(sModuleInfo,"Couldn't start Appium server: %s" % returncode, 3)
+        CommonUtil.ExecLog(sModuleInfo,"Couldn't start Appium server. May not be installed, or not in your PATH: %s" % returncode, 3)
         return 'failed'
+    
+    # Wait for server to startup and return
     Shared_Resources.Set_Shared_Variables('appium_server', appium_server) # Save the server object, so we can retrieve it later
     CommonUtil.ExecLog(sModuleInfo,"Waiting 10 seconds for server to start", 0)
     time.sleep(10) # Wait for server to get to ready state
@@ -121,6 +129,10 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
+    # Get the dependency again in case it was missed
+    if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
+        dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
+
     try:
         global appium_driver
         if appium_driver == None:
@@ -856,10 +868,27 @@ def Enter_Text_Appium(data_set):
                 # Enter text into element
                 Element.click() # Set focus to textbox
                 Element.clear() # Remove any text already existing
+
                 if dependency['Mobile'].lower() == 'ios':
                     Element.set_value(text_value) # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
-                else:
+            except Exception:
+                errMsg = "Found element, but couldn't write text to it"
+                return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+            # This is wrapped in it's own try block because we sometimes get an error from send_keys stating "Parameters were incorrect". However, most devices work only with send_keys
+            try:
+                if dependency['Mobile'].lower() != 'ios':
                     Element.send_keys(text_value) # Enter the user specified text
+            except Exception:
+                CommonUtil.ExecLog(sModuleInfo, "Found element, but couldn't write text to it. Trying another method", 2)
+                try:
+                    Element.set_value(text_value) # Enter the user specified text
+                except Exception:
+                    errMsg = "Found element, but couldn't write text to it. Giving up"
+                    return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+            # Complete the action
+            try:
                 appium_driver.hide_keyboard() # Remove keyboard
                 CommonUtil.TakeScreenShot(sModuleInfo) # Capture screen
                 CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
@@ -867,7 +896,6 @@ def Enter_Text_Appium(data_set):
             except Exception:
                 errMsg = "Found element, but couldn't write text to it"
                 return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
     except Exception:
         errMsg = "Could not find element."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
@@ -1190,7 +1218,6 @@ def Compare_Lists(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-'===================== ===x=== Sequential Actions Section Ends ===x=== ======================'
 
 
 def get_program_names(search_name):
@@ -1228,3 +1255,48 @@ def get_program_names(search_name):
     except:
         result = CommonUtil.Exception_Handler(sys.exc_info())
         return result, ''
+
+def device_information(data_set):
+    ''' Returns the requested device information '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+    # Parse data set
+    try:
+        dep = dependency['Mobile'].lower()
+        cmd = ''
+        shared_var = ''
+        
+        for row in data_set: # Check each row
+            if row[1] == 'action': # If this is the action row
+                cmd = row[0].lower().strip() # Save the command type
+                shared_var = row[2] # Save the name of the shared variable
+                break
+
+        if cmd == '':
+            CommonUtil.ExecLog(sModuleInfo,"Action's Field contains incorrect information", 3)
+            return 'failed'
+        if shared_var == '':
+            CommonUtil.ExecLog(sModuleInfo,"Action's Value contains incorrect information", 3)
+            return 'failed'
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error when trying to read Field and Value for action")
+
+    # Get device information
+    try:
+        if cmd == 'imei':
+            if dep == 'android': output = adbOptions.get_device_imei_info()
+            elif dep == 'ios': output = iosOptions.get_ios_imei()
+        else:
+            CommonUtil.ExecLog(sModuleInfo,"Action's Field contains incorrect information", 3)
+            return 'failed'
+            
+        # Save the output to the user specified shared variable
+        Shared_Resources.Set_Shared_Variables(shared_var, output)
+        CommonUtil.ExecLog(sModuleInfo,"Saved %s [%s] as %s" % (cmd, str(output), shared_var), 1)
+        return 'passed'
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+

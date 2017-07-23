@@ -44,7 +44,7 @@ if Shared_Resources.Test_Shared_Variables('selenium_driver'): # Check if driver 
     selenium_driver = Shared_Resources.Get_Shared_Variables('selenium_driver') # Retreive appium driver
 
 global dependency
-dependency = {'Browser':'chrome'}
+dependency = None
 if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
 
@@ -133,13 +133,16 @@ def Open_Browser(dependency):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 def Open_Browser_Wrapper(step_data):
-    #this function needs work with validating page title.  We need to check if user entered any title.
-    #if not then we don't do the validation
+    ''' Temporary wrapper for open_browser() until that function can be updated to use only data_set '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         global dependency
-        #browser = dependency['Browser']
-        #dict = {'Browser':browser}
+        # Get the dependency again in case it was missed
+        if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
+            dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
+    
+
         return Open_Browser(dependency)
     except Exception:
         ErrorMessage =  "failed to open browser"
@@ -196,67 +199,140 @@ def Enter_Text_In_Text_Box(step_data):
         errMsg = "Could not select/click your element."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
-
-#Method to click on element; step data passed on by the user
-def Keystroke_For_Element(step_data):
-    try:
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-        Element = LocateElement.Get_Element(step_data,selenium_driver)
-        if Element != "failed":
-            for each in step_data:
-                if each[1]=="action":
-                    if each[0]=="keystroke keys":
-                        keystroke_value=(each[2]).upper()
-                        get_keystroke_value = getattr(Keys, keystroke_value)
-                        result = Element.send_keys(get_keystroke_value)
-                    elif each[0] == "keystroke chars":
-                        keystroke_value=(each[2])
-                        result = Element.send_keys(keystroke_value)
-                    else:
-                        CommonUtil.ExecLog(sModuleInfo, "The correct parameter for the action has not been entered. Please check for errors.", 2)
-                        result = "failed"
-                else:
-                    continue
-            if (result != "failed"):
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                CommonUtil.ExecLog(sModuleInfo, "Successfully entered keystroke for the element with given parameters and values", 1)
-                return "passed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo, "Could not enter keystroke for the element with given parameters and values", 3)
-                element_attributes = Element.get_attribute('outerHTML')
-                CommonUtil.ExecLog(sModuleInfo, "Element Attributes: %s"%(element_attributes),3)
-                return "failed"
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
-            return "failed"
-        
-    except Exception:
-        errMsg = "Could not enter keystroke for your element."
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+def Keystroke_For_Element(data_set):
+    ''' Send a key stroke or string to an element or wherever the cursor is located '''
+    # Keystroke Keys: Any key. Eg: Tab, Escape, etc
+    # Keystroke Chars: Any string. Eg: The quick brown...
+    # If no element parameter is provided, it will enter the keystroke wherever the cursor is located
     
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    
+    # Parse the data set
+    try:
+        stype = '' # keys/chars
+        get_element = False # Use element
+        key_count = 1 # Default number of button presses
+        for row in data_set:
+            if row[1] == "action":
+                if row[0] == "keystroke keys": # Keypress
+                    stype = 'keys'
+                    keystroke_value = row[2]
+                    if ',' in keystroke_value: # If user supplied a number of presses
+                        keystroke_value.replace(' ', '')
+                        keystroke_value, key_count = keystroke_value.split(',') # Save keypress and count
+                        key_count = int(key_count)
+                elif row[0] == "keystroke chars": # String
+                    stype = 'chars'
+                    keystroke_value = row[2]
+            elif row[1] == 'element parameter':
+                get_element = True
+
+        if stype == '':
+            CommonUtil.ExecLog(sModuleInfo, "Field contains incorrect data", 3)
+            return 'failed'
+        
+        
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(),None, "Error parsing data set")
+        
+
+    # Get the element, or if none provided, create action chains for keystroke insertion without an element
+    if get_element == True:
+        Element = LocateElement.Get_Element(data_set, selenium_driver)
+        if Element in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Failed to locate element", 3)
+            return 'failed'
+    else:
+        Element = ActionChains(selenium_driver)
+
+            
+    # Insert keystroke
+    try:
+        if stype == 'keys':
+            # Requires: python-selenium v3.1+, geckodriver v0.15.0+
+            get_keystroke_value = getattr(Keys, keystroke_value.upper()) # Create an object for the keystroke
+            result = Element.send_keys(get_keystroke_value * key_count) # Prepare keystroke for sending if Actions, or send if Element
+            if get_element == False: Element.perform() # Send keystroke
+        else:
+            result = Element.send_keys(keystroke_value)
+            if get_element == False: Element.perform()
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(),None, "Error sending keystroke %s: %s" % (stype, keystroke_value))
+
+
+    # Test result
+    if result not in failed_tag_list:
+        CommonUtil.ExecLog(sModuleInfo, "Successfully sent %s: %s %d times" % (stype, keystroke_value, key_count), 1)
+        return 'passed'
+    else:
+        CommonUtil.ExecLog(sModuleInfo, "Error sending keystroke %s: %s %d times" % (stype, keystroke_value, key_count), 3)
+        return 'failed'
 
 
 #Method to click on element; step data passed on by the user
-def Click_Element(step_data):
+def Click_Element(data_set):
+    ''' Click using element or location '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+        
     try:
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-        Element = LocateElement.Get_Element(step_data,selenium_driver)
-        if Element != "failed":
-                try:
-                    Element.click()
-                    CommonUtil.TakeScreenShot(sModuleInfo)
-                    CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element with given parameters and values", 1)
-                    return "passed"
-                except Exception:
-                    element_attributes = Element.get_attribute('outerHTML')
-                    CommonUtil.ExecLog(sModuleInfo, "Element Attributes: %s"%(element_attributes),3)
-                    errMsg = "Could not select/click your element."
-                    return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
-            return "failed"
+        bodyElement = ''
+        for row in data_set:
+            if row[0] == 'location' and row[1] == 'element parameter':
+                bodyElement = LocateElement.Get_Element([('tag', 'element parameter', 'body')], selenium_driver) # Get element object of webpage body, so we can have a reference to the 0,0 coordinates
+                shared_var = row[2] # Save shared variable name, or coordinates if entered directory in step data
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+        
+    # Click using element
+    if bodyElement == '':
+        CommonUtil.ExecLog(sModuleInfo, "Looking for element", 0)
+        
+        # Get element object
+        Element = LocateElement.Get_Element(data_set,selenium_driver)
+        if Element in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find element", 3)
+            return 'failed'
+        
+        # Click element
+        try:
+            Element.click()
+            CommonUtil.TakeScreenShot(sModuleInfo)
+            CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element", 1)
+            return "passed"
+        except Exception:
+            element_attributes = Element.get_attribute('outerHTML')
+            CommonUtil.ExecLog(sModuleInfo, "Element Attributes: %s"%(element_attributes),3)
+            errMsg = "Could not select/click your element."
+            return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    # Click using location    
+    else:
+        CommonUtil.ExecLog(sModuleInfo, "Using provided location", 0)
+        try:
+            # Get coordinates
+            if ',' in shared_var: # These are coordinates, use directly
+                location = shared_var
+            else: # Shared variable name was provided
+                location = Shared_Resources.Get_List_from_Shared_Variables(shared_var)
+            location = location.replace(' ', '')
+            location = location.split(',')
+            x = float(location[0])
+            y = float(location[1])
+            
+            # Click coordinates
+            actions = ActionChains(selenium_driver) # Create actions object
+            actions.move_to_element_with_offset(bodyElement, x, y) # Move to coordinates (referrenced by body at 0,0)
+            actions.click() # Click action
+            actions.perform() # Perform all actions
+        
+            CommonUtil.ExecLog(sModuleInfo, "Click on location successful", 1)
+            return 'passed'
+        except Exception:
+            return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error clicking location")
+        
 
 
 #Method to click and hold on element; step data passed on by the user
@@ -376,24 +452,79 @@ def Hover_Over_Element(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+def get_location_of_element(data_set):
+    ''' Returns the x,y location of an element '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Parse data set
+    try:
+        shared_var = ''
+        for row in data_set:
+            if row[1] == 'action':
+                shared_var = row[2] # Save the shared variable name
+        
+        if shared_var == '':
+            CommonUtil.ExecLog(sModuleInfo, "Shared variable name missing from Value on action row", 3)
+            return 'failed'
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Get element object
+    Element = LocateElement.Get_Element(data_set, selenium_driver)
+    if Element in failed_tag_list:
+        CommonUtil.ExecLog(sModuleInfo, "Could not find element", 3)
+        return 'failed'
+    
+    # Get element location
+    try:
+        location = Element.location # Retreive the dictionary containing the x,y location coordinates
+        if location in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Could not get element location", 3)
+            return 'failed'
+    
+        # Save location as string, in preparation for the shared variable
+        x = str(location['x'])
+        y = str(location['y'])
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error retrieving element location")
+    
+    # Save location in shared variable
+    Shared_Resources.Set_Shared_Variables(shared_var, "%s,%s" % (x, y))
+    return 'passed'
+
+    
 #Search for element on new page after a particular time-out duration entered by the user through step-data
 def Wait_For_New_Element(step_data):
     try:
         sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
         Element = LocateElement.Get_Element(step_data,selenium_driver)
+        wait_for_element_to_disappear = False
         for each in step_data:
             if each[1]=="action":
                 timeout_duration = int(each[2])
+                if(each[0] == 'wait disable'):
+                    wait_for_element_to_disappear = True
         start_time = time.time()
         interval = 1
         for i in range(timeout_duration):
             time.sleep(time.time() + i*interval - start_time)
             Element = LocateElement.Get_Element(step_data,selenium_driver)
-            if (Element == 'failed'):
-                continue
+            if wait_for_element_to_disappear == False:
+                if (Element == 'failed'):
+                    continue
+                else:
+                    return 'passed'
             else:
-                return 'passed'
-        CommonUtil.ExecLog(sModuleInfo, "Waited for %s seconds but couldnt locate your element", 3)
+                if (Element == 'failed'):
+                    return 'passed'
+                else:
+                    continue
+        if wait_for_element_to_disappear == False:
+            CommonUtil.ExecLog(sModuleInfo, "Waited for %s seconds but couldnt locate your element", 3)
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Waited for %s seconds but your element still exists", 3)
         return 'failed'
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -401,7 +532,7 @@ def Wait_For_New_Element(step_data):
 #Validating text from an element given information regarding the expected text
 def Compare_Lists(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Compare_Lists", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         return Shared_Resources.Compare_Lists([step_data])
     except:
@@ -411,7 +542,7 @@ def Compare_Lists(step_data):
 #Validating text from an element given information regarding the expected text
 def Compare_Variables(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Compare_Variables", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         return Shared_Resources.Compare_Variables([step_data])
     except:
@@ -421,7 +552,7 @@ def Compare_Variables(step_data):
 #Inserting a field into a list of shared variables
 def Insert_Into_List(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Insert_Into_List", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         if len(step_data) == 1: #will have to test #saving direct input string data
             list_name = ''
@@ -435,9 +566,7 @@ def Insert_Into_List(step_data):
 
             temp_list = full_input_key_value_name.split(',')
             if len(temp_list) == 1:
-                CommonUtil.ExecLog(sModuleInfo,
-                                   "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                                   3)
+                CommonUtil.ExecLog(sModuleInfo, "Value must contain more than one item, and must be comma separated", 3)
                 return "failed"
             else:
                 list_name = temp_list[0].split(':')[1].strip()
@@ -465,9 +594,7 @@ def Insert_Into_List(step_data):
             # get list name from full input_string
             temp_list = key.split(',')
             if len(temp_list) == 1:
-                CommonUtil.ExecLog(sModuleInfo,
-                    "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                        3)
+                CommonUtil.ExecLog(sModuleInfo, "Value must contain more than one item, and must be comma separated", 3)
                 return "failed"
             else:
                 list_name = str(temp_list[0]).split(':')[1].strip()
@@ -495,7 +622,7 @@ def Insert_Into_List(step_data):
 #Validating text from an element given information regarding the expected text
 def Save_Text(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Save_Text", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Element = LocateElement.Get_Element(step_data,selenium_driver)
         if Element == "failed":
@@ -523,7 +650,7 @@ def Save_Text(step_data):
 #Validating text from an element given information regarding the expected text
 def Validate_Text(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Validate_Text", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Element = LocateElement.Get_Element(step_data,selenium_driver)
         if Element == "failed":
@@ -543,8 +670,8 @@ def Validate_Text(step_data):
         #if step_data[0][len(step_data[0])-1][0] == "validate partial text":
         if validation_type == "validate partial text":
             actual_text_data = visible_list_of_element_text
-            CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, 1)
-            CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 1)
+            CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, )
+            CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 0)
             for each_actual_text_data_item in actual_text_data:
                 if expected_text_data in each_actual_text_data_item:
                     CommonUtil.ExecLog(sModuleInfo, "The text has been validated by a partial match.", 1)
@@ -554,8 +681,8 @@ def Validate_Text(step_data):
         #if step_data[0][len(step_data[0])-1][0] == "validate full text":
         if validation_type == "validate full text":
             actual_text_data = visible_list_of_element_text
-            CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, 1)
-            CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 1)
+            CommonUtil.ExecLog(sModuleInfo, "Expected Text: " + expected_text_data, 0)
+            CommonUtil.ExecLog(sModuleInfo, "Actual Text: " + str(actual_text_data), 0)
             if (expected_text_data in actual_text_data):
                 CommonUtil.ExecLog(sModuleInfo, "The text has been validated by using complete match.", 1)
                 return "passed"
@@ -574,7 +701,7 @@ def Validate_Text(step_data):
 #Method to sleep for a particular duration
 def Sleep(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Sleep", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         if ((1 < len(step_data) >= 2)):
             CommonUtil.ExecLog(sModuleInfo,"Please provide single row of data for only sleep. Consider using wait instead",3)
@@ -593,7 +720,7 @@ def Sleep(step_data):
 #Method to scroll down a page
 def Scroll(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Scroll", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         if ((1 < len(step_data) >= 2)):
             CommonUtil.ExecLog(sModuleInfo,"Please provide only single row of data",3)
@@ -602,7 +729,7 @@ def Scroll(step_data):
             tuple = step_data[0]
             scroll_direction = tuple[2]
             if scroll_direction == 'down':
-                CommonUtil.ExecLog(sModuleInfo,"Scrolling down",1)
+                CommonUtil.ExecLog(sModuleInfo,"Scrolling down", 1)
                 result = selenium_driver.execute_script("window.scrollBy(0,750)", "")
                 time.sleep(2)
                 return "passed"
@@ -612,7 +739,7 @@ def Scroll(step_data):
                 time.sleep(2)
                 return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo, "Scrolling was not successful", 3)
+                CommonUtil.ExecLog(sModuleInfo, "Value invalid. Only 'up', and 'down' allowed", 3)
                 result = "failed"
                 return result
 
@@ -624,7 +751,7 @@ def Scroll(step_data):
 #Method to return pass or fail for the step outcome
 def Navigate(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         if ((1 < len(step_data) >= 2)):
             CommonUtil.ExecLog(sModuleInfo,"Please provide only single row of data",3)
@@ -641,7 +768,7 @@ def Navigate(step_data):
                 selenium_driver.refresh()
                 CommonUtil.ExecLog(sModuleInfo, "Performing browser refresh", 1)
             else:
-                CommonUtil.ExecLog(sModuleInfo, "invalid navigation data set.  Please provide only a single row of data for this dataset", 3)
+                CommonUtil.ExecLog(sModuleInfo, "Value invalid. Only 'back', 'forward', 'refresh' allowed", 3)
                 return "failed"
             return "passed"
     except Exception:
@@ -650,7 +777,7 @@ def Navigate(step_data):
 
 def Select_Deselect(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Element = LocateElement.Get_Element(step_data,selenium_driver)
         if Element == "failed":
@@ -701,7 +828,7 @@ def Select_Deselect(step_data):
                     result = selected_Element.select_by_visible_text(visible_text)
                     return "passed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo, "The correct parameter for the action has not been entered. Please check for errors.", 2)
+                    CommonUtil.ExecLog(sModuleInfo, "Value invalid. Only 'deselect all', 'deselect by visible text', etc allowed", 3)
                     result = "failed"
 
             else:
@@ -718,7 +845,7 @@ def Select_Deselect(step_data):
 
 def Model_Actual_Data(actual_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Actual_Data", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -741,7 +868,7 @@ def Model_Actual_Data(actual_data):
 
 def Model_Actual_Data_Ignoring_Column(actual_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Actual_Data_Ignoring_Column", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -761,7 +888,7 @@ def Model_Actual_Data_Ignoring_Column(actual_data):
 
 def Model_Actual_Data_Ignoring_Row(actual_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Actual_Data_Ignoring_Row", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -781,7 +908,7 @@ def Model_Actual_Data_Ignoring_Row(actual_data):
 
 def Model_Expected_Data(expected_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Expected_Data", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -804,7 +931,7 @@ def Model_Expected_Data(expected_data):
 
 def Model_Expected_Data_Ignoring_Column(expected_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Expected_Data_Ignoring_Column", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -830,7 +957,7 @@ def Model_Expected_Data_Ignoring_Column(expected_data):
 
 def Model_Expected_Data_Ignoring_Row(expected_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Expected_Data_Ignoring_Row", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         Modeled_Data_Set = []
         row_count = 1
@@ -857,7 +984,7 @@ def Model_Expected_Data_Ignoring_Row(expected_data):
 def Model_Expected_Column_Row(expect_data):
     #collect all column name
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Model_Expected_Column_Row", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         column_names = []
         row_names = []
@@ -1064,112 +1191,10 @@ def Get_Table_Elements(step_data,get_all_unvalidated_elements=False, preferred_m
 
 '===================== ===x=== Get Element Section Ends ===x=== ======================'
 
-
-'''
-    This section below contains methods similar to Sequential Actions, however
-    different parameters are passed on as per user requests.
-'''
-'============================ Stand-alone Action Section Begins ============================='
-
-def Click_Element_StandAlone(Element):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Click_Element_StandAlone", 1)
-    try:
-        if isinstance(Element, (WebElement)) == True:
-            try:
-                Element.click()
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element", 1)
-                return "passed"
-            except Exception:
-                element_attributes = Element.get_attribute('outerHTML')
-                CommonUtil.ExecLog(sModuleInfo, "Element Attributes: %s"%(element_attributes),3)
-                errMsg = "Could not find/click your element"
-                return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    except Exception:
-        errMsg = "Could not find/click your element"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-def Hover_Over_Element_StandAlone(Element):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Hover_Over_Element_StandAlone", 1)
-    try:
-        if isinstance(Element, (WebElement)) == True:
-            try:
-                hov = ActionChains(selenium_driver).move_to_element(Element)
-                hov.perform()
-                CommonUtil.TakeScreenShot(sModuleInfo)
-                CommonUtil.ExecLog(sModuleInfo, "Successfully hovered over the element", 1)
-                return "passed"
-            except Exception:
-                element_attributes = Element.get_attribute('outerHTML')
-                CommonUtil.ExecLog(sModuleInfo, "Element Attributes: %s"%(element_attributes),3)
-                errMsg = "Could not find/hover over your element"
-                return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    except Exception:
-        errMsg = "Could not find/hover over your element"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-def Keystroke_Key_StandAlone(KeyToBePressed):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Keystroke_Key_StandAlone", 1)
-    try:
-        keystroke_value=KeyToBePressed.upper()
-        get_keystroke_value = getattr(Keys, keystroke_value)
-        result = ActionChains(selenium_driver).send_keys(get_keystroke_value)
-        #result.perform()
-        CommonUtil.TakeScreenShot(sModuleInfo)
-        CommonUtil.ExecLog(sModuleInfo, "Successfully pressed key", 1)
-        return "passed"
-    except Exception:
-        errMsg = "Could not press the desired key"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-def Keystroke_Characters_StandAlone(KeysToBePressed):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Keystroke_Characters_StandAlone", 1)
-    try:
-        result = ActionChains(selenium_driver).send_keys(KeysToBePressed)
-        #result.perform()
-        CommonUtil.TakeScreenShot(sModuleInfo)
-        CommonUtil.ExecLog(sModuleInfo, "Successfully pressed characters", 1)
-        return "passed"
-    except Exception:
-        errMsg = "Could not press the desired characters"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-def Scroll_StandAlone(scroll_direction):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Scroll_StandAlone", 1)
-    try:
-        if scroll_direction == 'down':
-            CommonUtil.ExecLog(sModuleInfo,"Scrolling down",1)
-            result = selenium_driver.execute_script("window.scrollBy(0,750)", "")
-            time.sleep(5)
-        elif scroll_direction == 'up':
-            CommonUtil.ExecLog(sModuleInfo, "Scrolling up", 1)
-            result = selenium_driver.execute_script("window.scrollBy(0,-750)", "")
-            time.sleep(5)
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "Scrolling was not successful", 3)
-            result = "failed"
-        return result
-
-    except Exception:
-        errMsg = "Could not scroll in the desired direction"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-'===================== ===x=== Stand-alone Action Section Ends ===x=== ======================'
-
-
 def Tear_Down_Selenium(step_data = [[[]]]):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
-        CommonUtil.ExecLog(sModuleInfo, "Trying to tear down the page and close the browser...", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Trying to tear down the page and close the browser...", 0)
         selenium_driver.quit()
         CommonUtil.ExecLog(sModuleInfo, "Closed the browser successfully.", 1)
         return "passed"
@@ -1181,7 +1206,7 @@ def Tear_Down_Selenium(step_data = [[[]]]):
 ##@Riz and @Sreejoy: More work is needed here. Please investigate further.
 def Get_Plain_Text_Element(element_parameter, element_value, parent=False):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Get_Plain_Text_Element", 1)
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
         if parent==False:
             all_elements_with_text = selenium_driver.find_elements_by_xpath(".//*")
@@ -1220,7 +1245,7 @@ def Get_Plain_Text_Element(element_parameter, element_value, parent=False):
             return_element = full_list[len(full_list) - 1]
 
         else:
-            CommonUtil.ExecLog(sModuleInfo, "Incorrect element parameter entered, please check the value.", 3)
+            CommonUtil.ExecLog(sModuleInfo, "Value invalid. Only 'plain_text', 'partial_plain_text' allowed", 3)
             return "failed"
 
         return return_element

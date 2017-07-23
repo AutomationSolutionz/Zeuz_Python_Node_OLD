@@ -15,7 +15,11 @@
 
 # Dictionary of supported actions and their respective modules
 # Rules: Action NAME must be lower case, no underscores, single spaces, no trailing whitespace. Module names must match those used in load_sa_modules()
+# Caveat: Modules that are common to more than one built in function are listed here as with the module set to "common". If there is a "common" function, and another module with the same name created here, there may be a conflict, and the wrong function may execute
 actions = { # Numbers are arbitrary, and are not used anywhere
+    900: {'module': 'common', 'name': 'step result', 'function': 'step_result'},
+    901: {'module': 'common', 'name': 'sleep', 'function': 'Sleep'},
+    
     100: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     101: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
     102: {'module': 'appium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
@@ -30,7 +34,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     111: {'module': 'appium', 'name': 'install', 'function': 'install_application'},
     112: {'module': 'appium', 'name': 'launch', 'function': 'launch_application'},
     113: {'module': 'appium', 'name': 'get location', 'function': 'get_element_location_by_id'},
-    114: {'module': 'appium', 'name': 'sleep', 'function': 'Sleep'},
     115: {'module': 'appium', 'name': 'swipe', 'function': 'swipe_handler'},
     116: {'module': 'appium', 'name': 'close', 'function': 'close_application'},
     117: {'module': 'appium', 'name': 'uninstall', 'function': 'uninstall_application'},
@@ -41,9 +44,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     121: {'module': 'rest', 'name': 'save response', 'function': 'Get_Response'},
     122: {'module': 'rest', 'name': 'compare variable', 'function': 'Compare_Variables'},
     123: {'module': 'rest', 'name': 'compare list', 'function': 'Compare_Lists'},
-    124: {'module': 'rest', 'name': 'sleep', 'function': 'Sleep'},
     125: {'module': 'rest', 'name': 'initialize list', 'function': 'Initialize_List'},
-    126: {'module': 'rest', 'name': 'step result', 'function': 'Step_Result'},
     127: {'module': 'rest', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     128: {'module': 'selenium', 'name': 'click', 'function': 'Click_Element'},
     129: {'module': 'selenium', 'name': 'click and hold', 'function': 'Click_and_Hold_Element'},
@@ -55,7 +56,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     135: {'module': 'selenium', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
     136: {'module': 'selenium', 'name': 'text', 'function': 'Enter_Text_In_Text_Box'},
     137: {'module': 'selenium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
-    138: {'module': 'selenium', 'name': 'sleep', 'function': 'Sleep'},
     139: {'module': 'selenium', 'name': 'initialize list', 'function': 'Initialize_List'},
     140: {'module': 'selenium', 'name': 'validate full text', 'function': 'Validate_Text'},
     141: {'module': 'selenium', 'name': 'validate partial text', 'function': 'Validate_Text'},
@@ -64,7 +64,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     144: {'module': 'selenium', 'name': 'compare list', 'function': 'Compare_Lists'},
     145: {'module': 'selenium', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     146: {'module': 'selenium', 'name': 'scroll', 'function': 'Scroll'},
-    147: {'module': 'selenium', 'name': 'step result', 'function': 'Step_Result'},
     148: {'module': 'selenium', 'name': 'deselect all', 'function': 'Select_Deselect'},
     149: {'module': 'selenium', 'name': 'select by visible text', 'function': 'Select_Deselect'},
     150: {'module': 'selenium', 'name': 'deselect by visible text', 'function': 'Select_Deselect'},
@@ -89,11 +88,9 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     169: {'module': 'utility', 'name': 'current documents', 'function': 'Get_Current_Documents'},
     170: {'module': 'utility', 'name': 'current desktop', 'function': 'Get_Current_Desktop'},
     171: {'module': 'utility', 'name': 'home directory', 'function': 'Get_Home_Directory'},
-    172: {'module': 'utility', 'name': 'run sudo', 'function': 'Run_Sudo_Command'},
+    172: {'module': 'utility', 'name': 'run sudo', 'function': 'Run_Command'},
     173: {'module': 'utility', 'name': 'run command', 'function': 'Run_Command'},
     174: {'module': 'utility', 'name': 'download', 'function': 'Download_file'},
-    175: {'module': 'utility', 'name': 'sleep', 'function': 'Sleep'},
-    176: {'module': 'utility', 'name': 'step result', 'function': 'Step_Result'},
     177: {'module': 'utility', 'name': 'log 2', 'function': 'Add_Log'},
     178: {'module': 'utility', 'name': 'log 3', 'function': 'Add_Log'},
     179: {'module': 'utility', 'name': 'log 1', 'function': 'Add_Log'},
@@ -102,7 +99,21 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     182: {'module': 'selenium', 'name': 'open browser', 'function': 'Open_Browser_Wrapper'},
     183: {'module': 'selenium', 'name': 'go to link', 'function': 'Go_To_Link'},
     184: {'module': 'selenium', 'name': 'tear down browser', 'function': 'Tear_Down_Selenium'},
-    185: {'module': 'selenium', 'name': 'navigate', 'function': 'Navigate'}
+    185: {'module': 'selenium', 'name': 'navigate', 'function': 'Navigate'},
+    186: {'module': 'xml', 'name': 'update', 'function': 'update_element'},
+    187: {'module': 'xml', 'name': 'add', 'function': 'add_element'},
+    188: {'module': 'xml', 'name': 'read', 'function': 'read_element'},
+    189: {'module': 'xml', 'name': 'delete', 'function': 'delete_element'},
+    190: {'module': 'appium', 'name': 'imei', 'function': 'device_information'},
+    191: {'module': 'selenium', 'name': 'wait disable', 'function': 'Wait_For_New_Element'},
+    192: {'module': 'desktop', 'name': 'click', 'function': 'Click_Element'},
+    193: {'module': 'desktop', 'name': 'double click', 'function': 'Double_Click_Element'},
+    194: {'module': 'desktop', 'name': 'hover', 'function': 'Hover_Over_Element'},
+    195: {'module': 'desktop', 'name': 'keystroke keys', 'function': 'Keystroke_For_Element'},
+    196: {'module': 'desktop', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
+    197: {'module': 'desktop', 'name': 'enter text', 'function': 'Enter_Text_In_Text_Box'},
+    198: {'module': 'desktop', 'name': 'wait', 'function': 'Sleep'},
+    199: {'module': 'selenium', 'name': 'get location', 'function': 'get_location_of_element'}
 }
 
 # List of Sub-Field keywords, must be all lowercase, and using single spaces - no underscores
@@ -113,6 +124,7 @@ action_support = [
     'element parameter',
     'child parameter',
     'parent parameter',
+    'target parameter',
     'method',
     'url',
     'body',
@@ -120,7 +132,8 @@ action_support = [
     'headers',
     'compare',
     'path',
-    'value'
+    'value',
+    'result'
 ]
 
 # Import modules
@@ -143,7 +156,9 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
-    if module == 'appium':
+    if module == 'common':
+        pass # Already imported at top of this file
+    elif module == 'appium':
         global appium
         from Framework.Built_In_Automation.Mobile.CrossPlatform.Appium import BuiltInFunctions as appium
     elif module == 'selenium':
@@ -155,6 +170,9 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
     elif module == 'utility':
         global utility
         from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as utility
+    elif module == 'xml':
+        global xml
+        from Framework.Built_In_Automation.XML import BuiltInFunctions_XML as xml
     else:
         CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
         return 'failed'
@@ -180,6 +198,7 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
     
     # Set screen capture type (desktop/mobile) as shared variable, so TakeScreenShot() can read it
     sr.Set_Shared_Variables('screen_capture', screen_capture.lower().strip()) # Save the screen capture type
+    CommonUtil.set_screenshot_vars(sr.Shared_Variable_Export()) # Get all the shared variables, and pass them to CommonUtil
 
     # Prepare step data for processing
     step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
@@ -213,14 +232,24 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
                     # Only run this when we have two conditional actions for this data set (a true and a false preferably)
                     if len(logic_row) == 2:
                         CommonUtil.ExecLog(sModuleInfo, "Found 2 conditional actions - moving ahead with them", 1)
-                        return Conditional_Action_Handler(step_data, data_set, row, logic_row, result) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
+                        return Conditional_Action_Handler(step_data, data_set, row, logic_row) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
                         # At this point, we don't process any more data sets, which is why we return here. The conditional action function takes care of the rest of the execution
                 
                 # If middle column = action, call action handler
                 elif "action" in action_name: # Must be last, since it's a single word that also exists in other action types
                     CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row: %s" % str(row), 0)
                     result = Action_Handler(data_set, row) # Pass data set, and action_name to action handler
-                    if result in failed_tag_list: # Check result of action handler
+
+                    # Check if user wants to store the result for later use
+                    stored = False
+                    for r in data_set:
+                        if r[0].lower().strip() == 'store' and r[1].lower().strip() == 'result': # If Field = store and Sub-Field = result
+                            CommonUtil.ExecLog(sModuleInfo, "Storing result for later use. Will not exit if action failed: %s" % result, 1)
+                            sr.Set_Shared_Variables(r[2].strip(), result) # Use the Value as the shared variable name, and save the result
+                            stored = True # In the case of a failed result, skip the return that comes after this
+                            
+                    # Check result of action handler 
+                    if stored == False and result in failed_tag_list:
                         return "failed"
                 
                 # Middle column not listed above, so data set is wrong
@@ -236,7 +265,7 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
 
  
 
-def Conditional_Action_Handler(step_data, data_set, row, logic_row, result):
+def Conditional_Action_Handler(step_data, data_set, row, logic_row):
     ''' Process conditional actions, called only by Sequential_Actions() '''
      
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
@@ -246,11 +275,36 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row, result):
     module = row[1].split(' ')[0]
     load_sa_modules(module)
 
-    data_set = shared_variable_to_value(data_set)
+    # Convert any shared variables into their strings
+    data_set = common.shared_variable_to_value(data_set)
     if data_set in failed_tag_list:
         return 'failed'
     
-    if module == 'appium' or module == 'selenium':
+    # Test if data set contains the recall line, and if so, get the saved result from the previous action
+    try:
+        stored = False
+        for row in data_set:
+            if row[0].lower().strip() == 'recall' and row[1].lower().strip() == 'result': # If Field = recall and Sub-Field = result
+                CommonUtil.ExecLog(sModuleInfo, "Recalled result: %s" % str(row[2]), 1)
+                stored = True
+                result = row[2] # Retrieve the saved result (already converted from shared variable)
+    except:
+        errMsg = "Error reading stored result. Perhaps it was not stored, or you failed to include the store result line in your previous action"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+    if stored == False: # Just to be clear, we can't to log that we are using the old method
+        CommonUtil.ExecLog(sModuleInfo, "Could not find the recall result row. It's either missing or mispelled. Trying old method of Conditional Action, but suggest you update to the currently accepted method", 2)
+        
+    if stored == True: # Use saved result from previous data set
+        if result in failed_tag_list: # Check result from previous action 
+            logic_decision = "false"
+        else: # Passed / Skipped
+            logic_decision = "true"
+
+
+    # *** Old method of conditional actions in the if statements below. Only kept for backwards compatibility *** #
+    
+    elif module == 'appium' or module == 'selenium':
         try:
             Element = LocateElement.Get_Element(data_set, eval(module).get_driver()) # Get the element object or 'failed'
             if Element in failed_tag_list:
@@ -312,6 +366,8 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row, result):
                 logic_decision = "false"
                 return CommonUtil.Exception_Handler(sys.exc_info())
 
+    # *** Old method of conditional actions in the if statements above. Only kept for backwards compatibility *** #
+    
     else:
         CommonUtil.ExecLog(sModuleInfo, "Either no module was specified in the Conditional Action line, or it is incorrect", 3)
         return "failed"
@@ -343,18 +399,16 @@ def Action_Handler(_data_set, action_row):
     # Split data set row into the usable parts
     action_name = action_row[0]
     action_subfield = action_row[1]
-    action_value = action_row[2]
 
     # Get module and function for this action
     module = ''
     function = ''
-    if action_name != 'step result': # Step result is handle here becaue it's common to all functions - we use this line because we don't want to process it as a module
-        module, function = get_module_and_function(action_name, action_subfield) # New, get the module to execute
-        CommonUtil.ExecLog(sModuleInfo, "Function identified as function: %s in module: %s" % (function, module), 0)
-    
-        if module in failed_tag_list or module == '' or function == '': # New, make sure we have a function
-            CommonUtil.ExecLog(sModuleInfo, "You probably didn't add the module as part of the action. Eg: appium action", 3)
-            return "failed"
+    module, function, original_module = common.get_module_and_function(action_name, action_subfield) # New, get the module to execute
+    CommonUtil.ExecLog(sModuleInfo, "Function identified as function: %s in module: %s" % (function, module), 0)
+
+    if module in failed_tag_list or module == '' or function == '': # New, make sure we have a function
+        CommonUtil.ExecLog(sModuleInfo, "You probably didn't add the module as part of the action. Eg: appium action", 3)
+        return "failed"
 
     # Strip the "optional" keyword, and module, so functions work properly (result of optional action is handled by sequential_actions)
     data_set = []
@@ -364,82 +418,27 @@ def Action_Handler(_data_set, action_row):
             new_row[1] = new_row[1].replace('optional', '').strip()
         if module in row[1]:
             new_row[1] = new_row[1].replace(module, '').strip()
+        if original_module != '' and original_module in row[1]:
+            new_row[1] = new_row[1].replace(original_module, '').strip()
         data_set.append(tuple(new_row))
 
     # Convert shared variables to their string equivelent
-    data_set = shared_variable_to_value(data_set)
+    data_set = common.shared_variable_to_value(data_set)
     if data_set in failed_tag_list:
         return 'failed'
 
     try:
-        if action_name == "step result": # Result from step data the user wants to specify (passed/failed)
-            if action_value in failed_tag_list: # Convert user specified pass/fail into standard result
-                return 'failed'
-            elif action_value in skipped_tag_list:
-                return 'skipped'
-            elif action_value in passed_tag_list:
-                return 'passed'
-            else:
-                CommonUtil.ExecLog(sModuleInfo, "Step Result action has invalid VALUE", 3)
-                return 'failed'
-        else:
-            result = load_sa_modules(module) # Load the appropriate module
-            if result == 'failed':
-                CommonUtil.ExecLog(sModuleInfo, "Can't find module for %s" % module, 3)
-                return 'failed'
+        result = load_sa_modules(module) # Load the appropriate module
+        if result == 'failed':
+            CommonUtil.ExecLog(sModuleInfo, "Can't find module for %s" % module, 3)
+            return 'failed'
             
-            CommonUtil.ExecLog(sModuleInfo, "Executing %s with data set %s" % (function, str(data_set)), 1)
-            run_function = getattr(eval(module), function) # create a reference to the function
-            result = run_function(data_set) # Execute function, providing all rows in the data set
-            return result # Return result to sequential_actions()
+        CommonUtil.ExecLog(sModuleInfo, "Executing %s with data set %s" % (function, str(data_set)), 1)
+        run_function = getattr(eval(module), function) # create a reference to the function
+        result = run_function(data_set) # Execute function, providing all rows in the data set
+        return result # Return result to sequential_actions()
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
  
-
-def get_module_and_function(action_name, action_sub_field):
-    ''' Function to split module from the action name, and with the action name tries to find the corrosponding function name '''
-    
-    try:
-        action_list = action_sub_field.split(' ') # Split sub-field, so we can get moudle name from step data
-        if action_list > 1: # Should be at least two words in the sub-field
-            module = action_list[0] # Save first word which is the module name
-            _exit = 0
-            function = ''
-            for i in actions: # For each dictionary in the dictionary
-                if _exit == 1: break # Exit if we found what we are looking for
-                for j in actions[i]: # For each entry in the sub-dictionary
-                    if actions[i]['module'] == module and actions[i]['name'] == action_name: # Module and action name match
-                        function = actions[i]['function'] # Save function
-                        _exit = 1 # Exit for loop
-                        break
-
-            return module, function # Return module and function name
-        else:
-            return '','' # Error handled in calling function
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-def shared_variable_to_value(data_set):
-    ''' Look for any Shared Variable strings in step data, convert them into their values, and return '''
-    
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    new_data = [] # Rebuild the data_set with the new variable (because it's a list of tuples which we can't update)
-
-    try:
-        for row in data_set: # For each row of the data set
-            data_row = list(row) # Convert row which is a tuple to a list, so we can update it if we need to
-            for i in range(0, 3): # For each field (Field, Sub-Field, Value)
-                if row[i] != False: # !!!! Probbly not needed
-                    while "%|" in data_row[i] and "|%" in data_row[i]: # If string contains these characters, it's a shared variable
-                        CommonUtil.ExecLog(sModuleInfo, "Shared Variable: %s" % row[i], 0)
-                        data_row[i] = sr.get_previous_response_variables_in_strings(data_row[i])# replace just the variable name with it's value (has to be in string format)
-                        if data_row[i] == 'failed': #!!!this won't work if there's extra strings around the shared variable 
-                            CommonUtil.ExecLog(sModuleInfo, "Invalid shared variable", 3)
-                            return "failed"
-            new_data.append(tuple(data_row)) # Convert row from list to tuple, and append to new data_set
-        return new_data # Return parsed data_set
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
 
