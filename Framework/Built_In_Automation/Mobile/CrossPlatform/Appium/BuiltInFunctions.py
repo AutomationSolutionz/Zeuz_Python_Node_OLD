@@ -15,16 +15,7 @@ from Framework.Built_In_Automation.Shared_Resources import LocateElement
 PATH = lambda p: os.path.abspath(
     os.path.join(os.path.dirname(__file__), p)
 )
-
- # Appium directory/filename - May need to move to settings.conf
-appium_binary = 'appium' # Default filename of appium, assume in the PATH
-if 'linux' in sys.platform:
-    appium_binary = 'appium'
-elif 'win' in sys.platform:
-    appium_binary = os.path.join(os.getenv('ProgramFiles'), 'APPIUM\Appium.exe')
-else:
-    CommonUtil.ExecLog(__name__ + " : " + __file__, "Unrecognized platform. Assuming 'appium' is in the PATH" % str(os.name), 3)
-    
+   
 # Recall appium driver, if not already set - needed between calls in a Zeuz test case
 appium_driver = None
 if Shared_Resources.Test_Shared_Variables('appium_driver'): # Check if driver is already set in shared variables
@@ -37,6 +28,44 @@ if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is al
 else:
     CommonUtil.ExecLog(__name__ + " : " + __file__, "No dependency set - Cannot run", 3)
 
+def find_appium():
+    ''' Do our very best to find the appium executable '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+    # Expected locations
+    appium_list = [
+        '/usr/bin/appium',
+        os.path.join(str(os.getenv('HOME')), '.linuxbrew/bin/appium'),
+        os.path.join(str(os.getenv('ProgramFiles')), 'APPIUM','Appium.exe')
+        ] # getenv() must be wrapped in str(), so it doesn't fail on other platforms
+    
+    # Try to find the appium executable
+    global appium_binary
+    appium_binary = ''
+    for binary in appium_list:
+        if os.path.exists(binary):
+            appium_binary = binary
+            break
+    
+    if appium_binary == '': # Didn't find where appium was installed
+        CommonUtil.ExecLog(sModuleInfo, "Appium not found. Trying to locate via which", 0)
+        try: appium_binary = subprocess.Popen(['which', 'appium'], stdout = subprocess.PIPE).communicate()[0].strip()
+        except: pass
+        
+        if appium_binary == '': # Didn't find where appium was installed
+            appium_binary = 'appium' # Default filename of appium, assume in the PATH
+            CommonUtil.ExecLog(sModuleInfo,"Appium still not found. Assuming it's in the PATH.", 2)
+        else:
+            CommonUtil.ExecLog(sModuleInfo,"Found appium: %s" % appium_binary, 1)
+    else: # Found appium's path
+        CommonUtil.ExecLog(sModuleInfo,"Found appium: %s" % appium_binary, 1)
+
+# Try to find appium
+appium_binary = ''
+find_appium()
+
 def get_driver():
     ''' For custom functions external to this script that need access to the driver '''
     # Caveat: create_appium_driver() must be executed before this variable is populated
@@ -47,6 +76,15 @@ def launch_application(data_set):
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Get the dependency again in case it was missed
+    if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
+        dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
+
+    # Ensure dependency is set
+    if 'Mobile' not in dependency:
+        CommonUtil.ExecLog(sModuleInfo, "Mobile dependency not set. You must set it when deploying a run.", 3)
+        return 'failed'
     
     # Parse data set
     try:
@@ -133,13 +171,18 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
     if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
         dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
 
+    # Ensure dependency is set
+    if 'Mobile' not in dependency:
+        CommonUtil.ExecLog(sModuleInfo, "Mobile dependency not set. You must set it when deploying a run.", 3)
+        return 'failed'
+    
     try:
         global appium_driver
         if appium_driver == None:
             # Start Appium server
             if start_appium_server() in failed_tag_list:
                 return 'failed'
-            
+
             # Create Appium driver
     
             # Setup capabilities
@@ -150,6 +193,10 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
             desired_caps['newCommandTimeout'] = 600 # Command timeout before appium destroys instance
             
             if dependency['Mobile'].lower() == 'android':
+                if adbOptions.is_android_connected() == False:
+                    CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
+                    return 'failed'
+
                 adbOptions.wake_android() # Send wake up command to avoid issues with devices ignoring appium when they are in lower power mode (android 6.0+)
                 CommonUtil.ExecLog(sModuleInfo,"Setting up with Android",1)
                 desired_caps['platformVersion'] = adbOptions.get_android_version().strip()
@@ -171,7 +218,6 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
                 CommonUtil.ExecLog(sModuleInfo, "Invalid dependency: %s" % str(dependency), 3)
                 return 'failed'
             CommonUtil.ExecLog(sModuleInfo,"Capabilities: %s" % str(desired_caps), 0)
-            
             # Create Appium instance with capabilities
             appium_driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps) # Create instance
             if appium_driver: # Make sure we get the instance
@@ -187,8 +233,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = ''):
             return 'passed'
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
-    
-    
+
 def teardown_appium(data_set):
     ''' Teardown of appium instance '''
     
@@ -693,7 +738,7 @@ def get_element_location_by_id(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
         
 
-def get_window_size():
+def get_window_size(read_type = False):
     ''' Read the device's LCD resolution / screen size '''
     # Returns a dictionary of width and height
     
@@ -701,7 +746,10 @@ def get_window_size():
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     try:
-        return appium_driver.get_window_size() # Get window resolution in dictionary
+        if read_type:
+            return appium_driver.find_element_by_xpath("//*[not(*)]").size # Works well at reading height in full screen mode, but Appium may complain if you work outside the boundaries it has set
+        else:
+            return appium_driver.get_window_size() # Read the screen size as reported by the device - this is always the safe value to work within
         CommonUtil.ExecLog(sModuleInfo,"Read window size successfully", 0)
     except Exception:
         errMsg = "Read window size unsuccessfully"
@@ -1028,7 +1076,13 @@ def Validate_Text_Appium(data_set):
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     data_set = [data_set]
     try:
-        Element = LocateElement.Get_Element(data_set[0],appium_driver)
+        for each_step_data_item in data_set[0]:
+            if each_step_data_item[1]=="element parameter" and each_step_data_item[2] == '':
+                Element = appium_driver.find_elements_by_xpath("//*[@%s]" %each_step_data_item[0])
+            if each_step_data_item[1]=="element parameter" and each_step_data_item[2] != '':
+                Element = LocateElement.Get_Element(data_set[0],appium_driver)
+                Element = [Element]
+                
         if Element == "failed":
             CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
             return "failed" 
@@ -1039,59 +1093,79 @@ def Validate_Text_Appium(data_set):
                 expected_text_data = each_step_data_item[2].split('||') # Split the separator in case multiple string provided in the same data_set
                 validation_type = each_step_data_item[0]
         
+        #Get the string for a single and multiple element(s)
+        list_of_element_text = []
+        list_of_element = []
+        if len(Element)== 0:
+            return False
+        elif len(Element) == 1:           
+            for each_text in Element:
+                list_of_element = each_text.text # Extract the text element
+                list_of_element_text.append(list_of_element)
+        elif len(Element) > 1:           
+            for each_text in Element:
+                list_of_element = each_text.text.split('\n') # Extract the text elements
+                list_of_element_text.append(list_of_element[0])
+        else:
+            return "failed"
+            
+        #Extract only the visible element(s)
         visible_list_of_element_text = []
-        # Get the string for a single element
-        if Element != []:
-            list_of_element_text = Element.text.split('\n') # Extract the text element
-            visible_list_of_element_text = []
-            for each_text_item in list_of_element_text:
-                if each_text_item != "":
-                    visible_list_of_element_text.append(each_text_item)
+        for each_text_item in list_of_element_text:
+            if each_text_item != "":
+                visible_list_of_element_text.append(each_text_item)
         
-
-         
         # Validate the partial text/string provided in the step data with the text obtained from the device
         if validation_type == "validate partial text":
             actual_text_data = visible_list_of_element_text
             CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 0)
+#             print (">>>>>> Expected Text: %s" %expected_text_data)
             CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %actual_text_data, 0)
+#             print (">>>>>>>> Actual Text: %s" %actual_text_data)
             for each_actual_text_data_item in actual_text_data:
                 if expected_text_data[0] in each_actual_text_data_item: # index [0] used to remove the unicode 'u' from the text string
-                    CommonUtil.ExecLog(sModuleInfo, "The text has been validated by a partial match.", 0)
+                    CommonUtil.ExecLog(sModuleInfo, "Validate the text element %s using partial match." %visible_list_of_element_text, 0)
                     return "passed"
                 else:
-                    CommonUtil.ExecLog(sModuleInfo, "Unable to validate using partial match.", 3)
+                    CommonUtil.ExecLog(sModuleInfo, "Unable to validate the text element %s. Check the text element(s) in step_data(s) and/or in screen text." %visible_list_of_element_text, 3)
                     return "failed"
         
         # Validate the full text/string provided in the step data with the text obtained from the device
         if validation_type == "validate full text":
             actual_text_data = visible_list_of_element_text
             CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 0)
+#             print (">>>>>> Expected Text: %s" %expected_text_data)
             CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %actual_text_data, 0)
+#             print (">>>>>>>> Actual Text: %s" %actual_text_data)
             if (expected_text_data[0] == actual_text_data[0]): # index [0] used to remove the unicode 'u' from the text string
-                CommonUtil.ExecLog(sModuleInfo, "The text has been validated by using complete match.", 0)
+                CommonUtil.ExecLog(sModuleInfo, "Validate the text element %s using complete match." %visible_list_of_element_text, 0)
                 return "passed"
             else:
-                CommonUtil.ExecLog(sModuleInfo, "Unable to validate using complete match.", 3)
+                CommonUtil.ExecLog(sModuleInfo, "Unable to validate the text element %s. Check the text element(s) in step_data(s) and/or in screen text." %visible_list_of_element_text, 3)
                 return "failed"
         
         # Validate all the text/string provided in the step data with the text obtained from the device
         if validation_type == "validate screen text":
             CommonUtil.ExecLog(sModuleInfo, ">>>>>> Expected Text: %s" %expected_text_data, 0)
+#             print (">>>>>> Expected Text: %s" %expected_text_data)
             CommonUtil.ExecLog(sModuleInfo, ">>>>>>>> Actual Text: %s" %visible_list_of_element_text, 0)
+#             print (">>>>>>>> Actual Text: %s" %visible_list_of_element_text)
             i = 0
             for x in xrange(0, len(visible_list_of_element_text)): 
                 if (visible_list_of_element_text[x] == expected_text_data[i]): # Validate the matching string
                     CommonUtil.ExecLog(sModuleInfo, "The text element '%s' has been validated by using complete match." %visible_list_of_element_text[x], 1)
                     i += 1
+                    return "passed"
                 else:
                     visible_elem = [ve for ve in visible_list_of_element_text[x].split()]
                     expected_elem = [ee for ee in expected_text_data[i].split()]
                     for elem in visible_elem: # Validate the matching word
                         if elem in expected_elem:
-                            CommonUtil.ExecLog(sModuleInfo, "Validate the element '%s' using element match." %elem, 1)
+                            CommonUtil.ExecLog(sModuleInfo, "Validate the text element '%s' using element match." %elem, 1)
+                            return "passed"
                         else:
-                            CommonUtil.ExecLog(sModuleInfo, "Unable to validate the element '%s'. Check the element(s) in step_data(s) and/or in screen text." %elem, 1)
+                            CommonUtil.ExecLog(sModuleInfo, "Unable to validate the text element '%s'. Check the text element(s) in step_data(s) and/or in screen text." %elem, 1)
+                            return "failed"
                     if (visible_elem[0] in expected_elem):
                         i += 1
                         
@@ -1222,9 +1296,17 @@ def Compare_Lists(data_set):
 
 def get_program_names(search_name):
     ''' Find Package and Activity name based on wildcard match '''
+    # Android only
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Find package name for the program that's already installed
     try:
+        if adbOptions.is_android_connected() == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
+            return '', '' # Failure handling in calling function
+
         cmd = 'adb shell pm list packages'
         res = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE).communicate(0)
         res = str(res).replace('\\r','')
@@ -1258,12 +1340,19 @@ def get_program_names(search_name):
 
 def device_information(data_set):
     ''' Returns the requested device information '''
+    # This is the sequential action interface for much of the adbOptions.py and iosOptions.py, which provides direct device access via their standard comman line tools
+    # Note: This function does not require an Appium instance, so it can be called without calling launch_application() first
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
     try:
+        # Ensure dependency is set
+        if 'Mobile' not in dependency:
+            CommonUtil.ExecLog(sModuleInfo, "Mobile dependency not set. You must set it when deploying a run.", 3)
+            return 'failed'
+
         dep = dependency['Mobile'].lower()
         cmd = ''
         shared_var = ''
@@ -1283,14 +1372,33 @@ def device_information(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error when trying to read Field and Value for action")
 
+    # Ensure device is connected
+    if dep == 'android':
+        if adbOptions.is_android_connected() == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
+            return 'failed'
+
     # Get device information
     try:
         if cmd == 'imei':
             if dep == 'android': output = adbOptions.get_device_imei_info()
             elif dep == 'ios': output = iosOptions.get_ios_imei()
+        elif cmd == 'version':
+            if dep == 'android':
+                output = adbOptions.get_android_version()
+        elif cmd == 'model name':
+            if dep == 'android': output = adbOptions.get_device_model()
+        elif cmd == 'serial no':
+            if dep == 'android': output = adbOptions.get_device_serial_no()
+        elif cmd == 'storage':
+            if dep == 'android': output = adbOptions.get_device_storage()
         else:
             CommonUtil.ExecLog(sModuleInfo,"Action's Field contains incorrect information", 3)
             return 'failed'
+
+        if output in failed_tag_list or output=='':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find the device info about '%s'" % (cmd), 3)
+            return "failed"
             
         # Save the output to the user specified shared variable
         Shared_Resources.Set_Shared_Variables(shared_var, output)

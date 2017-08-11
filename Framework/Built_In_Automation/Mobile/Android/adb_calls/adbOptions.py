@@ -3,14 +3,14 @@
 
 #Android Debug Bridge (ADB) options to get the android devices info connected via usb/wi-fi
 __author__='minar'
-import subprocess, inspect, os, sys, re
+import subprocess, inspect, os, sys, re, math
 from Framework.Utilities import CommonUtil
 
 def start_adb_server():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb start server", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Starting adb server", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Starting adb server", 0)
         return output
 
     except Exception:
@@ -21,7 +21,7 @@ def kill_adb_server():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb kill-server", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Killing adb server", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Killing adb server", 0)
         return output
 
     except Exception:
@@ -33,8 +33,8 @@ def get_android_version():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell getprop ro.build.version.release", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
-        return output
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
+        return output.strip()
 
     except Exception:
         errMsg = "Unable to get android version"
@@ -44,8 +44,8 @@ def get_device_model():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell getprop ro.product.model", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
-        return output
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
+        return output.strip()
 
     except Exception:
         errMsg = "Unable to get device model"
@@ -55,18 +55,54 @@ def get_device_name():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell getprop ro.product.name", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
         errMsg = "Unableto get device name"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    
+
+def get_device_serial_no():
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        output = subprocess.check_output("adb get-serialno", shell=True)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
+        return output.strip()
+
+    except Exception:
+        errMsg = "Unableto get device serial no"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+def get_device_storage():
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        output = subprocess.check_output("adb shell df /data", shell=True)
+        CommonUtil.ExecLog(sModuleInfo, "%s" % output, 0)
+        storageList = ' '.join(output.split())
+        storageList = storageList.split(" ")
+        storage = storageList[6]
+        storage = storage.replace('G','')
+        storage = float(storage)
+        final_storage = 0
+        exp = 2
+        while True:
+            gb = math.pow(2,exp)
+            if storage < gb:
+                final_storage = gb
+                break
+            exp+=1
+        final_storage = int(final_storage)
+        return final_storage
+
+    except Exception:
+        errMsg = "Unableto get device storage"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
 def get_device_manufacturer():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell getprop ro.product.manufacturer", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -80,7 +116,6 @@ def get_device_imei_info():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output=subprocess.Popen('adb shell dumpsys iphonesubinfo'.split(' '), stdout=subprocess.PIPE).communicate()[0]
-        
         # Use dumpsys (Below Android v6)
         if output != '':
             output = output.split("\n")[2]
@@ -112,7 +147,7 @@ def get_device_summary():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb devices -l", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -123,7 +158,7 @@ def get_device_complete_info():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb devices -l", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -131,21 +166,52 @@ def get_device_complete_info():
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
 def get_devices():
+    ''' Retrieves a list of connected devices in the format of "SERIAL_NO STATE" and returns as a list '''
+    # State may be "device" if connected and we can talk to it, or "unauthorized" if we can't talk to it
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
+        # Get list of connected devices
         output = subprocess.check_output("adb devices", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        
+        # Cleanup data
+        output = output.replace("\r", '')
+        output = output.replace("\t", ' ')
+        output = output.split("\n")
+        output.pop(0) # Remove "list of..." string
+        output = [line for line in output if line != '']
+        
+        # Return as list 
+        CommonUtil.ExecLog(sModuleInfo, "Connected devices: %s" % str(output), 0)
         return output
 
     except Exception:
         errMsg = "Unable to get devices"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
+def is_android_connected():
+    ''' Return True/False if at least one device is connected '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    devices = get_devices()
+    
+    if devices != []:
+        for device in devices:
+            if 'device' in device:
+                CommonUtil.ExecLog(sModuleInfo, "Android connected", 0)
+                return True
+        CommonUtil.ExecLog(sModuleInfo, "Android connected, but not authorized. Ensure USB debugging is enabled in developer options, and that you authorized this computer to connect to it.", 2)
+        return False
+    else:
+        CommonUtil.ExecLog(sModuleInfo, "No Android connected", 0)
+        return False
+    
 def get_android_sdk():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell getprop ro.build.version.sdk", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -156,7 +222,7 @@ def install_app(apk_path):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb install %s"%apk_path, shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Installed app located %s"%apk_path, 1)
+        CommonUtil.ExecLog(sModuleInfo, "Installed app located %s"%apk_path, 0)
         return output
 
     except Exception:
@@ -167,11 +233,11 @@ def connect_device_via_wifi(device_ip):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb tcpip 5555", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Target device set to listen for a TCP/IP connection on port 5555.", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Target device set to listen for a TCP/IP connection on port 5555.", 0)
         output = subprocess.check_output("adb connect %s"%device_ip, shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Conncted to device via wifi", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Conncted to device via wifi", 0)
         output = subprocess.check_output("adb devices", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -184,7 +250,7 @@ def take_screenshot(image_name):
         #output = subprocess.check_output("adb shell screencap -p | perl -pe 's/\x0D\x0A/\x0A/g' > %s/%s.png"%(folder_path,image_name), shell=True)
         os.system("adb shell screencap -p /sdcard/%s.png"%image_name)
         os.system("adb pull /sdcard/%s.png"%image_name)
-        CommonUtil.ExecLog(sModuleInfo, "Screenshot taken as %s.png"%image_name, 1)
+        CommonUtil.ExecLog(sModuleInfo, "Screenshot taken as %s.png"%image_name, 0)
         return "Screen shot taken"
 
     except Exception:
@@ -196,7 +262,7 @@ def record_screen(folder_path,video_name):
     try:
         os.system("adb shell screenrecord /sdcard/%s.mp4"%(video_name), shell=True)
         os.system("adb pull /sdcard/%s.mp4"%video_name)
-        CommonUtil.ExecLog(sModuleInfo, "Screen recorded as %s.mp4"%video_name, 1)
+        CommonUtil.ExecLog(sModuleInfo, "Screen recorded as %s.mp4"%video_name, 0)
         return "Screen recorded"
 
     except Exception:
@@ -207,7 +273,7 @@ def get_device_battery_info():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell dumpsys battery", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -218,7 +284,7 @@ def get_device_wifi_info():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell dumpsys wifi", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -229,7 +295,7 @@ def get_device_cpu_info():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell dumpsys cpuinfo", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 1)
+        CommonUtil.ExecLog(sModuleInfo, "%s"%output, 0)
         return output
 
     except Exception:
@@ -240,7 +306,7 @@ def get_package_name():
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell pm list packages", shell=True)
-        CommonUtil.ExecLog(sModuleInfo, "Getting Packages Name of Installed Applications", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Getting Packages Name of Installed Applications", 0)
         return output
 
     except Exception:
@@ -248,6 +314,8 @@ def get_package_name():
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
     
 def wake_android():
+    ''' Sends the wakeup keypress and a swipe up gesture to try to unlock the device and get it to a usable state for automation '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         output = subprocess.check_output("adb shell wm size", shell=True) # Need size for swipe calculation
@@ -258,9 +326,19 @@ def wake_android():
         centre = int(int(w) / 2) # Calculate centre of screen horizontally
         output = subprocess.check_output("adb shell input keyevent KEYCODE_WAKEUP", shell=True) # Send wakeup command (puts us on lock screen)
         output = subprocess.check_output("adb shell input touchscreen swipe %d %d %d %d" % (centre, spos, centre, epos), shell=True) # Send vertical swipe command (takes us to home screen)
-        CommonUtil.ExecLog(sModuleInfo, "Waking device", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Waking device", 0)
         return output
 
     except Exception:
         errMsg = "Unable to wake device"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+def swipe_android(Xstart, Xend, Ystart, Yend):
+    ''' Sends a swipe gesture to a device '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        CommonUtil.ExecLog(sModuleInfo, "Sending swipe gesture", 0)
+        subprocess.check_output("adb shell input touchscreen swipe %d %d %d %d" % (Xstart, Xend, Ystart, Yend), shell=True) # Send swipe gesture
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error while performing swipe gesture")

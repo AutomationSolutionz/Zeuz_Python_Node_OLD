@@ -15,22 +15,24 @@
 
 # Dictionary of supported actions and their respective modules
 # Rules: Action NAME must be lower case, no underscores, single spaces, no trailing whitespace. Module names must match those used in load_sa_modules()
+# Common module: These are functions that are common to multiple Built In Functions, which have special handling. See common_functions.py where they are stored for more information
 # Caveat: Modules that are common to more than one built in function are listed here as with the module set to "common". If there is a "common" function, and another module with the same name created here, there may be a conflict, and the wrong function may execute
 actions = { # Numbers are arbitrary, and are not used anywhere
     900: {'module': 'common', 'name': 'step result', 'function': 'step_result'},
     901: {'module': 'common', 'name': 'sleep', 'function': 'Sleep'},
+    902: {'module': 'common', 'name': 'wait', 'function': 'Wait_For_Element'},
+    903: {'module': 'common', 'name': 'wait disable', 'function': 'Wait_For_Element'},
+    904: {'module': 'common', 'name': 'save text', 'function': 'Save_Text'},
+    905: {'module': 'common', 'name': 'compare variable', 'function': 'Compare_Variables'},
+    906: {'module': 'common', 'name': 'initialize list', 'function': 'Initialize_List'},
+    907: {'module': 'common', 'name': 'compare list', 'function': 'Compare_Lists'},
+    908: {'module': 'common', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     
     100: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     101: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
-    102: {'module': 'appium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
     103: {'module': 'appium', 'name': 'tap', 'function': 'Tap_Appium'},
     104: {'module': 'appium', 'name': 'validate full text', 'function': 'Validate_Text_Appium'},
     105: {'module': 'appium', 'name': 'validate partial text', 'function': 'Validate_Text_Appium'},
-    106: {'module': 'appium', 'name': 'save text', 'function': 'Save_Text'},
-    107: {'module': 'appium', 'name': 'compare variable', 'function': 'Compare_Variables'},
-    108: {'module': 'appium', 'name': 'initialize list', 'function': 'Initialize_List'},
-    109: {'module': 'appium', 'name': 'compare list', 'function': 'Compare_Lists'},
-    110: {'module': 'appium', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     111: {'module': 'appium', 'name': 'install', 'function': 'install_application'},
     112: {'module': 'appium', 'name': 'launch', 'function': 'launch_application'},
     113: {'module': 'appium', 'name': 'get location', 'function': 'get_element_location_by_id'},
@@ -42,10 +44,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     120: {'module': 'appium', 'name': 'tap location', 'function': 'tap_location'},
     200: {'module': 'appium', 'name': 'reset', 'function': 'reset_application'},
     121: {'module': 'rest', 'name': 'save response', 'function': 'Get_Response'},
-    122: {'module': 'rest', 'name': 'compare variable', 'function': 'Compare_Variables'},
-    123: {'module': 'rest', 'name': 'compare list', 'function': 'Compare_Lists'},
-    125: {'module': 'rest', 'name': 'initialize list', 'function': 'Initialize_List'},
-    127: {'module': 'rest', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     128: {'module': 'selenium', 'name': 'click', 'function': 'Click_Element'},
     129: {'module': 'selenium', 'name': 'click and hold', 'function': 'Click_and_Hold_Element'},
     130: {'module': 'selenium', 'name': 'context click', 'function': 'Context_Click_Element'},
@@ -55,14 +53,9 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     134: {'module': 'selenium', 'name': 'keystroke keys', 'function': 'Keystroke_For_Element'},
     135: {'module': 'selenium', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
     136: {'module': 'selenium', 'name': 'text', 'function': 'Enter_Text_In_Text_Box'},
-    137: {'module': 'selenium', 'name': 'wait', 'function': 'Wait_For_New_Element'},
     139: {'module': 'selenium', 'name': 'initialize list', 'function': 'Initialize_List'},
     140: {'module': 'selenium', 'name': 'validate full text', 'function': 'Validate_Text'},
     141: {'module': 'selenium', 'name': 'validate partial text', 'function': 'Validate_Text'},
-    142: {'module': 'selenium', 'name': 'save text', 'function': 'Save_Text'},
-    143: {'module': 'selenium', 'name': 'compare variable', 'function': 'Compare_Variables'},
-    144: {'module': 'selenium', 'name': 'compare list', 'function': 'Compare_Lists'},
-    145: {'module': 'selenium', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     146: {'module': 'selenium', 'name': 'scroll', 'function': 'Scroll'},
     148: {'module': 'selenium', 'name': 'deselect all', 'function': 'Select_Deselect'},
     149: {'module': 'selenium', 'name': 'select by visible text', 'function': 'Select_Deselect'},
@@ -73,7 +66,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     154: {'module': 'selenium', 'name': 'deselect by index', 'function': 'Select_Deselect'},
     155: {'module': 'utility', 'name': 'math', 'function': 'Calculate'},
     156: {'module': 'utility', 'name': 'upload', 'function': 'Upload'},
-    157: {'module': 'utility', 'name': 'save text', 'function': 'Save_Text'},
+    157: {'module': 'utility', 'name': 'save string', 'function': 'Save_Text'},
     158: {'module': 'utility', 'name': 'copy', 'function': 'Copy_File_or_Folder'},
     159: {'module': 'utility', 'name': 'delete', 'function': 'Delete_File_or_Folder'},
     160: {'module': 'utility', 'name': 'create', 'function': 'Create_File_or_Folder'},
@@ -105,7 +98,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     188: {'module': 'xml', 'name': 'read', 'function': 'read_element'},
     189: {'module': 'xml', 'name': 'delete', 'function': 'delete_element'},
     190: {'module': 'appium', 'name': 'imei', 'function': 'device_information'},
-    191: {'module': 'selenium', 'name': 'wait disable', 'function': 'Wait_For_New_Element'},
     192: {'module': 'desktop', 'name': 'click', 'function': 'Click_Element'},
     193: {'module': 'desktop', 'name': 'double click', 'function': 'Double_Click_Element'},
     194: {'module': 'desktop', 'name': 'hover', 'function': 'Hover_Over_Element'},
@@ -113,7 +105,13 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     196: {'module': 'desktop', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
     197: {'module': 'desktop', 'name': 'enter text', 'function': 'Enter_Text_In_Text_Box'},
     198: {'module': 'desktop', 'name': 'wait', 'function': 'Sleep'},
-    199: {'module': 'selenium', 'name': 'get location', 'function': 'get_location_of_element'}
+    199: {'module': 'selenium', 'name': 'get location', 'function': 'get_location_of_element'},
+    201: {'module': 'appium', 'name': 'validate screen text', 'function': 'Validate_Text_Appium'},
+    202: {'module': 'appium', 'name': 'model name', 'function': 'device_information'},
+    203: {'module': 'appium', 'name': 'version', 'function': 'device_information'},
+    204: {'module': 'selenium', 'name': 'validate table', 'function': 'validate_table'},
+    205: {'module': 'appium', 'name': 'serial no', 'function': 'device_information'},
+    206: {'module': 'appium', 'name': 'storage', 'function': 'device_information'}
 }
 
 # List of Sub-Field keywords, must be all lowercase, and using single spaces - no underscores
@@ -133,7 +131,8 @@ action_support = [
     'compare',
     'path',
     'value',
-    'result'
+    'result',
+    'table parameter'
 ]
 
 # Import modules
@@ -173,6 +172,9 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
     elif module == 'xml':
         global xml
         from Framework.Built_In_Automation.XML import BuiltInFunctions_XML as xml
+    elif module == 'desktop':
+        global desktop
+        from Framework.Built_In_Automation.Desktop.CrossPlatform import BuiltInFunctions as desktop
     else:
         CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
         return 'failed'
@@ -403,6 +405,7 @@ def Action_Handler(_data_set, action_row):
     # Get module and function for this action
     module = ''
     function = ''
+    original_module = ''
     module, function, original_module = common.get_module_and_function(action_name, action_subfield) # New, get the module to execute
     CommonUtil.ExecLog(sModuleInfo, "Function identified as function: %s in module: %s" % (function, module), 0)
 
@@ -410,6 +413,13 @@ def Action_Handler(_data_set, action_row):
         CommonUtil.ExecLog(sModuleInfo, "You probably didn't add the module as part of the action. Eg: appium action", 3)
         return "failed"
 
+    # If this is a common function, try to get the webdriver for it, if there is one, and save it to shared variables. This will allow common functions to work with whichever webdriver they need
+    if original_module != '': # This was identified as a common module
+        try:
+            common_driver = eval(original_module).get_driver() # Get webdriver object
+            sr.Set_Shared_Variables('common_driver', common_driver) # Save in shared variable
+        except: pass # Not all modules have get_driver, so don't worry if this crashes
+    
     # Strip the "optional" keyword, and module, so functions work properly (result of optional action is handled by sequential_actions)
     data_set = []
     for row in _data_set:
@@ -427,6 +437,7 @@ def Action_Handler(_data_set, action_row):
     if data_set in failed_tag_list:
         return 'failed'
 
+    # Execute the action's function
     try:
         result = load_sa_modules(module) # Load the appropriate module
         if result == 'failed':

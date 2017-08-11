@@ -316,11 +316,18 @@ def call_driver_function_of_test_step(sModuleInfo, TestStepsList, StepSeq, step_
                 try:
                     # importing functions from driver
                     functionTocall = getattr(module_name, step_name)
+                except:
+                    CommonUtil.Exception_Handler(sys.exc_info(), None, "Could not find function name: %s in Driver/%s.py. Perhaps you need to add a custom driver or add an alias step to the Test Step." % (step_name, current_driver))
+                    sStepResult = "Failed"
+                try:
                     simple_queue = Queue.Queue()
-                    screen_capture = get_screen_capture_settings_of_a_test_step(step_id)
-                    if len(screen_capture) > 0:
-                        screen_capture = screen_capture[0]
-                    else:
+                    try:
+                        screen_capture = get_screen_capture_settings_of_a_test_step(step_id)
+                        if len(screen_capture) > 0:
+                            screen_capture = screen_capture[0]
+                        else:
+                            screen_capture = 'Desktop'
+                    except:
                         screen_capture = 'Desktop'
 
                     if ConfigModule.get_config_value('RunDefinition', 'Threading') in passed_tag_list:
