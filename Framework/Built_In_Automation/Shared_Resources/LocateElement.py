@@ -8,6 +8,7 @@ import sys
 import inspect
 from Framework.Utilities import CommonUtil
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list
+from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -43,6 +44,11 @@ def Get_Element(step_data_set,driver,query_debug=False):
         except:
             CommonUtil.ExecLog(sModuleInfo, "Incorrect driver.  Unable to switch to default content", 3)
             return "failed"
+        
+        # If driver is pyautogui, perform specific get element function and exit
+        if driver_type == 'pyautogui':
+            result = _pyautogui(step_data_set)
+            return result
             
         #here we switch driver if we need to
         _switch(step_data_set)
@@ -145,6 +151,8 @@ def _driver_type(query_debug):
             driver_type = "appium"
         elif "Element" in driver_string:
             driver_type = "xml"
+        elif "pyautogui" in driver_string:
+            driver_type = "pyautogui"
         else:
             driver_type = None
         return driver_type
@@ -300,6 +308,52 @@ def _locate_index_number(step_data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
     
+def _pyautogui(step_data_set):
+    ''' Gets coordinates for pyautogui (doesn't provide an object) '''
+    
+    # Only used by desktop, so only import here
+    import pyautogui, os.path
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if sr.Test_Shared_Variables('file_attachment'):
+        file_attachment = sr.Get_Shared_Variables('file_attachment')
+    
+    # Parse data set
+    try:
+        file_name = ''
+        for row in step_data_set:
+            if row[1] == 'element parameter': # Find element line
+                file_name = row[2] # Save Value as the filename
+            elif row[1] == 'action' and file_name == '': # Alternative method, there is no element parameter, so filename is expected on the action line
+                file_name = row[2] # Save Value as the filename
+
+        # Check that we have some value                
+        if file_name == '':
+            return 'failed'
+        
+        # Try to find the image file
+        if file_name not in file_attachment and os.path.exists(file_name) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
+            return 'failed'
+        if file_name in file_attachment: file_name = file_attachment[file_name] # In file is an attachment, get the full path
+        # Now file_name should have a directory/file pointing to the correct image
+
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Find element information
+    try:
+        element = pyautogui.locateOnScreen(file_name.encode('ascii'), grayscale=True) # Get coordinates of element. Use greyscale for increased speed and better matching across machines. May cause higher number of false-positives
+        if element == None or element in failed_tag_list or element == '':
+            return 'failed'
+        else:
+            return element
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info())
 
 
 '''

@@ -13,6 +13,7 @@ import time
 import inspect
 import zipfile
 import string
+import ConfigParser
 from Framework.Utilities import ConfigModule
 import filecmp
 import random
@@ -432,6 +433,7 @@ def DeleteFolder(sFolderPath):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
+
 # function to check a file exists or not
 def find(sFilePath):
     """
@@ -616,15 +618,21 @@ def run_cmd(command, return_status=False, is_shell=True, stdout_val=subprocess.P
         # this is will make the shell process the group leader for all the child processes spawning from it
         status = subprocess.Popen(command, shell=is_shell, stdout=stdout_val, preexec_fn=os.setsid)
         subprocess_dict[status] = Running
+        status.wait() # Wait for process to complete, and populate returncode
+        errcode = status.returncode
+        
         for line in status.stdout:
             result.append(line)
-        errcode = status.returncode
+        
         for line in result:
             CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
+        
         if return_status:
-            return status
-        else:
+            return errcode, result
+        elif errcode == 0:
             return Passed
+        else:
+            return Failed
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -1737,6 +1745,237 @@ def Download_File_and_Unzip(step_data):
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
+def Change_Value_ini(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    # Parse data set
+    try:
+        file_name = ''
+        section_name = ''
+        line_name = ''
+        new_expected_value_of_line = ''
+        for row in data_set:
+            if "action" in row[1]:
+                new_expected_value_of_line = row[2]    #previous value should be changed to this value
+            if row[1] == 'path':
+                file_name = row[2]    # name of the file where the change should be made
+            if row[1] == 'value':
+                section_name = row[0]   # name of the section where th change should be made
+                line_name = row[2]    # name of the line where value should be changed
+
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+            return 'failed'
+        if section_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
+            return 'failed'
+        if line_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file line name for this action", 3)
+            return 'failed'
+        if new_expected_value_of_line == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find new expected value for this action", 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Perform action
+    try:
+        if os.path.isfile(file_name): # check if the file exists or not
+            '''change the value'''
+            config = ConfigParser.SafeConfigParser()
+            config.read(file_name)
+            list_of_sections = config.sections()
+            if section_name in list_of_sections:
+                options = config.options(section_name)
+                # check if this name exists
+                if line_name in options:
+                    config.set(section_name, line_name, new_expected_value_of_line)  # change value
+                    #writeback file
+                    with open(file_name, 'wb') as configfile:
+                        config.write(configfile)
+
+                    '''check if line is changed properly'''
+                    config.read(file_name)
+                    check_value = config.get(section_name, line_name)
+                    if check_value == new_expected_value_of_line:
+                        CommonUtil.ExecLog(sModuleInfo, "Value is changed successfully", 1)
+                        return "passed"
+
+            CommonUtil.ExecLog(sModuleInfo, "Can't add line", 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
+            return "failed"
+
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+def Add_line_ini(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    # Parse data set
+    try:
+        file_name = ''
+        section_name = ''
+        line_name = ''
+        value_of_line = ''
+        for row in data_set:
+            if "action" in row[1]:
+                value_of_line = row[2]   # value of the new line
+            if row[1] == 'path':
+                file_name = row[2]         # name of the file where the change should be made
+            if row[1] == 'value':
+                section_name = row[0]       # name of the section where the new line should be added
+                line_name = row[2]       # name of the new line to be added
+
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+            return 'failed'
+        if section_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
+            return 'failed'
+        if line_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file line name for this action", 3)
+            return 'failed'
+        if value_of_line == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find new expected value for this action", 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Perform action
+    try:
+        if os.path.isfile(file_name):    # check if the file exists or not
+            '''add line'''
+            config = ConfigParser.SafeConfigParser()
+            config.read(file_name)
+            list_of_sections = config.sections()
+            if section_name in list_of_sections:
+                config.set(section_name, line_name, value_of_line)  #add line
+                # writeback file
+                with open(file_name, 'wb') as configfile:
+                    config.write(configfile)
+
+                '''check if line is added properly'''
+                config.read(file_name)
+                options = config.options(section_name)
+                if line_name in options:
+                    check_value = config.get(section_name, line_name)
+                    if check_value == value_of_line:
+                        CommonUtil.ExecLog(sModuleInfo,"Line is added successfully" ,1)
+                        return "passed"
+
+            CommonUtil.ExecLog(sModuleInfo, "Can't add line", 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
+            return "failed"
+
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+def Delete_line_ini(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    # Parse data set
+    try:
+        file_name = ''
+        section_name = ''
+        line_name = ''
+        for row in data_set:
+            if row[1] == 'path':
+                file_name = row[2]   # name of the file where the change should be made
+            if row[1] == 'value':
+                section_name = row[0]    # name of the section from where line should be deleted
+                line_name = row[2]    # name of the line to be deleted
+
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+            return 'failed'
+        if section_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
+            return 'failed'
+        if line_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file line name for this action", 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Perform action
+    try:
+        if os.path.isfile(file_name):   # check if the file exists or not
+            '''delete the line'''
+            config = ConfigParser.SafeConfigParser()
+            config.read(file_name)
+            config.remove_option(section_name, line_name)   #delete file
+            # writeback file
+            with open(file_name, 'wb') as configfile:
+                config.write(configfile)
+
+            '''check if the line is deleted properly'''
+            config.read(file_name)
+            options = config.options(section_name)
+            if line_name in options:
+                CommonUtil.ExecLog(sModuleInfo, "Can't delete line", 3)
+                return "failed"
+
+            CommonUtil.ExecLog(sModuleInfo, "The line is no more in the config file", 1)
+            return "passed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
+            return "failed"
+
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+def Read_line_name_and_value(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    # Parse data set
+    try:
+        file_name = ''
+        save_line_name_value = ''
+        for row in data_set:
+            if row[1] == 'path':
+                file_name = row[2]    # name of the file from where line name and value should be read
+            if "action" in row[1]:
+                save_line_name_value = row[2]    #user will provide the vaiable to the save the line name and values
+
+
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+            return 'failed'
+        if save_line_name_value == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find the name where to save line name and value in shared variables for this action", 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+    try:
+        if os.path.isfile(file_name):    # check if the file exists or not
+            '''read file and save'''
+            config = ConfigParser.SafeConfigParser()
+            config.read(file_name)
+            list_of_sections = config.sections()
+            dir ={}
+            for section in list_of_sections:
+                options = config.options(section)
+                for option in options:
+                    dir[section+"|"+option] = config.get(section,option)
+            #save in shared variable
+            Shared_Resources.Set_Shared_Variables(save_line_name_value, dir)
+            return "passed"
+
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
+            return "failed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 # return only the path step data
 def Get_Path_Step_Data(step_data):

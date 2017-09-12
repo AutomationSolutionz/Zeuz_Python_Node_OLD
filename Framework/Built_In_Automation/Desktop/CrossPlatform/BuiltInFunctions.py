@@ -7,84 +7,145 @@ Created on May 15, 2016
 '''
 
 
-import pyautogui as gui
-import os,sys,time
-import inspect
+import pyautogui as gui # https://pyautogui.readthedocs.io/en/latest/
+import os, os.path, sys, time, inspect, subprocess
 from Framework.Utilities import CommonUtil, FileUtilities  as FL
-from Framework.Built_In_Automation.Desktop.CrossPlatform import DesktopAutomation as da
-from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction
-local_run = False
-
-Passed = "Passed"
-Failed = "Failed"
+#from Framework.Built_In_Automation.Desktop.CrossPlatform import DesktopAutomation as da
+from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as FU
+from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
+from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list # Allowed return strings, used to normalize pass/fail
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
+from Framework.Built_In_Automation.Shared_Resources import LocateElement
 
-'============================================'
+# Valid image positions
+positions = ('left', 'right', 'centre', 'center')
 
-'============================= Sequential Action Section Begins=============================='
+# Recall dependency, if not already set
+dependency = None
+if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
+    dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive appium driver
+else:
+    CommonUtil.ExecLog(__name__ + " : " + __file__, "No dependency set - Cannot run", 3)
 
+# Recall file attachment, if not already set
 file_attachment = []
 if sr.Test_Shared_Variables('file_attachment'):
-        file_attachment = sr.Get_Shared_Variables('file_attachment')
+    file_attachment = sr.Get_Shared_Variables('file_attachment')
 
+''' **************************** Helper functions **************************** '''
 
+def get_driver():
+    ''' Returns pyautogui as the driver for compatibility with other modules '''
+    return gui
 
-# Handles actions for the sequential logic, based on the input from the mentioned function
-def Action_Handler(action_step_data, action_name,file_attachment=[]):
+def getCoordinates(element, position):
+    ''' Return coordinates of attachment's centre '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Action_Handler", 1, local_run)
-    try:
-        if action_name == "click":
-            result = Click_Element(action_step_data,file_attachment)
-            if result == "failed":
-                return "failed"
-        elif action_name == "double click":
-            result = Double_Click_Element(action_step_data, file_attachment)
-            if result == "failed":
-                return "failed"
-        elif action_name == "hover":
-            result = Hover_Over_Element(action_step_data,file_attachment)
-            if result == "failed":
-                return "failed"
-        elif (action_name == "keystroke keys" or action_name == "keystroke chars"):
-            result = Keystroke_For_Element(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif action_name == "enter text":
-            result = Enter_Text_In_Text_Box(action_step_data)
-            if result == "failed":
-                return "failed"
-        elif action_name == "wait":
-            result = Sleep(action_step_data)
-            if result == "failed":
-                return "failed"
-        else:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "The action you entered is incorrect. Please provide accurate information on the data set(s).",
-                               3, local_run)
-            return "failed"
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
+    # Parse input
+    try:
+        x = element[0]
+        y = element[1]
+        w = element[2]
+        h = element[3]
+        position = position.lower().strip()
+        
+        if position not in positions:
+            CommonUtil.ExecLog(sModuleInfo,"Position must be one of: %s" % positions, 3)
+            return 'failed'
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing coordinates")
+    
+    # Perform calculations
+    try:
+        if position in ('center', 'centre'):
+            result_x, result_y = gui.center(element)
+        elif position == 'left':
+            result_x = x + (w * 0.01)
+            result_y = y + (h / 2)
+        elif position == 'right':
+            result_x = x + (w * 0.99)
+            result_y = y + (h / 2)
+
+        if result_x in failed_tag_list or result_x == '' or result_x == None:
+            return 'failed', ''
+        return int(result_x), int(result_y)
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error calculating coordinates")
+
+def get_exec_from_icon(file_name):
+    ''' Read the Exec line from a Linux icon file '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+    try:
+        # Open file and read into memory
+        with open(file_name, "r") as myfile:
+            data = myfile.readlines()
+            
+        # Examine each line, looking for the Exec line
+        for element in data:
+            if element[:5] == "Exec=":
+                result = element[5:].strip() # Save execution line without the Exec= part
+        
+        if result == '':
+            return 'failed'
+        return result
 
     except Exception:
+        errMsg = "Can't get the exec of the file"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
-        return CommonUtil.Exception_Handler(sys.exc_info())
 
+''' *********************************** Sequential Actions ************************************************ '''
 
-# Method to enter texts in a text box; step data passed on by the user
-def Enter_Text_In_Text_Box(step_data):
+def Enter_Text(data_set):
+    ''' Insert text '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Enter_Text_In_Text_Box", 1, local_run)
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse data set
     try:
-        for each in step_data:
-            if "action" in each[1]:
-                text_value = each[2]
-            else:
-                continue
-                # text_value=step_data[0][len(step_data[0])-1][2]
-        da.type_text(text_value)
-        CommonUtil.TakeScreenShot(sModuleInfo, local_run)
-        CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1,
-                                       local_run)
+        element_parameter = False
+        text_value = ''
+        for row in data_set:
+            if "action" in row[1]:
+                text_value = row[2]
+            if row[1] == 'element parameter': # Indicates we should find the element instead of assuming we have keyboard focus
+                element_parameter = True
+                
+        if text_value == '':
+            CommonUtil.ExecLog(sModuleInfo, "Could not find value for this action", 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+    
+    # Perform action
+    try:
+        # Find image coordinates
+        if element_parameter:
+            CommonUtil.ExecLog(sModuleInfo, "Trying to locate element", 0)
+            element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
+            if element in failed_tag_list: # Error reason logged by Get_Element
+                return 'failed'
+            
+            # Get coordinates for position user specified
+            x, y = getCoordinates(element, 'centre') # Find coordinates (x,y)
+            if x in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Error calculating coordinates", 3)
+                return 'failed'
+            CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
+            gui.click(x, y) # Single click
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "No element provided. Assuming textbox has keyboard focus", 0)
+
+        # Enter text
+        gui.typewrite(text_value)
+        CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
         return "passed"
 
     except Exception:
@@ -93,321 +154,357 @@ def Enter_Text_In_Text_Box(step_data):
 
 
 
-# Method to click on element; step data passed on by the user
-def Keystroke_For_Element(step_data):
+def Keystroke_For_Element(data_set):
+    ''' Insert characters - mainly key combonations'''
+    # Example: Ctrl+c
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Keystroke_For_Element", 1, local_run)
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse dataset
     try:
-        result = ""
-        for each in step_data:
-            if "action" in each[1]:
-                if each[0] == "keystroke_keys":
-                    keystroke_value = str(each[2]).lower()
+        keystroke_value = ''
+        for row in data_set:
+            if "action" in row[1]:
+                if row[0] == "keystroke keys":
+                    keystroke_value = str(row[2]).lower() # Store keystrok
 
-                    keys = keystroke_value.split('+')
+        if keystroke_value == '':
+            CommonUtil.ExecLog(sModuleInfo, "Invalid action found", 3)
+            return 'failed'
 
-                    keys_list = []
-                    for each in keys:
-                        keys_list.append(each.strip())
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
-                    print keys_list
+    # Perform action
+    try:
+        count = 1
+        if ',' in keystroke_value: # Check for delimiter indicating multiple keystrokes
+            keystroke_value, count = keystroke_value.split(',') # Separate keystroke and count
+            count = int(count.strip())
+        keys = keystroke_value.split('+') # Split string into array
+        keys = [x.strip() for x in keys] # Clean it up
+        
+        for i in range(count): gui.hotkey(*keys) # Send keypress (as individual values using the asterisk)
 
-                    i = 1
-                    for each in keys_list:
-                        if i == len(keys_list):
-                            gui.press(each)
-                        else:
-                            gui.keyDown(each)
-                        i += 1
-
-                    time.sleep(5)
-
-                    for each in keys_list:
-                        gui.keyUp(each)
-
-
-                else:
-                    CommonUtil.ExecLog(sModuleInfo,
-                                        "The correct parameter for the action has not been entered. Please check for errors.",
-                                        2, local_run)
-                    result = "failed"
-            else:
-                continue
-
-
-        if (result != "failed"):
-            CommonUtil.TakeScreenShot(sModuleInfo, local_run)
-            CommonUtil.ExecLog(sModuleInfo,
-                                       "Successfully entered keystroke for the element with given parameters and values",
-                                       1, local_run)
-            return "passed"
-        else:
-            CommonUtil.TakeScreenShot(sModuleInfo, local_run)
-            CommonUtil.ExecLog(sModuleInfo,
-                                "Could not enter keystroke for the element with given parameters and values",
-                                    3, local_run)
-            return "failed"
+        CommonUtil.ExecLog(sModuleInfo,"Successfully entered keystroke", 1)
+        return 'passed'
 
     except Exception:
         errMsg = "Could not enter keystroke for your element."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
 
-
-# Method to click on element; step data passed on by the user
-
-def click_on_image(file_name, _file_attachment=[],no_of_clicks=1):
+def close_program(data_set):
+    ''' Exit a running program via process kill '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse data set
     try:
-        if _file_attachment == []:
-            global file_attachment
-            _file_attachment = file_attachment
-
-        logo = None
-        # Loop through data sets to see if ok_logo/program_logo/config_logo text is present in any data field
-        logo = _file_attachment[file_name]
-
-
-        CommonUtil.ExecLog(sModuleInfo, "Trying to Click Button Logo: %s" % file_name)
-
-        click_status = da.click(logo, no_of_clicks)
-        time.sleep(5)
-        if click_status == "Failed":
-            CommonUtil.ExecLog(sModuleInfo, "Could Not click on Button %s" % file_name, 3)
-            return Failed
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "Successfully Clicked on Button %s" % file_name, 1)
-            return Passed
-
+        program_name = ''
+        for row in data_set:
+            if row[1] == 'action':
+                program_name = row[2] # Program name passed by user
+                
+        if program_name == '':
+            CommonUtil.ExecLog(sModuleInfo,"Expected a program name in Value", 3)
+            return 'failed'
     except Exception:
-        errMsg = "Unable to click using image"
+        errMsg = "Error parsing data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-
-
-
-
-def get_center_using_image(file_name, file_attachment):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
     try:
-        logo = None
-        # Loop through data sets to see if ok_logo/program_logo/config_logo text is present in any data field
-        logo = file_attachment[file_name]
-        CommonUtil.ExecLog(sModuleInfo, "Trying to Click Button Logo: %s" % file_name)
-        result = da.getCenter(logo)
-        return result
+        if dependency['PC'].lower() == 'linux' or dependency['PC'].lower() == 'mac':
+            command = 'pkill -f '+ program_name # Try Process Kill with full command checking set, which finds most programs automatically
+            close_status, output = FU.run_cmd(command, return_status=True) # Execute command and return the return code
 
+            # Check result
+            if close_status == None or close_status < 1:
+                close_status = 'passed'
 
-    except Exception:
-        errMsg = "Unable to get center using image"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-def Double_Click_Element(step_data, _file_attachment):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    try:
-        if _file_attachment == []:
-            global file_attachment
-            _file_attachment = file_attachment
-        # element_step_data = step_data[0][0:len(step_data[0])-1:1]
-        returned_step_data_list = Validate_Step_Data(step_data)
-        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
-            return "failed"
-        else:
-            if returned_step_data_list[0] == 'image':
-                result = click_on_image(returned_step_data_list[1],_file_attachment,2)
+            # pkill failed, try another method
             else:
-                CommonUtil.ExecLog(sModuleInfo,
-                                       "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                                       3, local_run)
+                CommonUtil.ExecLog(sModuleInfo,"pKill command failed, trying another method", 0)
+                command = "ps aux | grep -i '%s' | grep -v grep | awk '{print $2}'" % program_name # Try to find the PID
+                close_status, output = FU.run_cmd(command, return_status=True) # Run the command above and return the output which should contain a list of PIDs found
+                if output != []:
+                    output = output[0].strip() # First PID found
+                    close_status = FU.run_cmd("kill -9 %s" % output) # Send the terminate signal to this PID
+                else: close_status = 'failed' # No PID received - error occurred or program doesn't exist
 
-        if result!=Failed:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Successfully clicked on element with given images/text", 1,
-                               local_run)
-            return Passed
+        elif dependency['PC'].lower() == 'windows':
+            command = "taskkill /F /IM " + program_name + ".exe"
+            close_status = FU.run_win_cmd(command)
+
         else:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Couldn't click on element with given images/text", 3,
-                               local_run)
-            return Failed
+            CommonUtil.ExecLog(sModuleInfo, "Uknown dependency %s" % dependency['PC'], 3)
+            return 'failed'
 
+        # Check result
+        if close_status in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Could not send signal to close program.", 3)
+            return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Sent signal to close program.", 1)
+            return 'passed'
+        
+            
+    except Exception:
+        errMsg = "Could not close the program"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+def move_mouse(data_set):
+    ''' Hover over element or move to coordinates '''
+
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse data set
+    try:
+        cmd = ''
+        file_name = ''
+        position = 'centre'
+        for row in data_set:
+            if row[1] == 'action':
+                if row[0] == 'hover':
+                    cmd = 'hover'
+                    position = row[2] # Store coordinates
+                elif row[0] == 'move':
+                    cmd = 'move'
+                    file_name = row[2] # Store position (see positions at top)
+            elif row[1] == 'element parameter':
+                file_name = row[2] # Store filename for hover
+        
+        if cmd == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid action not found. Expected Field set to 'move' or 'hover'", 3)
+            return 'failed'
+        
+        if cmd == 'hover':
+            if file_name == '':
+                CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
+                return 'failed'
+            if position not in positions:
+                CommonUtil.ExecLog(sModuleInfo, "Will click on centre of element. Expected Value to be one of: %s" % str(positions), 2)
+        elif cmd == 'move':
+            if file_name == '':
+                CommonUtil.ExecLog(sModuleInfo, "Valid action not found. Expected Value to be coordinates in format of 'x,y'", 3)
+                return 'failed'
+        
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)    
+    # Perform action
+    try:
+        if cmd == 'hover':
+            # Find image coordinates
+            CommonUtil.ExecLog(sModuleInfo, "Performing %s action on file %s" % (cmd, file_name), 0)
+            element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
+            if element in failed_tag_list: # Error reason logged by Get_Element
+                return 'failed'
+            
+            # Get coordinates for position user specified
+            x, y = getCoordinates(element, position) # Find coordinates (x,y)
+            if x in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Error calculating coordinates", 3)
+                return 'failed'
+            CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
+        
+        elif cmd == 'move':
+            x, y = file_name.replace(' ', '').split(',') # Get the coordinates
+            x = int(x)
+            y = int(y)
+
+        # Move mouse pointer
+        CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
+        result = gui.moveTo(x, y) # Move to element / Hover over element
+
+
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't move mouse pointer", 3)
+            return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Successfully mouse pointer", 1)
+            return 'passed'
 
     except Exception:
-        errMsg = "Unable to click using image/text"
+        errMsg = "Error while trying to move mouse pointer"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
 
-def Click_Element(step_data, _file_attachment=[]):
+def Click_Element(data_set):
+    ''' Single or double mouse click on element '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse data set
     try:
-            # element_step_data = step_data[0][0:len(step_data[0])-1:1]
-        if _file_attachment == []:
-            global file_attachment
-            _file_attachment = file_attachment
+        cmd = ''
+        file_name = ''
+        position = 'centre'
+        for row in data_set:
+            if row[1] == 'action':
+                if row[0] == 'click':
+                    cmd = 'click'
+                    position = row[2]
+                elif row[0] in ('doubleclick', 'double click'):
+                    cmd = 'doubleclick'
+                    position = row[2]
+            elif row[1] == 'element parameter':
+                file_name = row[2]
+        
+        if cmd == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid action not found. Expected Field set to 'click' or 'doubleclick', and the Value one of: %s" % str(positions), 3)
+            return 'failed'
+        if position not in positions:
+            CommonUtil.ExecLog(sModuleInfo, "Will click on centre of element. Expected Value to be one of: %s" % str(positions), 2)
+        
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
+            return 'failed'
+        
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    # Perform action
+    try:
+        # Find image coordinates
+        CommonUtil.ExecLog(sModuleInfo, "Performing %s action on file %s" % (cmd, file_name), 0)
+        element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
+        if element in failed_tag_list: # Error reason logged by Get_Element
+            return 'failed'
+        
+        # Get coordinates for position user specified
+        x, y = getCoordinates(element, position) # Find coordinates (x,y)
+        if x in failed_tag_list: # Error reason logged by Get_Element
+            CommonUtil.ExecLog(sModuleInfo, "Error calculating coordinates", 3)
+            return 'failed'
+        CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
+        
+        # Click on image
+        if cmd == 'click':
+            result = gui.click(x, y) # Single click
+        elif cmd == 'doubleclick':
+            result = gui.doubleClick(x, y) # Double click
 
-        returned_step_data_list = Validate_Step_Data(step_data)
-        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
-            return "failed"
+        # Check result and return
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't click on element with given images", 3)
+            return 'failed'
         else:
-            if returned_step_data_list[0] == 'image':
-                result = click_on_image(returned_step_data_list[1],_file_attachment,1)
-            else:
-                CommonUtil.ExecLog(sModuleInfo,
-                                   "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                                   3, local_run)
-
-        if result!=Failed:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Successfully clicked on element with given images/text", 1,
-                               local_run)
-            return Passed
-        else:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Couldn't click on element with given images/text", 3,
-                               local_run)
-            return Failed
-
+            CommonUtil.ExecLog(sModuleInfo, "Successfully clicked on element with given images", 1)
+            return 'passed'
 
     except Exception:
-        errMsg = "Unable to click using image/text"
+        errMsg = "Error while trying to perform click action"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+def check_for_element(data_set):
+    ''' Tests whether or not an element is visible on screen '''
+
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+    # Parse data set
+    try:
+        file_name = ''
+        for row in data_set:
+            if row[1] == 'element parameter':
+                file_name = row[2]
+        
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
+            return 'failed'
+        
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+    # Perform action
+    try:
+        CommonUtil.ExecLog(sModuleInfo, "Performing check action on file %s" % (file_name), 0)
+        element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
+        if element in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Element not found", 3)
+            return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Found element", 1)
+            return 'passed'
+        
+    except Exception:
+        errMsg = "Error parsing data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
 
-def Hover_Over_Element(step_data, _file_attachment=[]):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    try:
-        if _file_attachment == []:
-            global file_attachment
-            _file_attachment = file_attachment
+def launch_program(data_set):
+    ''' Read the Exec line from a Linux icon file '''
 
-            # element_step_data = step_data[0][0:len(step_data[0])-1:1]
-        returned_step_data_list = Validate_Step_Data(step_data)
-        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
-            return "failed"
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
+
+    try:
+        file_name = data_set[0][2] # Get filename from data set
+        Command = ''
+
+        # Check if filename from data set is an icon file on the desktop by using full or partial match
+        path = os.path.join(FU.get_home_folder(), 'Desktop') # Prepare path for desktop if needed
+        files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))] # Get list of files in specified directory
+        for f in files: # For each file found
+            if file_name in f: # If filename from data set matches fully or partially
+                # Save full path/file
+                file_name = os.path.join(path, f)
+
+                # Read first line to check if it's an icon file
+                with open(file_name, "rb") as myfile:
+                    data = myfile.read()[:16]
+                    if data.strip() == "[Desktop Entry]":
+                        Command = get_exec_from_icon(file_name)
+                
+                break
+
+        # Try to find the image file
+        if file_name not in file_attachment and os.path.exists(file_name) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
+            return 'failed'
+        if file_name in file_attachment:
+            Command = file_attachment[file_name] # In file is an attachment, get the full path
+        elif os.path.exists(file_name) and Command == '': # User provided correct path
+            Command = file_name
+
+        # Now file_name should have a directory/file pointing to the correct image
+
+        # Execute program
+        if dependency['PC'].lower() == 'linux' or dependency['PC'].lower() == 'mac':
+            launch_status = subprocess.Popen(Command.split(' ')) # FU.run_cmd() blocks further execution, so we'll just use subprocess here
+
+        elif dependency['PC'].lower() == 'windows':
+            launch_status = FU.run_win_cmd(Command)
+
         else:
-            if returned_step_data_list[0] == 'image':
-                center = get_center_using_image(returned_step_data_list[1],_file_attachment)
-            else:
-                CommonUtil.ExecLog(sModuleInfo,
-                                       "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",
-                                       3, local_run)
+            CommonUtil.ExecLog(sModuleInfo, "Unknown dependency %s" % dependency['PC'], 3)
+            return 'failed'
 
-        gui.FAILSAFE = False
-        result = gui.moveTo(center[0],center[1])
-
-
-        if result!=Failed:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Successfully hover oover element with given images/text", 1,
-                               local_run)
-            return Passed
+        # Check result and return
+        if launch_status in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Could not launch the program", 3)
+            return 'failed'
         else:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Couldn't hover over element with given images/text", 3,
-                               local_run)
-            return Failed
+            CommonUtil.ExecLog(sModuleInfo, "Program launched successfully.", 1)
+            return 'passed'
 
 
     except Exception:
-        errMsg = "Unable to hover using image/text"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-
-
-# Method to sleep for a particular duration
-def Sleep(step_data):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Sleep", 1, local_run)
-    try:
-        tuple = step_data[0][0]
-        seconds = int(tuple[2])
-        CommonUtil.ExecLog(sModuleInfo, "Sleeping for %s seconds" % seconds, 1, local_run)
-        result = time.sleep(seconds)
-
-        return result
-
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-
-# Method to return pass or fail for the step outcome
-def Step_Result(step_data):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Step_Result", 1, local_run)
-    try:
-        step_result = step_data[0][0][2]
-        if step_result == 'pass':
-            result = "passed"
-        elif step_result == 'fail':
-            result = "failed"
-
-        return result
-
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-# Performs a series of action or conditional logical action decisions based on user input
-def Sequential_Actions(step_data,file_attachment):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Sequential_Actions", 1, local_run)
-    try:
-        for each in step_data:
-            for row in each:
-                # finding what to do for each dataset
-                # if len(row)==5 and row[1] != "":     ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement
-                if ((row[1] == "element parameter")):  ##modifying the filter for changes to be made in the sub-field of the step data. May remove this part of the if statement
-                    continue
-
-                elif row[1] == "action":
-                    CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row", 1,
-                                       local_run)
-                    result = Action_Handler(each, row[0], file_attachment)
-                    if result == [] or result == "failed":
-                        return "failed"
-
-                # If middle column = optional action, call action handler, but always return a pass
-                elif row[1] == "optional action":
-                    CommonUtil.ExecLog(sModuleInfo,"Checking the optional action to be performed in the action row: %s" % str(row), 1)
-                    result = Action_Handler(each, row[0] , file_attachment)  # Pass data set, and action_name to action handler
-                    if result == 'failed':
-                        CommonUtil.ExecLog(sModuleInfo, "Optional action failed. Returning pass anyway", 2)
-                    result = 'passed'
-
-                else:
-                    CommonUtil.ExecLog(sModuleInfo,
-                                       "The sub-field information is incorrect. Please provide accurate information on the data set(s).",
-                                       3, local_run)
-                    return "failed"
-        return "passed"
-
-
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-'===================== ===x=== Sequential Action Section Ends ===x=== ======================'
-# Validation of step data passed on by the user
-def Validate_Step_Data(step_data):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function: Validate_Step_Data", 1, local_run)
-    try:
-        element_parameter = step_data[0][0]
-        element_value = step_data[0][2]
-        reference_parameter = False
-        reference_value = False
-        reference_is_parent_or_child = False
-        validated_data = (
-                element_parameter, element_value, reference_parameter, reference_value, reference_is_parent_or_child)
-        return validated_data
-    except:
-        CommonUtil.ExecLog(sModuleInfo, "Data set incorrect. Please provide accurate data set(s) information.", 3,
-                               local_run)
-        return "failed"
-
-
-
-
-'===================== ===x=== Validation Section Ends ===x=== ======================'
+        errMsg = "Can't execute the program"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+    
+def teardown(data_set):
+    ''' Cleanup automation '''
+    
+    # Cleanup shared variables
+    Shared_Resources.Clean_Up_Shared_Variables()
+        
+    return 'passed'
