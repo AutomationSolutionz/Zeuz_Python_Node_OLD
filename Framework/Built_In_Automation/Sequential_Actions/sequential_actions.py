@@ -28,6 +28,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     107: {'module': 'common', 'name': 'compare list', 'function': 'Compare_Lists'},
     108: {'module': 'common', 'name': 'insert into list', 'function': 'Insert_Into_List'},
     109: {'module': 'common', 'name': 'save variable', 'function': 'Save_Variable'},
+    110: {'module': 'common', 'name': 'delete shared variables', 'function': 'delete_all_shared_variables'},
     
     200: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
@@ -52,6 +53,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     220: {'module': 'appium', 'name': 'storage', 'function': 'device_information'},
     221: {'module': 'appium', 'name': 'reboot', 'function': 'device_information'},
     222: {'module': 'appium', 'name': 'phone name', 'function': 'device_information'},
+    223: {'module': 'appium', 'name': 'device password', 'function': 'set_device_password'},
+    224: {'module': 'appium', 'name': 'switch device', 'function': 'switch_device'},
 
     300: {'module': 'rest', 'name': 'save response', 'function': 'Get_Response'},
     
@@ -61,7 +64,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     404: {'module': 'selenium', 'name': 'double click', 'function': 'Double_Click_Element'},
     405: {'module': 'selenium', 'name': 'move to element', 'function': 'Move_To_Element'},
     406: {'module': 'selenium', 'name': 'hover', 'function': 'Hover_Over_Element'},
-    406: {'module': 'selenium', 'name': 'keystroke keys', 'function': 'Keystroke_For_Element'},
+    407: {'module': 'selenium', 'name': 'keystroke keys', 'function': 'Keystroke_For_Element'},
     408: {'module': 'selenium', 'name': 'keystroke chars', 'function': 'Keystroke_For_Element'},
     409: {'module': 'selenium', 'name': 'text', 'function': 'Enter_Text_In_Text_Box'},
     410: {'module': 'selenium', 'name': 'initialize list', 'function': 'Initialize_List'},
@@ -81,6 +84,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     424: {'module': 'selenium', 'name': 'navigate', 'function': 'Navigate'},
     425: {'module': 'selenium', 'name': 'get location', 'function': 'get_location_of_element'},
     426: {'module': 'selenium', 'name': 'validate table', 'function': 'validate_table'},
+    427: {'module': 'selenium', 'name': 'handle alert', 'function': 'Handle_Browser_Alert'},
+    428: {'module': 'selenium', 'name': 'browser', 'function': 'Open_Browser_Wrapper'},
     
     500: {'module': 'utility', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'name': 'upload', 'function': 'Upload'},
@@ -128,6 +133,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     708: {'module': 'desktop', 'name': 'check', 'function': 'check_for_element'},
     709: {'module': 'desktop', 'name': 'move', 'function': 'move_mouse'},
     710: {'module': 'desktop', 'name': 'teardown', 'function': 'teardown'},
+    711: {'module': 'desktop', 'name': 'drag', 'function': 'Drag_Element'},
+    712: {'module': 'desktop', 'name': 'listbox', 'function': 'navigate_listbox'},
 }
 
 # List of Sub-Field keywords, must be all lowercase, and using single spaces - no underscores
@@ -148,7 +155,8 @@ action_support = [
     'path',
     'value',
     'result',
-    'table parameter'
+    'table parameter',
+    'source parameter'
 ]
 
 # List of supported mobile platforms - must be lower case
@@ -172,6 +180,10 @@ dependency = None
 if sr.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = sr.Get_Shared_Variables('dependency') # Retreive appium driver
 
+# Initialize bypass data set (need to be global, so separate test cases can access them)
+bypass_data_set = []
+bypass_row = []
+loaded_modules = []
 
 def load_sa_modules(module): # Load module "AS" must match module name we get from step data (See actions variable above)
     ''' Dynamically loads modules when needed '''
@@ -179,29 +191,35 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
-    if module == 'common':
-        pass # Already imported at top of this file
-    elif module == 'appium':
-        global appium
-        from Framework.Built_In_Automation.Mobile.CrossPlatform.Appium import BuiltInFunctions as appium
-    elif module == 'selenium':
-        global selenium
-        from Framework.Built_In_Automation.Web.Selenium import BuiltInFunctions as selenium
-    elif module == 'rest':
-        global rest
-        from Framework.Built_In_Automation.Web.REST import BuiltInFunctions as rest
-    elif module == 'utility':
-        global utility
-        from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as utility
-    elif module == 'xml':
-        global xml
-        from Framework.Built_In_Automation.XML import BuiltInFunctions_XML as xml
-    elif module == 'desktop':
-        global desktop
-        from Framework.Built_In_Automation.Desktop.CrossPlatform import BuiltInFunctions as desktop
-    else:
-        CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
-        return 'failed'
+    try:
+        global loaded_modules
+        loaded_modules.append(module) # Save the module name - we need to check it under certain circumstances
+        
+        if module == 'common':
+            pass # Already imported at top of this file
+        elif module == 'appium':
+            global appium
+            from Framework.Built_In_Automation.Mobile.CrossPlatform.Appium import BuiltInFunctions as appium
+        elif module == 'selenium':
+            global selenium
+            from Framework.Built_In_Automation.Web.Selenium import BuiltInFunctions as selenium
+        elif module == 'rest':
+            global rest
+            from Framework.Built_In_Automation.Web.REST import BuiltInFunctions as rest
+        elif module == 'utility':
+            global utility
+            from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as utility
+        elif module == 'xml':
+            global xml
+            from Framework.Built_In_Automation.XML import BuiltInFunctions_XML as xml
+        elif module == 'desktop':
+            global desktop
+            from Framework.Built_In_Automation.Desktop.CrossPlatform import BuiltInFunctions as desktop
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Invalid sequential actions module: %s" % module, 3)
+            return 'failed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info())
     return 'passed'
 
 def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = {}, _temp_q = '',screen_capture='Desktop'):
@@ -243,6 +261,14 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
                 if action_name in action_support:
                     continue
 
+                # If middle coloumn = bypass action, store the data set for later use if needed
+                elif "bypass action" in action_name:
+                    CommonUtil.ExecLog(sModuleInfo, "Bypass action found, storing data set for later use", 1)
+                    global bypass_data_set, bypass_row
+                    bypass_data_set.append(data_set) # Save this data set - see "action" if block below for further processing
+                    bypass_row.append(row)
+                    result = 'passed'
+                    
                 # If middle column = action, call action handler, but always return a pass
                 elif "optional action" in action_name:
                     CommonUtil.ExecLog(sModuleInfo, "Checking the optional action to be performed in the action row: %s" % str(row), 0)
@@ -275,9 +301,31 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
                             sr.Set_Shared_Variables(r[2].strip(), result) # Use the Value as the shared variable name, and save the result
                             stored = True # In the case of a failed result, skip the return that comes after this
                             
-                    # Check result of action handler 
+                    # Check result of action handler and use bypass action if specified
                     if stored == False and result in failed_tag_list:
-                        return "failed"
+                        if bypass_data_set != []: # User specified a bypass action, so let's try it before we fail
+                            action_module = [x for x in loaded_modules if str(x) in str(row[1])] # Save module for the original action
+                            for i in range(len(bypass_data_set)):
+                                bypass_module = [x for x in loaded_modules if str(x) in str(bypass_row[i][1])] # Save module for the bypass action
+                                if action_module != bypass_module:
+                                    CommonUtil.ExecLog(sModuleInfo, "Skipping bypass #%d because it's not the same module" % (i + 1), 1)
+                                    continue
+
+                                CommonUtil.ExecLog(sModuleInfo, "Action failed. Trying bypass #%d" % (i + 1), 1)
+                                result = Action_Handler(bypass_data_set[i], bypass_row[i])
+                                if result in failed_tag_list: # This also failed, so chances are first failure was real
+                                    continue # Try the next bypass, if any
+                                else: # Bypass passed, which indicates there was something blocking the element in the first place
+                                    CommonUtil.ExecLog(sModuleInfo, "Bypass passed. Retrying original action", 1)
+                                    result = Action_Handler(data_set, row) # Retry failed original data set
+                                    if result in failed_tag_list: # Still a failure, give up
+                                        return 'failed'
+                                    break # No need to process more bypasses
+                            if result in failed_tag_list: # All bypass actions failed
+                                CommonUtil.ExecLog(sModuleInfo, "All bypass actions failed", 3)
+                                return 'failed'
+                        else: # Yup, it's a failure, and no bypass specified
+                            return "failed"
                 
                 # Middle column not listed above, so data set is wrong
                 else:
@@ -456,6 +504,8 @@ def Action_Handler(_data_set, action_row):
         new_row = list(row)
         if 'optional' in row[1]:
             new_row[1] = new_row[1].replace('optional', '').strip()
+        if 'bypass' in row[1]:
+            new_row[1] = new_row[1].replace('bypass', '').strip()
         if module in row[1]:
             new_row[1] = new_row[1].replace(module, '').strip()
         if original_module != '' and original_module in row[1]:
@@ -481,5 +531,3 @@ def Action_Handler(_data_set, action_row):
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
- 
-

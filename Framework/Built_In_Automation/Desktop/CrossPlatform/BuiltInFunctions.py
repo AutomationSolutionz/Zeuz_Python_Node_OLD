@@ -10,11 +10,9 @@ Created on May 15, 2016
 import pyautogui as gui # https://pyautogui.readthedocs.io/en/latest/
 import os, os.path, sys, time, inspect, subprocess
 from Framework.Utilities import CommonUtil, FileUtilities  as FL
-#from Framework.Built_In_Automation.Desktop.CrossPlatform import DesktopAutomation as da
 from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as FU
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list # Allowed return strings, used to normalize pass/fail
-from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
 from Framework.Built_In_Automation.Shared_Resources import LocateElement
 
 # Valid image positions
@@ -25,12 +23,12 @@ dependency = None
 if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive appium driver
 else:
-    CommonUtil.ExecLog(__name__ + " : " + __file__, "No dependency set - Cannot run", 3)
+    raise ValueError("No dependency set - Cannot run")
 
 # Recall file attachment, if not already set
 file_attachment = []
-if sr.Test_Shared_Variables('file_attachment'):
-    file_attachment = sr.Get_Shared_Variables('file_attachment')
+if Shared_Resources.Test_Shared_Variables('file_attachment'):
+    file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
 
 ''' **************************** Helper functions **************************** '''
 
@@ -131,6 +129,7 @@ def Enter_Text(data_set):
             CommonUtil.ExecLog(sModuleInfo, "Trying to locate element", 0)
             element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
             if element in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Could not locate element", 3)
                 return 'failed'
             
             # Get coordinates for position user specified
@@ -157,6 +156,7 @@ def Enter_Text(data_set):
 def Keystroke_For_Element(data_set):
     ''' Insert characters - mainly key combonations'''
     # Example: Ctrl+c
+    # Repeats keypress if a number follows, example: tab,3 
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
@@ -215,7 +215,8 @@ def close_program(data_set):
     except Exception:
         errMsg = "Error parsing data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    
+
+    # Perform action    
     try:
         if dependency['PC'].lower() == 'linux' or dependency['PC'].lower() == 'mac':
             command = 'pkill -f '+ program_name # Try Process Kill with full command checking set, which finds most programs automatically
@@ -257,7 +258,7 @@ def close_program(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
 def move_mouse(data_set):
-    ''' Hover over element or move to coordinates '''
+    ''' Hover over element or move to specified x,y coordinates '''
 
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
@@ -288,6 +289,7 @@ def move_mouse(data_set):
                 return 'failed'
             if position not in positions:
                 CommonUtil.ExecLog(sModuleInfo, "Will click on centre of element. Expected Value to be one of: %s" % str(positions), 2)
+                position = 'centre'
         elif cmd == 'move':
             if file_name == '':
                 CommonUtil.ExecLog(sModuleInfo, "Valid action not found. Expected Value to be coordinates in format of 'x,y'", 3)
@@ -296,6 +298,7 @@ def move_mouse(data_set):
     except Exception:
         errMsg = "Error parsing data set"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)    
+
     # Perform action
     try:
         if cmd == 'hover':
@@ -303,6 +306,7 @@ def move_mouse(data_set):
             CommonUtil.ExecLog(sModuleInfo, "Performing %s action on file %s" % (cmd, file_name), 0)
             element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
             if element in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Could not locate element", 3)
                 return 'failed'
             
             # Get coordinates for position user specified
@@ -313,9 +317,16 @@ def move_mouse(data_set):
             CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
         
         elif cmd == 'move':
-            x, y = file_name.replace(' ', '').split(',') # Get the coordinates
-            x = int(x)
-            y = int(y)
+            try:
+                if ',' not in file_name.replace(' ', '').split(','):
+                    CommonUtil.ExecLog(sModuleInfo, "Expected Value to be 'X,Y' format for coordinates. If you want to use an image, try using the 'hover' action", 3)
+                    return 'failed'
+                
+                x, y = file_name.replace(' ', '').split(',') # Get the coordinates
+                x = int(x)
+                y = int(y)
+            except:
+                return CommonUtil.Exception_Handler(sys.exc_info(), None, "Expected Value to be 'X,Y' format for coordinates. If you want to use an image, try using the 'hover' action")
 
         # Move mouse pointer
         CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
@@ -361,6 +372,7 @@ def Click_Element(data_set):
             return 'failed'
         if position not in positions:
             CommonUtil.ExecLog(sModuleInfo, "Will click on centre of element. Expected Value to be one of: %s" % str(positions), 2)
+            position = 'centre'
         
         if file_name == '':
             CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
@@ -376,6 +388,7 @@ def Click_Element(data_set):
         CommonUtil.ExecLog(sModuleInfo, "Performing %s action on file %s" % (cmd, file_name), 0)
         element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
         if element in failed_tag_list: # Error reason logged by Get_Element
+            CommonUtil.ExecLog(sModuleInfo, "Could not locate element", 3)
             return 'failed'
         
         # Get coordinates for position user specified
@@ -441,15 +454,26 @@ def check_for_element(data_set):
 
 
 def launch_program(data_set):
-    ''' Read the Exec line from a Linux icon file '''
+    ''' Execute a program or desktop icon '''
+    # If a linux desktop icon filename is specified, then it will read the file, and extract the Exec line to execute it directly
+    # Anything else is executed, including if it's an attachment
 
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
+    # Parse data set
     try:
         file_name = data_set[0][2] # Get filename from data set
         Command = ''
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Value field empty. Expected filename or full file path", 3)
+            return 'failed'
+    except:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
 
+    # Execute program    
+    try:
         # Check if filename from data set is an icon file on the desktop by using full or partial match
         path = os.path.join(FU.get_home_folder(), 'Desktop') # Prepare path for desktop if needed
         files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))] # Get list of files in specified directory
@@ -506,5 +530,144 @@ def teardown(data_set):
     
     # Cleanup shared variables
     Shared_Resources.Clean_Up_Shared_Variables()
-        
     return 'passed'
+
+def Drag_Element(data_set):
+    ''' Drag element from source to destination '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Parse data set
+    try:
+        cmd = ''
+        file_name = ''
+        src_file_name = ''
+        position = 'centre'
+        for row in data_set:
+            if row[1] == 'action':
+                if row[0] == 'drag':
+                    cmd = 'drag'
+                    position = row[2]
+            elif row[1] == 'element parameter':
+                file_name = row[2]
+            elif row[1] == 'source parameter':
+                src_file_name = row[2]
+        
+        if cmd == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid action not found. Expected Field set to 'click' or 'doubleclick', and the Value one of: %s" % str(positions), 3)
+            return 'failed'
+        if position not in positions:
+            CommonUtil.ExecLog(sModuleInfo, "Will click on centre of element. Expected Value to be one of: %s" % str(positions), 2)
+            position = 'centre'
+        
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
+            return 'failed'
+        
+        if src_file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'source parameter', and Value to be a filename", 3)
+            return 'failed'
+        
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    # Perform action
+    try:
+        # Get coordinates for source and destiniation
+        for filename in (file_name, src_file_name):
+            tmp_data_set = [('image', 'element parameter', filename)]
+            # Find image coordinates for destination element
+            CommonUtil.ExecLog(sModuleInfo, "Performing %s action on file %s" % (cmd, filename), 0)
+            element = LocateElement.Get_Element(tmp_data_set, gui) # (x, y, w, h)
+            if element in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Could not locate element: %s" % filename, 3)
+                return 'failed'
+    
+            # DESTINATION  Get coordinates for position user specified
+            x, y = getCoordinates(element, position) # Find coordinates (x,y)
+            if x in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Error calculating coordinates", 3)
+                return 'failed'
+            CommonUtil.ExecLog(sModuleInfo, "Image coordinates on screen %d x %d" % (x, y), 0)
+            
+            # Put the x,y in usable variables
+            if filename == file_name:
+                dst_x, dst_y = x, y
+            else:
+                src_x, src_y = x, y
+
+        # Drag source to destination
+        gui.moveTo(src_x, src_y) # Move to source
+        result = gui.dragTo(dst_x, dst_y, 2, button = 'left') # Click and drag to destination, taking two seconds, then release - the 2 seconds is important for some drags because without the time, it happens too fast and the drag command is missed by the window manager
+
+        # Check result and return
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Couldn't dragged element with given images", 3)
+            return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Successfully dragged element with given images", 1)
+            return 'passed'
+
+    except Exception:
+        errMsg = "Error while trying to perform drag action"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+def navigate_listbox(data_set):
+    ''' Scroll listbox until image element is found or timeout is hit '''
+    # Continually presses page down and checks for the image
+    # Assumptions: Listbox already has focus - user ought to use click action to click on the listbox, or the drop down menu's arrow
+    # Assumptions: User has image of the list item they want to find
+    # Produces: Pass/Fail - User is responsible for performing the action they desire now that the listbox is where their element is visible
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    # Maximum number of tries to find the element. Have no way of knowing when we hit the last list item, so we have to hard code a value
+    max_tries = 10
+    
+    # Delay before checking for image element
+    delay = 1
+    
+    # Parse data set
+    try:
+        file_name = ''
+        for row in data_set:
+            if row[1] == 'element parameter':
+                file_name = row[2]
+            elif row[1] == 'action':
+                try:
+                    delay = int(row[2]) # Test if user specified a delay on the action line
+                    CommonUtil.ExecLog(sModuleInfo, "Using customer specified delay of %d" % delay, 1)
+                except: delay = 1 # Default delay - user did not specify
+        
+        if file_name == '':
+            CommonUtil.ExecLog(sModuleInfo, "Valid element not found. Expected Sub-Field to be 'element parameter', and Value to be a filename", 3)
+            return 'failed'
+    except Exception:
+        errMsg = "Error parsing data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    # Perform action
+    try:
+        # Get coordinates for source and destiniation
+        for i in range(max_tries):
+            CommonUtil.ExecLog(sModuleInfo, "Checking listbox for element", 0)
+            element = LocateElement.Get_Element(data_set, gui) # (x, y, w, h)
+            if element in failed_tag_list: # Error reason logged by Get_Element
+                CommonUtil.ExecLog(sModuleInfo, "Could not locate element - trying a new position. Attempt #%d" % i, 0)
+                gui.hotkey('pgdn')
+                time.sleep(delay) # Wait for listbox to update
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Found element", 1)
+                return 'passed'
+        
+        CommonUtil.ExecLog(sModuleInfo, "Could not locate element after %d attempts" % max_tries, 3)
+        return 'failed'
+    
+    except Exception:
+        errMsg = "Error while trying to perform drag action"
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+    

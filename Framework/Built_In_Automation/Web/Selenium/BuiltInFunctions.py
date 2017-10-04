@@ -21,6 +21,7 @@ import time
 import inspect
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import NoAlertPresentException
 from selenium.webdriver.common.keys import Keys
 #Ver1.0
 from selenium.webdriver.common.by import By
@@ -43,10 +44,12 @@ selenium_driver = None
 if Shared_Resources.Test_Shared_Variables('selenium_driver'): # Check if driver is already set in shared variables
     selenium_driver = Shared_Resources.Get_Shared_Variables('selenium_driver') # Retreive appium driver
 
-global dependency
+# Recall dependency, if not already set
 dependency = None
 if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
-    dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
+    dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive appium driver
+else:
+    raise ValueError("No dependency set - Cannot run")
 
 
 
@@ -105,7 +108,7 @@ def Open_Browser(dependency):
                         break
             selenium_driver = webdriver.Firefox()
             selenium_driver.implicitly_wait(WebDriver_Wait)
-            selenium_driver.maximize_window()
+            #selenium_driver.maximize_window()
             CommonUtil.ExecLog(sModuleInfo, "Started Firefox Browser", 1)
             Shared_Resources.Set_Shared_Variables('selenium_driver', selenium_driver)
             CommonUtil.set_screenshot_vars(Shared_Resources.Shared_Variable_Export())
@@ -146,8 +149,13 @@ def Open_Browser_Wrapper(step_data):
         if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
             dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
     
-
-        return Open_Browser(dependency)
+        cmd = step_data[0][2] # Expected "open" or "close" for current method. May contain other strings for old method of Field="open browser"
+        if cmd.lower().strip() == 'close': # User issued close command
+            try: selenium_driver.close()
+            except: pass
+            return 'passed'
+        else: # User issued "open" command or used old method of "open browser"
+            return Open_Browser(dependency)
     except Exception:
         ErrorMessage =  "failed to open browser"
         return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
@@ -157,18 +165,64 @@ def Go_To_Link(step_data, page_title=False):
     #this function needs work with validating page title.  We need to check if user entered any title.
     #if not then we don't do the validation
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    
+    # Open browser and create driver if user has not already done so
     try:
-        web_link=step_data[0][2]
-        selenium_driver.get(web_link)
-        selenium_driver.implicitly_wait(WebDriver_Wait)
+        if Shared_Resources.Test_Shared_Variables('selenium_driver') == False:
+            CommonUtil.ExecLog(sModuleInfo, "Browser not previously opened, doing so now", 1)
+            global dependency
+            # Get the dependency again in case it was missed
+            if Shared_Resources.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
+                dependency = Shared_Resources.Get_Shared_Variables('dependency') # Retreive selenium driver
+        
+    
+            result = Open_Browser(dependency)
+            if result in failed_tag_list:
+                return 'failed'
+    except Exception:
+        ErrorMessage =  "failed to open browser"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
+
+    # Open URL in browser
+    try:
+        web_link=step_data[0][2] # Save Value field (URL)
+        selenium_driver.get(web_link) # Open in browser
+        selenium_driver.implicitly_wait(WebDriver_Wait) # Wait for page to load
         CommonUtil.ExecLog(sModuleInfo, "Successfully opened your link: %s" % web_link, 1)
         CommonUtil.TakeScreenShot(sModuleInfo)
-#         if page_title != False:
-#             assert page_title in selenium_driver.title
-        #time.sleep(3)
         return "passed"
     except Exception:
         ErrorMessage =  "failed to open your link: %s" %(web_link)
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
+
+
+def Handle_Browser_Alert(step_data):
+    #accepts browser alert
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        choice = str(step_data[0][2]).lower()
+        if choice == 'accept' or choice == 'pass' or choice == 'yes' or choice == 'ok':
+            try:
+                selenium_driver.switch_to_alert().accept()
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert accepted", 1)
+                return "passed"
+            except NoAlertPresentException as e:
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 2)
+                return "passed"
+        elif choice == 'reject' or choice == 'fail' or choice == 'no' or choice == 'cancel':
+            try:
+                selenium_driver.switch_to_alert().dismiss()
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert rejected", 1)
+                return "passed"
+            except NoAlertPresentException as e:
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 2)
+                return "passed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Wrong Step Data", 3)
+            return "failed"
+
+    except Exception:
+        ErrorMessage =  "Failed to accept browser alert"
         return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
 
 
