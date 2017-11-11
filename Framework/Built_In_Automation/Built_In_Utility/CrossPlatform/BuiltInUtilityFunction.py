@@ -13,7 +13,6 @@ import time
 import inspect
 import zipfile
 import string
-import ConfigParser
 from Framework.Utilities import ConfigModule
 import filecmp
 import random
@@ -23,7 +22,7 @@ from sys import platform as _platform
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
 
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
-import os, subprocess, shutil
+import os, subprocess, shutil,ast
 
 add_sanitization = True
 
@@ -879,14 +878,32 @@ def raw(text):
 def Copy_File_or_Folder(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     try:
         if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
-            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be copied
-            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to copy the file/folder
+            from_path = str(step_data[0][2]).strip()  # location of the file/folder to be copied
+            if from_path[0]=="/": from_path=from_path.lstrip('/')
+            to_path = str(step_data[1][2]).strip()
+            if to_path[0] == "/": to_path=to_path.lstrip('/')
+            to_path =os.path.join( get_home_folder() , to_path)  # location where to copy the file/folder
         elif _platform == "win32":
             from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be copied
-            to_path = raw(str(step_data[1][2]).strip())  # location where to copy the file/folder
+            to_path = os.path.join(get_home_folder(),raw(str(step_data[1][2]).strip()))  # location where to copy the file/folder
         file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to copy
+        # Try to find the file
+        if from_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), from_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,
+                               "Could not find file attachment called %s, and could not find it locally" % from_path, 3)
+            return 'failed'
+        if from_path in file_attachment: from_path = file_attachment[from_path]  # In file is an attachment, get the full path
+
+        if from_path not in file_attachment:
+            from_path = os.path.join(get_home_folder(), from_path)
         if file_or_folder.lower() == 'file':
                 # copy file "from_path" to "to_path"
             result = copy_file(from_path, to_path)
@@ -1304,19 +1321,44 @@ def Create_File(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-
 # Method to compare file
 def Compare_File(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     try:
         if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
-            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of file path to be compared
-            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location of file path to be compared
+            from_path = str(step_data[0][2]).strip()  # location of file path to be compared
+            to_path = str(step_data[1][2]).strip()  # location of file path to be compared
         elif _platform == "win32":
             from_path = raw(str(step_data[0][2]).strip())  # location of file path to be compared
             # print  from_path
             to_path = raw(str(step_data[1][2]).strip())  # location of file path to be compared
+
+        # Try to find the file
+        if from_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), from_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,
+                               "Could not find file attachment called %s, and could not find it locally" % from_path, 3)
+            return 'failed'
+        if from_path in file_attachment: from_path = file_attachment[from_path]  # In file is an attachment, get the full path
+
+        if from_path not in file_attachment:
+            from_path = os.path.join(get_home_folder(), from_path)
+
+        # Try to find the file
+        if to_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), to_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,
+                               "Could not find file attachment called %s, and could not find it locally" % to_path, 3)
+            return 'failed'
+        if to_path in file_attachment: to_path = file_attachment[to_path]  # In file is an attachment, get the full path
+
+        if to_path not in file_attachment:
+            to_path = os.path.join(get_home_folder(), to_path)
 
         file_or_folder = str(step_data[2][2]).strip()
         if file_or_folder.lower() == 'file':
@@ -1341,14 +1383,40 @@ def Compare_File(step_data):
 def Rename_File_or_Folder(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     try:
         if _platform == "linux" or _platform == "linux2" or _platform == "darwin" :
 
-            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be renamed
-            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to rename the file/folder
+            from_path = str(step_data[0][2]).strip()  # location of the file/folder to be renamed
+            to_path = str(step_data[1][2]).strip()  # location where to rename the file/folder
         elif _platform == "win32":
             from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be renamed
             to_path = raw(str(step_data[1][2]).strip())  # location where to rename the file/folder
+
+         # Try to find the file
+        if from_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), from_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,
+                               "Could not find file attachment called %s, and could not find it locally" % from_path, 3)
+            return 'failed'
+        if from_path in file_attachment: from_path = file_attachment[from_path]  # In file is an attachment, get the full path
+
+        if from_path not in file_attachment:
+            from_path = os.path.join(get_home_folder(), from_path)
+
+        # Try to find the file
+        if to_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), to_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,
+                               "Could not find file attachment called %s, and could not find it locally" % to_path, 3)
+            return 'failed'
+        if to_path in file_attachment: to_path = file_attachment[to_path]  # In file is an attachment, get the full path
+
+        if to_path not in file_attachment:
+            to_path = os.path.join(get_home_folder(), to_path)
 
         file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to rename
         if file_or_folder.lower() == 'file':
@@ -1766,9 +1834,120 @@ def Download_File_and_Unzip(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+
+def replace_Substring(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
+    # Parse data set
+    try:
+        substring = ''
+        new_string = ''
+        file_name = ''
+        replace_all = True
+        case_sensitive = True
+        replace_dict = {}
+        for row in data_set:
+            if "action" in row[1]:
+                file_name = row[2]
+                if file_name[0]=="/": file_name=file_name.lstrip("/")
+            if row[1] == 'element parameter':
+                if row[0] == 'replace all':
+                    #The user should be able to replace the first instance found, or all strings found (default is to replace all)
+                    if row[2].lower().strip() == 'true' or row[2].lower().strip() == 'yes': #replace_all
+                        replace_all = True
+                    elif row[2].lower().strip() == 'false' or row[2].lower().strip() == 'no': #replace_first_one_only
+                        replace_all = False
+                    elif row[2]!='':
+                        CommonUtil.ExecLog(sModuleInfo,"Unknown Value for element parameter 'replace_all'. Should be true or false.", 3)
+                        return 'failed'
+
+                elif row[0] == 'case sensitive':
+                    #User should be able to specify case sensitivity (default is to be case sensitive)
+                    if row[2].lower().strip() == 'true' or row[2].lower().strip() == 'yes':  #case_sensitive
+                        case_sensitive = True
+                    elif row[2].lower().strip() == 'false' or row[2].lower().strip() == 'no': #case_insensitive
+                        case_sensitive = False
+                    elif row[2]!='':
+                        CommonUtil.ExecLog(sModuleInfo,"Unknown Value for element parameter 'case_sensitive'. Should be true or false.", 3)
+                        return 'failed'
+
+                elif row[0] == 'dictionary':
+                    if row[2] != '':
+                        try:
+                            replace_dict = ast.literal_eval(row[2].strip())
+                        except:
+                            CommonUtil.ExecLog(sModuleInfo,"Unknown Value for element parameter 'dictionary'. Should be a string representation of python dictionary.", 3)
+                            return 'failed'
+                    else:
+                        CommonUtil.ExecLog(sModuleInfo,"Unknown Value for element parameter 'dictionary'. Should be a string representation of python dictionary.",3)
+                        return 'failed'
+                else:
+                    substring = row[0].strip()  #substring to be replaced
+                    new_string = row[2].strip()  #substring should be replaced to this string
+                    replace_dict = {substring:new_string}
+
+         # Try to find the file
+        if file_name not in file_attachment and os.path.exists(os.path.join(get_home_folder(), file_name)) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
+            return 'failed'
+        if file_name in file_attachment: file_name = file_attachment[file_name] # In file is an attachment, get the full path
+
+        if file_name not in file_attachment:
+            file_name = os.path.join(get_home_folder(), file_name)
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Perform action
+    try:
+
+        #read and change the file
+        f = open(file_name, 'r')
+        newTxt = str(f.read())
+        f.close()
+
+        for substring in replace_dict.keys():
+            new_string = replace_dict[substring]
+            if substring == '':
+                CommonUtil.ExecLog(sModuleInfo, "Could not find substring for this action", 3)
+                return 'failed'
+            if new_string == '':
+                CommonUtil.ExecLog(sModuleInfo, "Could not find new_string for this action", 3)
+                return 'failed'
+            if case_sensitive == False: #case insensitive
+                newTxt = newTxt.lower()
+                substring = substring.lower()
+                new_string = new_string.lower()
+            if replace_all == False: #replace only first one
+                newTxt = newTxt.replace(substring, new_string, 1)
+            if replace_all == True: #replace all
+                newTxt =newTxt.replace(substring, new_string)
+
+        #write back
+        f = open(file_name, 'w')
+        f.write(newTxt)
+        f.close()
+        return "passed"
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+
 def Change_Value_ini(data_set):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     # Parse data set
     try:
         file_name = ''
@@ -1784,9 +1963,15 @@ def Change_Value_ini(data_set):
                 section_name = row[0]   # name of the section where th change should be made
                 line_name = row[2]    # name of the line where value should be changed
 
-        if file_name == '':
-            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+        # Try to find the file
+        if file_name not in file_attachment and os.path.exists(os.path.join(get_home_folder(), file_name)) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
             return 'failed'
+        if file_name in file_attachment: file_name = file_attachment[file_name] # In file is an attachment, get the full path
+
+        if file_name not in file_attachment:
+            file_name = os.path.join(get_home_folder(), file_name)
+
         if section_name == '':
             CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
             return 'failed'
@@ -1801,41 +1986,30 @@ def Change_Value_ini(data_set):
 
     # Perform action
     try:
-        if os.path.isfile(file_name): # check if the file exists or not
-            '''change the value'''
-            config = ConfigParser.SafeConfigParser()
-            config.read(file_name)
-            list_of_sections = config.sections()
-            if section_name in list_of_sections:
-                options = config.options(section_name)
-                # check if this name exists
-                if line_name in options:
-                    config.set(section_name, line_name, new_expected_value_of_line)  # change value
-                    #writeback file
-                    with open(file_name, 'wb') as configfile:
-                        config.write(configfile)
 
-                    '''check if line is changed properly'''
-                    config.read(file_name)
-                    check_value = config.get(section_name, line_name)
-                    if check_value == new_expected_value_of_line:
-                        CommonUtil.ExecLog(sModuleInfo, "Value is changed successfully", 1)
-                        return "passed"
-
-            CommonUtil.ExecLog(sModuleInfo, "Can't add line", 3)
-            return "failed"
+        result = ConfigModule.add_config_value(section_name, line_name, new_expected_value_of_line, location = file_name)
+        if result:
+            CommonUtil.ExecLog(sModuleInfo, "INI upated successfully", 1)
+            return 'passed'
         else:
-            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
-            return "failed"
+            CommonUtil.ExecLog(sModuleInfo, "Error updating %s with %s in section %s" % (line_name, new_expected_value_of_line, section_name), 3)
+        return "failed"
+
 
 
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error performing action")
 
 
 def Add_line_ini(data_set):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     # Parse data set
     try:
         file_name = ''
@@ -1851,9 +2025,15 @@ def Add_line_ini(data_set):
                 section_name = row[0]       # name of the section where the new line should be added
                 line_name = row[2]       # name of the new line to be added
 
-        if file_name == '':
-            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+        # Try to find the file
+        if file_name not in file_attachment and os.path.exists(os.path.join(get_home_folder(), file_name)) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
             return 'failed'
+        if file_name in file_attachment: file_name = file_attachment[file_name] # In file is an attachment, get the full path
+
+        if file_name not in file_attachment:
+            file_name = os.path.join(get_home_folder(), file_name)
+
         if section_name == '':
             CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
             return 'failed'
@@ -1868,31 +2048,15 @@ def Add_line_ini(data_set):
 
     # Perform action
     try:
-        if os.path.isfile(file_name):    # check if the file exists or not
-            '''add line'''
-            config = ConfigParser.SafeConfigParser()
-            config.read(file_name)
-            list_of_sections = config.sections()
-            if section_name in list_of_sections:
-                config.set(section_name, line_name, value_of_line)  #add line
-                # writeback file
-                with open(file_name, 'wb') as configfile:
-                    config.write(configfile)
 
-                '''check if line is added properly'''
-                config.read(file_name)
-                options = config.options(section_name)
-                if line_name in options:
-                    check_value = config.get(section_name, line_name)
-                    if check_value == value_of_line:
-                        CommonUtil.ExecLog(sModuleInfo,"Line is added successfully" ,1)
-                        return "passed"
-
-            CommonUtil.ExecLog(sModuleInfo, "Can't add line", 3)
-            return "failed"
+        result = ConfigModule.add_config_value(section_name, line_name, value_of_line,location=file_name)
+        if result:
+            CommonUtil.ExecLog(sModuleInfo, "INI upated successfully", 1)
+            return 'passed'
         else:
-            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
-            return "failed"
+            CommonUtil.ExecLog(sModuleInfo, "Error updating %s with %s in section %s" % (line_name, value_of_line, section_name), 3)
+        return "failed"
+
 
 
     except Exception:
@@ -1901,6 +2065,12 @@ def Add_line_ini(data_set):
 def Delete_line_ini(data_set):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
     # Parse data set
     try:
         file_name = ''
@@ -1913,9 +2083,15 @@ def Delete_line_ini(data_set):
                 section_name = row[0]    # name of the section from where line should be deleted
                 line_name = row[2]    # name of the line to be deleted
 
-        if file_name == '':
-            CommonUtil.ExecLog(sModuleInfo, "Could not find ini file name for this action", 3)
+        # Try to find the file
+        if file_name not in file_attachment and os.path.exists(os.path.join(get_home_folder(), file_name)) == False:
+            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % file_name, 3)
             return 'failed'
+        if file_name in file_attachment: file_name = file_attachment[file_name] # In file is an attachment, get the full path
+
+        if file_name not in file_attachment:
+            file_name = os.path.join(get_home_folder(), file_name)
+
         if section_name == '':
             CommonUtil.ExecLog(sModuleInfo, "Could not find ini file section name for this action", 3)
             return 'failed'
@@ -1927,27 +2103,15 @@ def Delete_line_ini(data_set):
 
     # Perform action
     try:
-        if os.path.isfile(file_name):   # check if the file exists or not
-            '''delete the line'''
-            config = ConfigParser.SafeConfigParser()
-            config.read(file_name)
-            config.remove_option(section_name, line_name)   #delete file
-            # writeback file
-            with open(file_name, 'wb') as configfile:
-                config.write(configfile)
 
-            '''check if the line is deleted properly'''
-            config.read(file_name)
-            options = config.options(section_name)
-            if line_name in options:
-                CommonUtil.ExecLog(sModuleInfo, "Can't delete line", 3)
-                return "failed"
-
-            CommonUtil.ExecLog(sModuleInfo, "The line is no more in the config file", 1)
-            return "passed"
+        result = ConfigModule.remove_config_value(section_name, line_name,location=file_name)
+        if result:
+            CommonUtil.ExecLog(sModuleInfo, "INI upated successfully", 1)
+            return 'passed'
         else:
-            CommonUtil.ExecLog(sModuleInfo, "Couldn't find the config file", 1)
-            return "failed"
+            CommonUtil.ExecLog(sModuleInfo, "Error updating %s with %s in section %s" % (line_name, section_name), 3)
+        return "failed"
+
 
 
     except Exception:
@@ -1977,16 +2141,6 @@ def Read_line_name_and_value(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
     try:
         if os.path.isfile(file_name):    # check if the file exists or not
-            '''read file and save'''
-            config = ConfigParser.SafeConfigParser()
-            config.read(file_name)
-            list_of_sections = config.sections()
-            dir ={}
-            for section in list_of_sections:
-                options = config.options(section)
-                for option in options:
-                    dir[section+"|"+option] = config.get(section,option)
-            #save in shared variable
             Shared_Resources.Set_Shared_Variables(save_line_name_value, dir)
             return "passed"
 
@@ -2029,8 +2183,7 @@ def Validate_Path_Step_Data(step_data):
     try:
         path1 = get_home_folder() + str(step_data[0][0]).strip()
         path2 = get_home_folder() + str(step_data[0][2]).strip()
-        validated_data = (path1, path2
-                          )
+        validated_data = (path1, path2)
         return validated_data
     except Exception:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -2038,6 +2191,25 @@ def Validate_Path_Step_Data(step_data):
         Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
             exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
         CommonUtil.ExecLog(sModuleInfo, "Could not find the new page element requested.  Error: %s" % (Error_Detail), 3)
+        return "failed"
+
+
+# return no of files(sub directory included) in a directory
+def count_no_of_files_in_folder(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    try:
+        path = get_home_folder() + "/" +str(step_data[0][2]).strip()
+        count = 0
+        count = sum([len(files) for r, d, files in os.walk(path)])
+        Shared_Resources.Set_Shared_Variables('noOfFiles',str(count))
+        return "passed"
+    except Exception:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
+            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
+        CommonUtil.ExecLog(sModuleInfo, "Could not count no of files in the directory.  Error: %s" % (Error_Detail), 3)
         return "failed"
 
 

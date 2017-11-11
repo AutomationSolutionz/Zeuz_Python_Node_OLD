@@ -123,7 +123,7 @@ def get_device_imei_info(serial = ''):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
         if serial != '': serial = '-s %s' % serial # Prepare serial number with command line switch
-        output=subprocess.Popen(str('adb %s shell dumpsys iphonesubinfo' % serial).split(' '), stdout=subprocess.PIPE).communicate()[0]
+        output=subprocess.check_output('adb %s shell dumpsys iphonesubinfo' % serial, shell = True)
         # Use dumpsys (Below Android v6)
         if output != '':
             output = output.split("\n")[2]
@@ -131,7 +131,7 @@ def get_device_imei_info(serial = ''):
             
         # Use service call (Above Android v6)
         else:
-            output=subprocess.Popen(str('adb shell service call iphonesubinfo 1' % serial).split(' '), stdout=subprocess.PIPE).communicate()[0]
+            output=subprocess.check_output('adb shell service call iphonesubinfo 1' % serial, shell = True)
             output=output.split(' ') # Contains hex output, and characters that need to be removed
             tmp = ''
             for val in output:
@@ -194,8 +194,8 @@ def get_devices():
         return output
 
     except Exception:
-        errMsg = "Unable to get devices"
-        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+        CommonUtil.ExecLog(sModuleInfo, "Unable to get devices", 3)
+        return []
 
 def is_android_connected(serial = ''):
     ''' Return True/False if at least one device is connected '''
@@ -351,9 +351,9 @@ def wake_android(serial = ''):
         CommonUtil.ExecLog(sModuleInfo, "Waking device", 0)
         
         # If there is a password, handle it
-        output = detect_foreground_android(serial) # Check if we are on the password screen
+        output = detect_foreground_android(serial.replace('-s ', '')) # Check if we are on the password screen
         if output == 'Bouncer':
-            output = unlock_android(serial)
+            output = unlock_android(serial.replace('-s ', ''))
             if output == 'failed':
                 return 'failed'
         
@@ -383,7 +383,7 @@ def unlock_android(serial = ''):
         time.sleep(3) # Give time for foreground to switch and unlock to complete
 
         # Verify success
-        output = detect_foreground_android(serial) # Check if we are still on the password screen
+        output = detect_foreground_android(serial.replace('-s ', '')) # Check if we are still on the password screen
         if output == 'Bouncer': # Password didn't work
             CommonUtil.ExecLog(sModuleInfo, "Unlocking failed. Password may be invalid - %s" % password, 3)
             return 'failed'
@@ -401,7 +401,7 @@ def detect_foreground_android(serial = ''):
     try:
         if serial != '': serial = '-s %s' % serial # Prepare serial number with command line switch
         output = subprocess.check_output("adb %s shell dumpsys window windows" % serial, shell=True) # Get list of windows
-        p = re.compile('CurrentFocus=Window{\w+\s+\w+\s+\w+\s+(.*?)}', re.MULTILINE) # Find CurrentFocus line, and return package/activity
+        p = re.compile('CurrentFocus=.*?\s+([\w\.]+)/([\w\.]+)', re.MULTILINE) # Find CurrentFocus line, and return package/activity
         m = p.search(output) # Perform regex
         return str(m.group(1)) # Return package/activity
     except Exception:
@@ -424,10 +424,8 @@ def reset_android(serial = ''):
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
-        if serial != '': serial = '-s %s' % serial # Prepare serial number with command line switch
         CommonUtil.ExecLog(sModuleInfo, "Resetting device %s" % serial, 0)
-        if serial != '':
-            serial = '-s %s' % serial # Prepend the command line switch to add the serial number
+        if serial != '': serial = '-s %s' % serial # Prepend the command line switch to add the serial number
         subprocess.check_output("adb %s reboot" % serial, shell=True) # Send reset
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error while performing swipe gesture")

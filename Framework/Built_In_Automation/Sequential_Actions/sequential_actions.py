@@ -55,6 +55,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     222: {'module': 'appium', 'name': 'phone name', 'function': 'device_information'},
     223: {'module': 'appium', 'name': 'device password', 'function': 'set_device_password'},
     224: {'module': 'appium', 'name': 'switch device', 'function': 'switch_device'},
+    225: {'module': 'appium', 'name': 'long press', 'function': 'Long_Press_Appium'},
 
     300: {'module': 'rest', 'name': 'save response', 'function': 'Get_Response'},
     
@@ -86,6 +87,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     426: {'module': 'selenium', 'name': 'validate table', 'function': 'validate_table'},
     427: {'module': 'selenium', 'name': 'handle alert', 'function': 'Handle_Browser_Alert'},
     428: {'module': 'selenium', 'name': 'browser', 'function': 'Open_Browser_Wrapper'},
+    429: {'module': 'selenium', 'name': 'teardown', 'function': 'Tear_Down_Selenium'},
     
     500: {'module': 'utility', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'name': 'upload', 'function': 'Upload'},
@@ -112,10 +114,12 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     522: {'module': 'utility', 'name': 'log 1', 'function': 'Add_Log'},
     523: {'module': 'utility', 'name': 'download and unzip', 'function': 'Download_File_and_Unzip'},
     524: {'module': 'utility', 'name': 'take screen shot', 'function': 'TakeScreenShot' },
-    525: {'module': 'utility', 'name': 'change value', 'function': 'Change_Value_ini' },
-    526: {'module': 'utility', 'name': 'add line', 'function': 'Add_line_ini' },
-    527: {'module': 'utility', 'name': 'delete line', 'function': 'Delete_line_ini' },
+    525: {'module': 'utility', 'name': 'change ini value', 'function': 'Change_Value_ini' },
+    526: {'module': 'utility', 'name': 'add ini line', 'function': 'Add_line_ini' },
+    527: {'module': 'utility', 'name': 'delete ini line', 'function': 'Delete_line_ini' },
     528: {'module': 'utility', 'name': 'read name_value', 'function': 'Read_line_name_and_value' },
+    529: {'module': 'utility', 'name': 'text replace', 'function': 'replace_Substring' },
+    530: {'module': 'utility', 'name': 'count files in folder', 'function': 'count_no_of_files_in_folder'},
 
     600: {'module': 'xml', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'name': 'add', 'function': 'add_element'},
@@ -142,6 +146,7 @@ action_support = [
     'action',
     'optional action',
     'conditional action',
+    'loop action',
     'element parameter',
     'child parameter',
     'parent parameter',
@@ -222,38 +227,62 @@ def load_sa_modules(module): # Load module "AS" must match module name we get fr
         return CommonUtil.Exception_Handler(sys.exc_info())
     return 'passed'
 
-def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = {}, _temp_q = '',screen_capture='Desktop'):
+def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file_attachment = {}, _temp_q = '',screen_capture='Desktop',_device_info = {}):
     ''' Main Sequential Actions function - Performs logical decisions based on user input '''
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
-    # Set dependency, file_attachemnt as global variables
-    global dependency, file_attachment
-    if _dependency != {}:
-        dependency = _dependency # Save to global variable
-        sr.Set_Shared_Variables('dependency', _dependency) # Save in Shared Variables
-    
-    if _file_attachment != {}: # If a file attachment was passed
-        file_attachment = _file_attachment # Save as a global variable
-        sr.Set_Shared_Variables('file_attachment', _file_attachment) # Add entire file attachment dictionary to Shared Variables
-        for file_attachment_name in _file_attachment: # Add each attachment as it's own Shared Variable, so the user can easily refer to it
-            sr.Set_Shared_Variables(file_attachment_name, _file_attachment[file_attachment_name])
-    
-    # Set screen capture type (desktop/mobile) as shared variable, so TakeScreenShot() can read it
-    sr.Set_Shared_Variables('screen_capture', screen_capture.lower().strip()) # Save the screen capture type
-    CommonUtil.set_screenshot_vars(sr.Shared_Variable_Export()) # Get all the shared variables, and pass them to CommonUtil
-
-    # Prepare step data for processing
-    step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
-    step_data = common.adjust_element_parameters(step_data, supported_platforms) # Parse any mobile platform related fields
-    if step_data in failed_tag_list: return 'failed'
-    if common.verify_step_data(step_data) in failed_tag_list: return 'failed' # Verify step data is in correct format
-    
+    # Initialize
     try:
-        result = 'failed' # Initialize result            
-        for data_set in step_data: # For each data set within step data
+        # Set dependency, file_attachemnt as global variables
+        global dependency, file_attachment, device_details
+        if _dependency != {}:
+            dependency = _dependency # Save to global variable
+            sr.Set_Shared_Variables('dependency', _dependency, protected = True) # Save in Shared Variables
+        
+        if _file_attachment != {}: # If a file attachment was passed
+            file_attachment = _file_attachment # Save as a global variable
+            sr.Set_Shared_Variables('file_attachment', _file_attachment, protected = True) # Add entire file attachment dictionary to Shared Variables
+            for file_attachment_name in _file_attachment: # Add each attachment as it's own Shared Variable, so the user can easily refer to it
+                sr.Set_Shared_Variables(file_attachment_name, _file_attachment[file_attachment_name])
+        
+        if _device_info != {}: # If any devices and their details were sent by the server, save to shared variable
+            device_info = _device_info
+            sr.Set_Shared_Variables('device_info', device_info, protected = True)
+         
+        # Set screen capture type (desktop/mobile) as shared variable, so TakeScreenShot() can read it
+        if screen_capture != None and screen_capture != 'None':
+            sr.Set_Shared_Variables('screen_capture', screen_capture.lower().strip()) # Save the screen capture type
+            CommonUtil.set_screenshot_vars(sr.Shared_Variable_Export()) # Get all the shared variables, and pass them to CommonUtil
+    
+        # Prepare step data for processing
+        step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
+        step_data = common.adjust_element_parameters(step_data, supported_platforms) # Parse any mobile platform related fields
+        if step_data in failed_tag_list: return 'failed'
+        if common.verify_step_data(step_data) in failed_tag_list: return 'failed' # Verify step data is in correct format
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error during Sequential Actions startup")
+
+    # Process step data
+    return Run_Sequential_Actions(step_data)
+    
+def Run_Sequential_Actions(step_data):
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    try:
+        result = 'failed' # Initialize result
+        skip = [] # List of data set numbers that have been processed, and need to be skipped, so they are not processed again
+                    
+        for dataset_cnt in range(len(step_data)): # For each data set within step data
+            data_set = step_data[dataset_cnt]
             logic_row=[] # Holds conditional actions
+            if dataset_cnt in skip: continue # If this data set is in the skip list, do not process it
+            
+            if CommonUtil.check_offline(): # Check if user initiated offline command from GUI
+                CommonUtil.ExecLog(sModuleInfo, "User requested Zeuz Node to go Offline", 2)
+                return 'failed'
+            
             for row in data_set: # For each row of the data set
                 action_name = row[1] # Get Sub-Field
                 
@@ -287,6 +316,64 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = '', _file
                         CommonUtil.ExecLog(sModuleInfo, "Found 2 conditional actions - moving ahead with them", 1)
                         return Conditional_Action_Handler(step_data, data_set, row, logic_row) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
                         # At this point, we don't process any more data sets, which is why we return here. The conditional action function takes care of the rest of the execution
+                
+                # Simulate a while/for loop with the specified data sets
+                elif 'loop action' in action_name:
+                    ### Create sub-set of step data that we will send to SA for processing
+                    try:
+                        sets = map(int, row[2].replace(' ', '').split(',')) # Save data sets to loop
+                        sets = [x - 1 for x in sets] # Convert data set numbers to array friendly
+                        new_step_data = []
+                        for i in sets: new_step_data.append(step_data[i]) # Create new sub-set
+                    except:
+                        CommonUtil.ExecLog(sModuleInfo, "Loop format incorrect. Expected 'true/false number' or 'number'. Eg: true 2 OR 5", 3)
+                        return 'failed'
+                    
+                    ### Determine loop type
+                    # Current types: Loop N times || Loop until Data_set #N = true/false
+                    try: # Format of Field: true/false/pass/fail NUMBER - Eg: true 2 - If second data set results in true/pass, then stop loop
+                        loop_type, action_result = row[0].lower().replace(',', ' ').replace('  ', ' ').split(' ') # True/False that we want to monitor as the result, and data set number to base output on
+                        action_result = int(action_result) - 1 # Bring user specified data set number into array format
+                        action_result = action_result - dataset_cnt - 1 # Calculate data set number of this data set in the new sub-set. -1 Because we are currently on the loop action, and this data set is not included in the sub-set
+                        if loop_type in passed_tag_list: loop_type = 'passed'
+                        elif loop_type in failed_tag_list: loop_type = 'failed'
+                        else:
+                            CommonUtil.ExecLog(sModuleInfo, "Loop format incorrect. Expected Field to contain 'true/false number'. Eg: true 2", 3)
+                            return 'failed'
+                        loop_len = 1000 # Not used. Set to impossibly high number
+                    except:
+                        try: # Format of Field: NUMBER - Number of times to run, regardless of result
+                            loop_len = int(row[0]) # Number of times to loop
+                            loop_type = '' # Must be blank
+                            action_result = '' # Not used
+                        except:
+                            print "ERROR"
+                            quit()
+                    
+                    ### Send sub-set to SA until we get our desired value or number of loops
+                    sub_set_cnt = 0 # Used in counting number of loops
+                    die = False # Used to exit parent while loop
+                    while True: # We control the new sub-set of the step data, so we can examine the output
+                        for ndc in range(len(new_step_data)): # For each data set in the sub-set
+                            new_data_set = new_step_data[ndc] # Get the data set
+                            result = Run_Sequential_Actions([new_data_set]) # Send single data set to SA as step data, so we control the loop
+                            if result in passed_tag_list: result = 'passed' # Make sure the reuslt matches the string we set above
+                            else: result = 'failed'
+                            
+                            # Check if we should exit now or keep going
+                            if ndc == action_result and result == loop_type: # If this data set that just returned is the one that we are watching AND it returned the result we want, then exit the loop 
+                                skip = sets # Tell SA to skip these data sets that were in the loop once it picks up processing normally
+                                die=True # Exit while loop
+                                break # Stop processing sub-sets
+    
+                        # These must be between the two IF statements
+                        sub_set_cnt += 1 # Used for numerical loops only, keep track of how many times we've looped the sub-set
+                        if die: break # Stop processing this while loop, and go back to regular SA
+                    
+                        # Check if we hit our set number of loops
+                        if sub_set_cnt >= loop_len and loop_type == '': # If we hit out desired number of loops for this loop type, then exit
+                            skip = sets # Tell SA to skip these data sets that were in the loop once it picks up processing normally
+                            break # Stop processing sub-sets and exit while loop
                 
                 # If middle column = action, call action handler
                 elif "action" in action_name: # Must be last, since it's a single word that also exists in other action types
@@ -453,6 +540,10 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row):
         if logic_decision in conditional_steps: # If we have a result from the element check above (true/false)
             list_of_steps = conditional_steps[2].split(",") # Get the data set numbers for this conditional action and put them in a list
             for each_item in list_of_steps: # For each data set number we need to process before finishing
+                if CommonUtil.check_offline(): # Check if user initiated offline command from GUI
+                    CommonUtil.ExecLog(sModuleInfo, "User requested Zeuz Node to go Offline", 2)
+                    return 'failed'
+
                 CommonUtil.ExecLog(sModuleInfo, "Processing conditional step %s" % str(each_item), 1)
                 data_set_index = int(each_item.strip()) - 1 # data set number, -1 to offset for data set numbering system
                 

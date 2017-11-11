@@ -3,7 +3,7 @@
 
 import sys
 import inspect
-import os, psutil
+import os, psutil, os.path
 import logging
 from Framework.Utilities import ConfigModule
 import datetime
@@ -25,7 +25,6 @@ temp_config=os.path.join(os.path.join(FL.get_home_folder(),os.path.join('Desktop
 passed_tag_list = ['Pass', 'pass', 'PASS', 'PASSED', 'Passed', 'passed', 'true', 'TRUE', 'True', '1', 'Success','success', 'SUCCESS', True]
 failed_tag_list = ['Fail', 'fail', 'FAIL', 'Failed', 'failed', 'FAILED', 'false', 'False', 'FALSE', '0', False]
 skipped_tag_list=['skip','SKIP','Skip','skipped','SKIPPED','Skipped']
-
 
 
 def to_unicode(obj, encoding='utf-8'):
@@ -128,10 +127,14 @@ def Result_Analyzer(sTestStepReturnStatus,temp_q):
     except Exception, e:
         return Exception_Handler(sys.exc_info())
 
-def ExecLog(sModuleInfo, sDetails, iLogLevel=1, local_run=False, sStatus=""):
+def ExecLog(sModuleInfo, sDetails, iLogLevel=1, _local_run="", sStatus=""):
     try:
+        # Read from settings file
         local_run = ConfigModule.get_config_value('RunDefinition','local_run')
         debug_mode = ConfigModule.get_config_value('RunDefinition', 'debug_mode')
+        
+        # Check if user overrode local_run variable. If so, use that instead
+        if _local_run != '': local_run = _local_run
         
         # ";" is not supported for logging.  So replacing them
         sDetails = sDetails.replace(";", ":")
@@ -150,17 +153,26 @@ def ExecLog(sModuleInfo, sDetails, iLogLevel=1, local_run=False, sStatus=""):
             status = 'Warning'
         elif iLogLevel == 3:
             status = 'Error'
+        elif iLogLevel == 4:
+            status = 'Console'
         else:
             print "*** Unknown log level- Set to Warning ***"
             status = 'Warning'
 
         # Display on console
-        print "%s - %s\n\t%s" % (status.upper(), sModuleInfo, sDetails)
+        if status == 'Console': # Change the format for console, mainly leave out the status level
+            msg = ''
+            if sModuleInfo != '': msg = sModuleInfo + "\t" # Print sModuleInfo only if provided
+            msg += sDetails # Add details
+            print msg # Display in console
+        else:
+            print "%s - %s\n\t%s" % (status.upper(), sModuleInfo, sDetails) # Display in console
 
         # Upload logs to server if local run is not set to False
         if (local_run == False or local_run == 'False') and iLogLevel > 0:
             log_id=ConfigModule.get_config_value('sectionOne','sTestStepExecLogId',temp_config)
             FWLogFile = ConfigModule.get_config_value('sectionOne','log_folder',temp_config)
+            if os.path.exists(FWLogFile) == False: FL.CreateFolder(FWLogFile) # Create log directory if missing
             if FWLogFile=='':
                 FWLogFile=ConfigModule.get_config_value('sectionOne','temp_run_file_path',temp_config)+os.sep+'execlog.log'
             else:
@@ -189,7 +201,7 @@ def ExecLog(sModuleInfo, sDetails, iLogLevel=1, local_run=False, sStatus=""):
             r = RequestFormatter.Get('log_execution',{'logid': log_id, 'modulename': sModuleInfo, 'details': sDetails, 'status': status,'loglevel': iLogLevel})
 
     except Exception, e:
-        return Exception_Handler(sys.exc_info())
+        pass # This can happen when server is not available. In that case, we don't need to do anything
 
 def FormatSeconds(sec):
         hours, remainder = divmod(sec, 3600)
@@ -279,7 +291,7 @@ def TakeScreenShot(ImageName,local_run=False):
         image.thumbnail(picture_size, Image.ANTIALIAS) # Resize picture to lower file size
         image.save(ImageName, format = "JPEG", quality = picture_quality) # Change quality to reduce file size
     else:
-        print "Error saving %s screenshot to %s" % (screen_capture_type, ImageName)
+        ExecLog(sModuleInfo, "Error saving %s screenshot to %s" % (screen_capture_type, ImageName), 3)
 
 
 def TimeStamp(format):
@@ -315,6 +327,19 @@ def TimeStamp(format):
 
     return TimeStamp
 
+def set_exit_mode(emode):
+    ''' Sets a value in the temp config file to tell sequential actions to exit, if set to true '''
+    # Set by the user via the GUI
+    ConfigModule.add_config_value('sectionOne', 'exit_script', str(emode), temp_config)
+
+def check_offline():
+    ''' Checks the value set in the temp config file to tell sequential actions to exit, if set to true '''
+    # Set by the user via the GUI
+    value = ConfigModule.get_config_value('sectionOne', 'exit_script', temp_config)
+    if value == 'True':
+        return True
+    else:
+        return False
 
 class MachineInfo():
     def getLocalIP(self):
