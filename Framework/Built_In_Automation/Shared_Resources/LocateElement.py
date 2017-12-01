@@ -4,7 +4,7 @@
 Created on Jun 21, 2017
 @author: Built_In_Automation Solutionz Inc.
 '''
-import sys
+import sys, time
 import inspect
 from Framework.Utilities import CommonUtil
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list
@@ -21,7 +21,7 @@ generic_driver = None
 global driver_type 
 driver_type = None
 
-def Get_Element(step_data_set,driver,query_debug=False):
+def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
     '''
     This funciton will return "Failed" if something went wrong, else it will always return a single element
     if you are trying to produce a query from a step dataset, make sure you provide query_debug =True.  This is
@@ -37,6 +37,7 @@ def Get_Element(step_data_set,driver,query_debug=False):
         if driver_type == None:
             CommonUtil.ExecLog(sModuleInfo, "Incorrect driver.  Please validate driver", 3)
             return "failed"
+        
         # We need to switch to default content just in case previous action switched to something else
         try:
             if driver_type == 'selenium':
@@ -44,31 +45,44 @@ def Get_Element(step_data_set,driver,query_debug=False):
         except:
             pass # Exceptions happen when we have an alert, but is not a problem
 
-        
-        # If driver is pyautogui, perform specific get element function and exit
-        if driver_type == 'pyautogui':
-            result = _pyautogui(step_data_set)
-            return result
+        wait_time = int(sr.Get_Shared_Variables('element_wait'))
+        etime = time.time() + wait_time # Default time to wait for an element 
+        while time.time() < etime: # Our own built in "wait" until True because sometimes elements do not appear fast enough
+            # If driver is pyautogui, perform specific get element function and exit
+            if driver_type == 'pyautogui':
+                result = _pyautogui(step_data_set)
+                if result not in failed_tag_list: return result # Return on pass
+                if not wait_enable:
+                    CommonUtil.ExecLog(sModuleInfo, "Waited %d seconds for element" % wait_time, 3)
+                    return result # If asked not to loop, return the failure
+                continue # If fail, but instructed to loop, do so
+                
+            #here we switch driver if we need to
+            _switch(step_data_set)
+            index_number = _locate_index_number(step_data_set)
+            element_query, query_type = _construct_query (step_data_set)
+            CommonUtil.ExecLog(sModuleInfo, "Element query used to locate the element: %s. Query method used: %s "%(element_query,query_type), 1)
             
-        #here we switch driver if we need to
-        _switch(step_data_set)
-        index_number = _locate_index_number(step_data_set)
-        element_query, query_type = _construct_query (step_data_set)
-        CommonUtil.ExecLog(sModuleInfo, "Element query used to locate the element: %s. Query method used: %s "%(element_query,query_type), 1)
-        
-        if query_debug == True:
-            print "This query will not be run as query_debu is enabled.  It will only print out in console"
-            print "Your query from the step data provided is:  %s" %element_query
-            print "Your query type is: %s" %query_type
-            return "passed"
-        if element_query == False:
-            return "failed"
-        elif query_type == "xpath" and element_query != False:
-            return _get_xpath_or_css_element(element_query,"xpath",index_number)
-        elif query_type == "css" and element_query != False:
-            return _get_xpath_or_css_element(element_query,"css",index_number)
-        else:
-            return "failed"
+            if query_debug == True:
+                print "This query will not be run as query_debug is enabled.  It will only print out in console"
+                print "Your query from the step data provided is:  %s" %element_query
+                print "Your query type is: %s" %query_type
+                result = "passed"
+            if element_query == False:
+                result = "failed"
+            elif query_type == "xpath" and element_query != False:
+                result = _get_xpath_or_css_element(element_query,"xpath",index_number)
+            elif query_type == "css" and element_query != False:
+                result = _get_xpath_or_css_element(element_query,"css",index_number)
+            else:
+                result = "failed"
+            
+            if result not in failed_tag_list: return result # Return on pass
+            if not wait_enable:
+                CommonUtil.ExecLog(sModuleInfo, "Waited %d seconds for element" % wait_time, 3) 
+                return result # If asked not to loop, return the failure
+            # If fail, but instructed to loop, do so
+
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -83,10 +97,12 @@ def _construct_query (step_data_set):
         # find out if ref exists.  If it exists, it will set the value to True else False
         child_ref_exits = any("child parameter" in s for s in step_data_set)
         parent_ref_exits = any("parent parameter" in s for s in step_data_set)
+        sibling_ref_exits = any("sibling parameter" in s for s in step_data_set)
         #get all child, element, and parent only
         child_parameter_list = filter(lambda x: 'child parameter' in x[1], step_data_set) 
         element_parameter_list = filter(lambda x: 'element parameter' in x[1], step_data_set) 
         parent_parameter_list = filter(lambda x: 'parent parameter' in x[1], step_data_set) 
+        sibling_parameter_list = filter(lambda x: 'sibling parameter' in x[1], step_data_set) 
         
         if "css" in collect_all_attribute and "xpath" not in collect_all_attribute:
             # return the raw css command with css as type.  We do this so that even if user enters other data, we will ignore them.  
@@ -96,12 +112,12 @@ def _construct_query (step_data_set):
             # return the raw xpath command with xpath as type.  We do this so that even if user enters other data, we will ignore them.  
             # here we expect to get raw xpath query
             return ((filter(lambda x: 'xpath' in x[0], step_data_set) [0][2]), "xpath" )       
-        elif child_ref_exits == False and parent_ref_exits == False :
+        elif child_ref_exits == False and parent_ref_exits == False and sibling_ref_exits == False:
             '''  If  there are no child or parent as reference, then we construct the xpath differently'''
             #first we collect all rows with element parameter only 
             xpath_element_list = (_construct_xpath_list(element_parameter_list))
             return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
-        elif child_ref_exits == True and parent_ref_exits == False:
+        elif child_ref_exits == True and parent_ref_exits == False and sibling_ref_exits == False:
             '''  If  There is child but making sure no parent'''
             xpath_child_list =  _construct_xpath_list(child_parameter_list,True)
             child_xpath_string = _construct_xpath_string_from_list(xpath_child_list) 
@@ -109,7 +125,8 @@ def _construct_query (step_data_set):
             #Take the first element, remove ]; add the 'and'; add back the ]; put the modified back into list. 
             xpath_element_list[1] = (xpath_element_list[1]).replace("]","") + ' and ' + child_xpath_string + "]"
             return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
-        elif child_ref_exits == False and parent_ref_exits == True and (driver_type=="appium" or driver_type == "selenium"):
+        
+        elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == False and (driver_type=="appium" or driver_type == "selenium"):
             '''  If  There is parent but making sure no child'''
             xpath_parent_list =  _construct_xpath_list(parent_parameter_list)
             parent_xpath_string = _construct_xpath_string_from_list(xpath_parent_list) 
@@ -117,7 +134,25 @@ def _construct_query (step_data_set):
             #Take the first element, remove ]; add the 'and'; add back the ]; put the modified back into list. 
             xpath_element_list[1] = (xpath_element_list[1]).replace("]","") + ' and ' + parent_xpath_string + "]"
             return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
-        elif child_ref_exits == False and parent_ref_exits == True and (driver_type=="xml"):
+        
+        elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == True and (driver_type=="appium" or driver_type == "selenium"):
+            '''  for siblings, we need parent, siblings and element.  Siblings cannot be used with just element
+            xpath_format = '//<sibling_tag>[<sibling_element>]/ancestor::<immediate_parent_tag>[<immediate_parent_element>]//<target_tag>[<target_element>]'
+            '''
+            xpath_sibling_list =  _construct_xpath_list(sibling_parameter_list)
+            sibling_xpath_string = _construct_xpath_string_from_list(xpath_sibling_list) + "/ancestor::"
+
+            xpath_parent_list =  _construct_xpath_list(parent_parameter_list)
+            parent_xpath_string = _construct_xpath_string_from_list(xpath_parent_list) 
+            parent_xpath_string = parent_xpath_string.replace("//", "")
+            
+            xpath_element_list = _construct_xpath_list(element_parameter_list)
+            element_xpath_string = _construct_xpath_string_from_list(xpath_element_list) 
+
+            full_query = sibling_xpath_string + parent_xpath_string + element_xpath_string
+            
+            return (full_query, "xpath")        
+        elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == False and (driver_type=="xml"):
             '''  If  There is parent but making sure no child'''
             xpath_parent_list =  _construct_xpath_list(parent_parameter_list)
             parent_xpath_string = _construct_xpath_string_from_list(xpath_parent_list) 
@@ -130,7 +165,10 @@ def _construct_query (step_data_set):
             '''Currently we do not support child as reference for xml'''
             CommonUtil.ExecLog(sModuleInfo, "Currently we do not support child as reference for xml.  Please contact info@automationsolutionz.com for help", 3)          
             return False, False
+
         else:
+            CommonUtil.ExecLog(sModuleInfo, "You have entered an unsupported data set.  Please contact info@automationsolutionz.com for help", 3)          
+
             return False, False
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -263,11 +301,11 @@ def _get_xpath_or_css_element(element_query,css_xpath, index_number=False):
         all_matching_elements = []
         sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
         if css_xpath == "xpath" and driver_type != 'xml':
-            all_matching_elements = WebDriverWait(generic_driver, WebDriver_Wait).until(EC.presence_of_all_elements_located((By.XPATH, element_query)))
+            all_matching_elements = generic_driver.find_elements(By.XPATH, element_query)
         elif css_xpath == "xpath" and driver_type == 'xml':
             all_matching_elements = generic_driver.xpath(element_query)
         elif css_xpath == "css":
-            all_matching_elements = WebDriverWait(generic_driver, WebDriver_Wait).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, element_query)))
+            all_matching_elements = generic_driver.find_elements(By.CSS_SELECTOR, element_query)
         if len(all_matching_elements)== 0:
             return False
         elif len(all_matching_elements)==1 and index_number == False:
@@ -506,7 +544,7 @@ def _pyautogui(step_data_set):
             return element
         
     except:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return 'failed'
     
 
 def _scale_image(file_name, size_w, size_h):
@@ -545,9 +583,19 @@ def _scale_image(file_name, size_w, size_h):
 
 
 '''
-Sample Example:
-step_data_set =  [ ( 'id' , 'element parameter' , 'twotabsearchtextbox' , False , False ) , ( 'text' , 'selenium action' , 'Camera' , False , False ) ]
+Sample sibling Example1:
+xpath_format = '//<sibling_tag>[<sibling_element>]/ancestor::<immediate_parent_tag>[<immediate_parent_element>]//<target_tag>[<target_element>]'
+
+#step_data_set =  [( 'tag' , 'parent parameter' , 'tagvale' , False , False ) , ( 'id' , 'element parameter' , 'twotabsearchtextbox' , False , False ) , ( 'text' , 'selenium action' , 'Camera' , False , False ), ( 'class' , 'sibling parameter' , 'twotabsearchtextbox' , False , False ), ( 'class' , 'parent parameter' , 'twotabsearchtextbox' , False , False )]
+
+step_data_set = [ ( 'role' , 'element parameter' , 'checkbox' , False , False , '' ) , ( 'text' , 'sibling parameter' , 'charlie' , False , False , '' ) , ( '*class' , 'parent parameter' , 'md-table-row' , False , False , '' ) , ( 'click' , 'selenium action' , 'click' , False , False , '' ) ] 
 driver = None
 query_debug = True
-Get_Element(step_data_set,driver,query_debug)
+global driver_type 
+driver_type = "selenium"
+global debug 
+debug = True
+_construct_query (step_data_set)
+
+
 '''

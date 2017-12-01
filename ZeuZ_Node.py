@@ -63,7 +63,12 @@ if sys.platform  == 'win32':
 else:
     node_id_filename = os.path.join(os.getenv('HOME'), 'Desktop', 'node_id.conf')
 
-gui_title = 'Zeuz Node'
+# Set title with version
+version_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Version.txt')
+try: local_version = ConfigModule.get_config_value('ZeuZ Python Version', 'version', version_path)
+except: local_version = ''
+gui_title = 'Zeuz Node v%s' % str(local_version)
+
 help_text = "\
 Zeuz Node Help\n\n\
 Description:\n\
@@ -120,13 +125,19 @@ class Application(tk.Frame):
             self.save_all(save = False)
             
             # If go online at start is set, go online
-            if 'go_online_at_start' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['go_online_at_start']['check'].get(): self.read_mod()
+            try:
+                if 'go_online_at_start' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['go_online_at_start']['check'].get(): self.read_mod()
+            except: pass # Exception Zeuz Node section doesn't exist (old settings format)
 
             self.start_up_display() # Determine if this is the first run, and display widgets accordingly
             self.read_log() # Start the log reader timer
-            self.check_for_updates(check = True) # Check for updates
+            
+            # Check for updates, if enabled
+            try:
+                if 'check_for_updates' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['check_for_updates']['check'].get(): self.check_for_updates(check = True) # Check for updates
+            except: pass # Exception Zeuz Node section doesn't exist (old settings format)
 
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 01', 'Exception caught: %s' % e)
 
     def createFrames(self):
         try:
@@ -153,7 +164,7 @@ class Application(tk.Frame):
             # Read the settings data, and dynamically add widgets to window
             self.settings_frame = tk.Frame(self.leftframe)
             self.settings_frame.grid(sticky = 'w')
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 02', 'Exception caught: %s' % e)
 
 
     def createButtons(self):
@@ -185,7 +196,7 @@ class Application(tk.Frame):
             self.scroll_lock = tk.IntVar()
             tk.Checkbutton(self.rightframe, variable = self.scroll_lock).grid(row = 0, column = 0, sticky = 'e')
             self.scroll_lock.set(1) # Enable scroll lock
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 03', 'Exception caught: %s' % e)
 
     def createLog(self):
         try:    
@@ -196,7 +207,7 @@ class Application(tk.Frame):
             self.logscrollY.grid(row = 1, column = 1, sticky = 'ns')
             self.log['yscrollcommand'] = self.logscrollY.set # Bind scrollbar to log textarea
             self.log.bind('<Button-3>', self.rClicker) # Bind copy/paste menu to right click
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 04', 'Exception caught: %s' % e)
             
     def createWidgets(self):
         # Sub-frames are created for each section, which allows us to show/hide tem dynamically
@@ -229,9 +240,10 @@ class Application(tk.Frame):
                             # Set these as drop down menus
                             elif option in ('team', 'project'):
                                 if option == 'team': # Put refresh link beside team
-                                    self.team_refresh = tk.Label(self.widgets[section]['frame'], text = 'Refresh', fg = 'blue', cursor = 'hand2') # Create label to look like hyperlink
-                                    self.team_refresh.grid(row = row, column = 1, sticky = 'e')
-                                    self.team_refresh.bind('<Button-1>', lambda e: self.get_teams()) # Bind label to action
+                                    tk.Label(self.widgets[section]['frame'], text = 'Press Save to Update Teams', fg = 'blue').grid(row = row, column = 1, sticky = 'e')
+                                    #self.team_refresh = tk.Label(self.widgets[section]['frame'], text = 'Refresh', fg = 'blue', cursor = 'hand2') # Create label to look like hyperlink
+                                    #self.team_refresh.grid(row = row, column = 1, sticky = 'e')
+                                    #self.team_refresh.bind('<Button-1>', lambda e: self.get_teams()) # Bind label to action
                                 
                                 # Configure drop down menu
                                 self.widgets['Authentication']['widget'][option]['dropdown'] = tk.StringVar(self) # Initialize drop down variable
@@ -262,12 +274,14 @@ class Application(tk.Frame):
             self.widgets['Authentication']['widget']['team']['dropdown'].trace('w', self.switch_teams) # Bind function to this drop down menu
             if self.widgets['Authentication']['widget']['team']['dropdown'].get() != '':
                 self.get_projects(self.widgets['Authentication']['widget']['team']['dropdown'].get()) # Get list of projects from the server for the curent team, populate the list
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 05', 'Exception caught: %s' % e)
         
     def check_for_updates(self, check = False):
         # Check if there's a new update for zeuz node - this is triggered upon startup or periodically via tk.after()
         # Always check for updates, but depending on user's settings, either update automatically or inform user of update
 
+        global q
+        
         try:
             # Just check for updates, and schedule testing to see if updates checking is complete
             if check:
@@ -276,13 +290,13 @@ class Application(tk.Frame):
                 last_update = ConfigModule.get_config_value('sectionOne', 'last_update', temp_ini_file)
                 update_interval = self.update_interval * 3600 # Convert interval into seconds for easy comparison
 
-                if last_update == '' or (last_update + update_interval) > time.time(): # If we have reached the allowed time to check for updates or nothing was previously set. Assume this is the first time, check for updates.
+                if last_update == '' or (float(last_update) + update_interval) > time.time(): # If we have reached the allowed time to check for updates or nothing was previously set. Assume this is the first time, check for updates.
 
                     ConfigModule.add_config_value('sectionOne', 'last_update', str(time.time()), temp_ini_file) # Record current time as update time
-                    
+
                     thread.start_new_thread(self_updater.check_for_updates, ()) # Check for updates in a separate thread
                     self.after(2000, self.check_for_updates) # Tests if check for updates is complete
-                    #!!!Enable when ready: self.after(self.update_interval * 3600 * 1000, lambda: self.check_for_updates(True)) # Reschedule next check for updates (calculates from hours to ms)
+                    self.after(self.update_interval * 3600 * 1000, lambda: self.check_for_updates(True)) # Reschedule next check for updates (calculates from hours to ms)
             
             # root.after() brings us here
             else:
@@ -293,17 +307,20 @@ class Application(tk.Frame):
                 # Update check complete, we have an update, start install
                 elif self_updater.check_complete == 'update':
                     # Read update settings
-                    if 'auto-update' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['auto-update']['check'].get(): auto_update = True
-                    else: auto_update = False
+                    try:
+                        if 'auto-update' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['auto-update']['check'].get(): auto_update = True
+                        else: auto_update = False
+                    except: auto_update = False
     
                     # If auto-update is true, then perform update
                     if auto_update:
-                        thread.start_new_thread(self_updater.main, (os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Framework')))
+                        q.put('*** A new update is available. Automatically installing.')
+                        thread.start_new_thread(self_updater.main, (os.path.dirname(os.path.realpath(__file__)).replace(os.sep + 'Framework', ''),))
                         self.after(10000, self.check_for_updates) # Checks if install is complete
                     # If auto-update is false, notify user via dialogue that there's a new update available, and ask if they want to download and install it
                     else:
                         if tkMessageBox.askyesno('Update', 'A Zeuz Node update is available. Do you want to download and install it?'):
-                            thread.start_new_thread(self_updater.main, (os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Framework')))
+                            thread.start_new_thread(self_updater.main, (os.path.dirname(os.path.realpath(__file__)).replace(os.sep + 'Framework', ''),))
                             self.after(10000, self.check_for_updates) # Checks if install is complete
                         else:
                             pass # Do nothing if the user doens't want to update. We'll check again tomorrow
@@ -315,11 +332,15 @@ class Application(tk.Frame):
                 # Update installed. Now we have to restart Zeuz Node for changes to take effect
                 elif self_updater.check_complete == 'done':
                     # Read update settings
-                    if 'auto-restart' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['auto-restart']['check'].get(): auto_restart = True
-                    else: auto_restart = False
+                    try:
+                        if 'auto-restart' in self.widgets['Zeuz Node']['widget'] and self.widgets['Zeuz Node']['widget']['auto-restart']['check'].get(): auto_restart = True
+                        else: auto_restart = False
+                    except: auto_update = False
                     
                     # If auto-reboot is true, then reboot the next time zeuz node is not in the middle of a run
                     if auto_restart:
+                        q.put('*** Update installed. Automatically restarting.')
+                        time.sleep(1) # Wait a bit, so they can see the message
                         self.self_restart()
                     
                     # If auto-reboot is false, then notify user via dialogue that the installation is complete and ask to reboot
@@ -332,7 +353,7 @@ class Application(tk.Frame):
                 # Some error occurred during updating
                 elif 'error' in self_updater.check_complete:
                     tkMessageBox.showerror('Update', "An error occurred during update: %s" % self_updater.check_complete)
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 06', 'Exception caught: %s' % e)
             
         
     def self_restart(self):
@@ -340,8 +361,9 @@ class Application(tk.Frame):
             if processing_test_case: # If we are in the middle of a run, try to restart again later
                 self.after(60000, self.self_restart)
             else: # Not running a test case, so it should be safe to restart
-                subprocess.check_output('python "%s%' % sys.argv[0]) # Restart zeuz node
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+                subprocess.Popen('python "%s"' % os.path.realpath(sys.argv[0]).replace(os.sep + 'Framework', ''), shell = True) # Restart zeuz node
+                quit() # Exit this process
+        except Exception, e: tkMessageBox.showerror('Error 07', 'Exception caught: %s' % e)
         
     def start_up_display(self):
         # Check if this is the first run (team widget is set to default string), and if so, rearrange, so the server/port is above the user/pass to help user understand what needs to be populated
@@ -353,7 +375,7 @@ class Application(tk.Frame):
                 self.continuous_server_check() # Tell program to constantly check for server connection until we connect
             else: # Show default section
                 self.widgets['Authentication']['frame'].grid(row = 0, column = 0, sticky = 'w') # Show authentication section on subsequent runs
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 08', 'Exception caught: %s' % e)
         
     def continuous_server_check(self, check = True):
         # Helps the user provide required login information by showing specific fields polling the server until everyting is set
@@ -380,7 +402,7 @@ class Application(tk.Frame):
                         self.widgets['Authentication']['widget']['project']['dropdown'].set('')
                 else: # No user/pass, try again
                     root.after(1000, self.continuous_server_check)
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 09', 'Exception caught: %s' % e)
         
     def onValidate(self, ctype, S):
         # Limit text to specified length and characters
@@ -419,7 +441,7 @@ class Application(tk.Frame):
                 for section in self.advanced_settings_frames:
                     self.widgets[section]['frame'].grid(row = row, column = 0, sticky = 'w')
                     row += 1
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 10', 'Exception caught: %s' % e)
 
     def write_log(self, msg, tag = ''):
         # Write to log file
@@ -442,8 +464,8 @@ class Application(tk.Frame):
                 self.startButton.configure(text = 'Offline', fg = 'green4')
                 self.log.delete(0.0, 'end') # Clear previous log
                 thread.start_new_thread(Login,()) # Execute Zeuz_Node.py
-                if self.node_id.get() == '': root.after(5000, lambda: self.read_node_id(self.node_id)) # If no node id was read or specified, wait a few seconds for zeuz_node.py to populate the node id file, and read it
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e) 
+                if self.node_id.get() == '': self.after(5000, lambda: self.read_node_id(self.node_id)) # If no node id was read or specified, wait a few seconds for zeuz_node.py to populate the node id file, and read it
+        except Exception, e: tkMessageBox.showerror('Error 11', 'Exception caught: %s' % e) 
 
     def read_log(self):
         # Read log lines from Zeuz Node framework
@@ -467,6 +489,8 @@ class Application(tk.Frame):
                 elif 'online with name' in data:
                     if int(float(self.log.index('end'))) > self.max_log_size: self.log.delete(0.0, float(self.max_log_size / 2)) # Trim log to half of max allowed lines when a test case has completed
                     colour = self.colour_passed
+                elif 'Authentication Failed' in data:
+                    colour = self.colour_failed
                 else:
                     colour = self.colour_default
         
@@ -482,7 +506,7 @@ class Application(tk.Frame):
                     self.read_mod()
                     
             self.after(self.log_read_timer, self.read_log)
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 12', 'Exception caught: %s' % e)
         
     def password(self, encrypt, key, pw):
         ''' Encrypt, decrypt password and encode in plaintext '''
@@ -509,7 +533,7 @@ class Application(tk.Frame):
             if os.path.exists(node_id_filename):
                 node_id = ConfigModule.get_config_value('UniqueID', 'id', node_id_filename).strip()
                 for c in node_id: w.insert('end', c) # We have to write characters one at a time due to how onValidate() works
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 13', 'Exception caught: %s' % e)
                 
     def save_all(self, save = False):
         ''' Check for changes, and if found, save them to disk '''
@@ -563,6 +587,7 @@ class Application(tk.Frame):
             
             # Check if we should save
             if save: # Yes, explicit save call, so tell the user
+                self.get_teams()
                 tkMessageBox.showinfo('Info', 'Settings Saved')
                 #if int(time.time()) - self.settings_saved > 5: # But, not too often
                 #    self.log.insert('end', 'Settings Updated\n')
@@ -582,7 +607,7 @@ class Application(tk.Frame):
         try:
             self.widgets['Authentication']['widget']['project']['dropdown'].set('') # Clear Project menu
             self.get_projects(self.widgets['Authentication']['widget']['team']['dropdown'].get()) # Update available options in project menu
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 14', 'Exception caught: %s' % e)
         
     def get_teams(self, noerror = False):
         # Populate drop down with teams user has access to
@@ -596,7 +621,7 @@ class Application(tk.Frame):
                 return False
             return True
         except Exception, e:
-            tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+            tkMessageBox.showerror('Error 15', 'Exception caught: %s' % e)
             return False
 
     def get_projects(self, team):
@@ -606,7 +631,7 @@ class Application(tk.Frame):
             self.widgets['Authentication']['widget']['project']['widget']['menu'].delete(0, 'end') # Clear drop down menu
             for project in self.widgets['Authentication']['widget']['project']['choices']: # For each new project
                 self.widgets['Authentication']['widget']['project']['widget']['menu'].add_command(label = project, command=tk._setit(self.widgets['Authentication']['widget']['project']['dropdown'], project)) # Add the project to the drop down menu
-        except Exception, e: tkMessageBox.showerror('Error', 'Exception caught: %s' % e)
+        except Exception, e: tkMessageBox.showerror('Error 16', 'Exception caught: %s' % e)
 
     def rClicker(self, e):
         ''' right click context menu for all Tk Entry and Text widgets '''
@@ -649,7 +674,10 @@ class Logger(object):
             #self.terminal.write(message) # Print to terminal (DEBUGGING)
             q.put(message) # Store message for writing to the log window
         except: pass
-
+    
+    def flush(self): # In case anything calls flush, we have to have a function for it
+        pass
+    
     def close(self):
         pass
         #self.log.close() # Save in case we want to start logging to disk

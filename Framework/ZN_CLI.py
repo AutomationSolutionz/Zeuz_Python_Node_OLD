@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: cp1252 -*-
 
-import os,sys,time
+import os,sys,time, os.path
 from base64 import b64encode, b64decode
 sys.path.append(os.path.dirname(os.getcwd()))
 from Utilities import ConfigModule,RequestFormatter,CommonUtil,FileUtilities,All_Device_Info
@@ -18,6 +18,7 @@ device_dict = {}
 
 processing_test_case = False # Used by Zeuz Node GUI to check if we are in the middle of a run
 exit_script = False # Used by Zeuz Node GUI to exit script
+if not os.path.exists(os.path.join(FileUtilities.get_home_folder(), 'Desktop',os.path.join('AutomationLog'))): os.mkdir(os.path.join(FileUtilities.get_home_folder(), 'Desktop',os.path.join('AutomationLog')))
 temp_ini_file = os.path.join(os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Temp', '_file')))))
 
 def Login():
@@ -85,12 +86,14 @@ def disconnect_from_server():
     CommonUtil.set_exit_mode(True) # Tell Sequential Actions to exit
     
 def RunProcess(sTesterid):
+    etime = time.time() + (30 * 60) # 30 minutes
     while (1):
         try:
             if exit_script: return False
+            if time.time() > etime: return True # Timeout reached, re-login. We do this because after about 3-4 hours this function will hang, and thus not be available for deployment
 
             r=RequestFormatter.Get('is_run_submitted_api',{'machine_name':sTesterid})
-            if r['run_submit']:
+            if 'run_submit' in r and r['run_submit']:
                 processing_test_case = True
                 CommonUtil.ExecLog('', "**************************\n* STARTING NEW TEST CASE *\n**************************", 4, False)
                 PreProcess()
@@ -102,7 +105,7 @@ def RunProcess(sTesterid):
                 CommonUtil.ExecLog('', "Successfully updated db with parameter", 4, False)
             else:
                 time.sleep(3)
-                if r['update']:
+                if 'update' in r and r['update']:
                     _r=RequestFormatter.Get('update_machine_with_time_api',{'machine_name':sTesterid})
         except Exception, e:
             exc_type, exc_obj, exc_tb = sys.exc_info()

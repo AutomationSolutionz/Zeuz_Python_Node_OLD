@@ -68,12 +68,13 @@ def Open_Browser(dependency):
         True
     try:
         browser = browser.lower()
-        if "chrome" in browser:
+        if "chrome" in browser or "chromeheadless" in browser:
 
             from selenium.webdriver.chrome.options import Options
             options = Options()
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-extensions")
+            if "chromeheadless" in browser: options.add_argument("--headless") # Enable headless operation if dependency set
             selenium_driver = webdriver.Chrome(chrome_options = options)
             selenium_driver.implicitly_wait(WebDriver_Wait)
             selenium_driver.maximize_window()
@@ -85,13 +86,7 @@ def Open_Browser(dependency):
 
         elif browser == 'firefox':
             from sys import platform as _platform
-            if _platform == "linux" or _platform == "linux2":
-                # linux
-                print "linux"
-            elif _platform == "darwin":
-                # MAC OS X
-                print "mac"
-            elif _platform == "win32":
+            if _platform == "win32":
                 try:
                     import winreg
                 except ImportError:

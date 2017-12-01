@@ -1,5 +1,4 @@
 [ZeuZ Python Version]
-version = 2.8
-
+version = 3.5
 [Release Date]
-date= 2017-11-11
+date= 2017-11-30
