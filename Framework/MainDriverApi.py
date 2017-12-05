@@ -24,6 +24,10 @@ failed_tag_list=['Fail','fail','FAIL','Failed','failed','FAILED','false','False'
 skipped_tag_list=['skip','SKIP','Skip','skipped','SKIPPED','Skipped']
 device_info = {}
 
+#writes all logs to server
+def write_all_logs_to_server(all_logs):
+    return RequestFormatter.Get('all_log_execution',{'all_logs': all_logs})
+
 
 #returns all drivers
 def get_all_drivers_list():
@@ -459,7 +463,7 @@ def run_all_test_steps_in_a_test_case(Stepscount, test_case, sModuleInfo, run_id
 
         test_steps_data = get_test_step_data(run_id, test_case, current_step_sequence, StepSeq)
 
-        CommonUtil.ExecLog(sModuleInfo, "steps data for Step #%d: %s" % (StepSeq, str(test_steps_data)), 1)
+        CommonUtil.ExecLog(sModuleInfo, "********** steps data for Step #%d: %s **********" % (StepSeq, str(test_steps_data)), 1)
         step_time = filter(lambda x: x[0] == 'estimated' and x[1] == 'time', step_meta_data)
         if step_time:
             step_time = int(step_time[0][2])
@@ -744,6 +748,10 @@ def run_test_case(TestCaseID, sModuleInfo, run_id, driver_list, final_dependency
         debug_steps = str(debug_steps).split("|")
         debug = True
 
+    if not debug: #if normal run, the write log file and cleanup driver instances
+        cleanup_driver_instances()
+        shared.Clean_Up_Shared_Variables()
+
     #runs all test steps in the test case, all test step result is stored in the list named sTestStepResultList
     sTestStepResultList = run_all_test_steps_in_a_test_case(Stepscount, test_case, sModuleInfo, run_id, TestStepsList, file_specific_steps, driver_list, final_dependency, final_run_params, test_case_result_index, temp_ini_file,debug,debug_steps)
 
@@ -775,6 +783,7 @@ def run_test_case(TestCaseID, sModuleInfo, run_id, driver_list, final_dependency
     if not debug: #if normal run, the write log file and cleanup driver instances
         write_log_file_for_test_case(sTestCaseStatus, test_case, run_id, sTestCaseEndTime, TestCaseDuration, FailReason, temp_ini_file)
         cleanup_driver_instances()
+        shared.Clean_Up_Shared_Variables()
     else:
         start_sending_log_to_server(run_id,temp_ini_file)
         start_sending_shared_var_to_server(run_id)
@@ -823,12 +832,16 @@ def main(device_dict):
 
     #for each test runid loop continues
     for TestRunID in TestRunLists:
+        CommonUtil.clear_all_logs()
         project_id = TestRunID[3]
         team_id = int(TestRunID[4])
         run_description = (TestRunID[1].replace("run_dependency",'')).replace('dependency_filter','')
         run_id=TestRunID[0]
         final_dependency = get_all_dependencies(project_id,team_id,run_description) #get dependencies
-        final_run_params = get_all_runtime_parameters(run_id) #get runtime params
+        final_run_params_from_server = get_all_runtime_parameters(run_id) #get runtime params
+        final_run_params = {}
+        for dict in final_run_params_from_server:
+            final_run_params[str(dict['field'])] = str(dict['name'])
         update_run_id_info_on_server(run_id) #update runid status
         TestSetStartTime = time.time()
         TestCaseLists=get_all_automated_test_cases_in_run_id(run_id)  #get all automated test cases of a runid
@@ -858,6 +871,9 @@ def main(device_dict):
             update_test_case_result_on_server(run_id, sTestSetEndTime, TestSetDuration) #update runid status on server
         ConfigModule.add_config_value('sectionOne', 'sTestStepExecLogId', "MainDriver", temp_ini_file)
         CommonUtil.ExecLog(sModuleInfo, "Test Set Completed", 4, False)
+        all_logs =  CommonUtil.get_all_logs()
+        write_all_logs_to_server(all_logs)
+
     return "pass"
 
 

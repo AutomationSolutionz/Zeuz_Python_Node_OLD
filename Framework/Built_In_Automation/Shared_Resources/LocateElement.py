@@ -72,14 +72,10 @@ def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
                 result = "failed"
             elif query_type == "xpath" and element_query != False:
                 result = _get_xpath_or_css_element(element_query,"xpath",index_number)
-                try:
-                    if not result.is_displayed(): result = 'failed'
-                except: pass
+
             elif query_type == "css" and element_query != False:
                 result = _get_xpath_or_css_element(element_query,"css",index_number)
-                try:
-                    if not result.is_displayed(): result = 'failed'
-                except: pass
+
             else:
                 result = "failed"
             
@@ -123,24 +119,36 @@ def _construct_query (step_data_set):
             #first we collect all rows with element parameter only 
             xpath_element_list = (_construct_xpath_list(element_parameter_list))
             return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
+       
         elif child_ref_exits == True and parent_ref_exits == False and sibling_ref_exits == False:
-            '''  If  There is child but making sure no parent'''
-            xpath_child_list =  _construct_xpath_list(child_parameter_list,True)
-            child_xpath_string = _construct_xpath_string_from_list(xpath_child_list) 
-            xpath_element_list = _construct_xpath_list(element_parameter_list)
-            #Take the first element, remove ]; add the 'and'; add back the ]; put the modified back into list. 
-            xpath_element_list[1] = (xpath_element_list[1]).replace("]","") + ' and ' + child_xpath_string + "]"
-            return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
-        
+            '''  If  There is child but making sure no parent or sibling
+            //<child_tag>[child_parameter]/ancestor::<element_tag>[element_parameter]
+            '''
+            xpath_child_list =  _construct_xpath_list(child_parameter_list)
+            child_xpath_string = _construct_xpath_string_from_list(xpath_child_list) + "/ancestor::"      
+            
+            xpath_element_list =  _construct_xpath_list(element_parameter_list)
+            element_xpath_string = _construct_xpath_string_from_list(xpath_element_list) 
+            element_xpath_string = element_xpath_string.replace("//", "")      
+
+            full_query =   child_xpath_string + element_xpath_string
+            return (full_query, "xpath")              
+            
         elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == False and (driver_type=="appium" or driver_type == "selenium"):
-            '''  If  There is parent but making sure no child'''
+            '''  
+            parent as a reference
+            '//<parent tag>[<parent attributes>]/descendant::<target element tag>[<target element attribute>]'
+            '''
             xpath_parent_list =  _construct_xpath_list(parent_parameter_list)
-            parent_xpath_string = _construct_xpath_string_from_list(xpath_parent_list) 
-            xpath_element_list = _construct_xpath_list(element_parameter_list,True)
-            #Take the first element, remove ]; add the 'and'; add back the ]; put the modified back into list. 
-            xpath_element_list[1] = (xpath_element_list[1]).replace("]","") + ' and ' + parent_xpath_string + "]"
-            return (_construct_xpath_string_from_list(xpath_element_list), "xpath")
-        
+            parent_xpath_string = _construct_xpath_string_from_list(xpath_parent_list) + "/descendant::"      
+            
+            xpath_element_list =  _construct_xpath_list(element_parameter_list)
+            element_xpath_string = _construct_xpath_string_from_list(xpath_element_list) 
+            element_xpath_string = element_xpath_string.replace("//", "")      
+
+            full_query =   parent_xpath_string + element_xpath_string
+            return (full_query, "xpath")  
+
         elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == True and (driver_type=="appium" or driver_type == "selenium"):
             '''  for siblings, we need parent, siblings and element.  Siblings cannot be used with just element
             xpath_format = '//<sibling_tag>[<sibling_element>]/ancestor::<immediate_parent_tag>[<immediate_parent_element>]//<target_tag>[<target_element>]'
@@ -156,8 +164,8 @@ def _construct_query (step_data_set):
             element_xpath_string = _construct_xpath_string_from_list(xpath_element_list) 
 
             full_query = sibling_xpath_string + parent_xpath_string + element_xpath_string
-            
-            return (full_query, "xpath")        
+            return (full_query, "xpath")  
+              
         elif child_ref_exits == False and parent_ref_exits == True and sibling_ref_exits == False and (driver_type=="xml"):
             '''  If  There is parent but making sure no child'''
             xpath_parent_list =  _construct_xpath_list(parent_parameter_list)
@@ -167,6 +175,7 @@ def _construct_query (step_data_set):
             element_xpath_string = _construct_xpath_string_from_list(xpath_element_list)
             xpath_element_list_combined = parent_xpath_string + element_xpath_string
             return (_construct_xpath_string_from_list(xpath_element_list_combined), "xpath")
+        
         elif child_ref_exits == True  and (driver_type=="xml"):
             '''Currently we do not support child as reference for xml'''
             CommonUtil.ExecLog(sModuleInfo, "Currently we do not support child as reference for xml.  Please contact info@automationsolutionz.com for help", 3)          
@@ -174,7 +183,6 @@ def _construct_query (step_data_set):
 
         else:
             CommonUtil.ExecLog(sModuleInfo, "You have entered an unsupported data set.  Please contact info@automationsolutionz.com for help", 3)          
-
             return False, False
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -225,13 +233,13 @@ def _construct_xpath_list(parameter_list,add_dot=False):
                 text_value = '[@text="%s"]'%attribute_value
                 element_main_body_list.append(text_value)
             elif attribute == "*text" and driver_type == "appium":
-                text_value = '[contains(@text,"%s")]'%attribute_value    
+                text_value = '[contains(text,"%s")]'%attribute_value    
                 element_main_body_list.append(text_value)            
             elif attribute not in excluded_attribute and '*' not in attribute:
                 other_value = '[@%s="%s"]'%(attribute,attribute_value)
                 element_main_body_list.append(other_value)
             elif attribute not in excluded_attribute and '*' in attribute:
-                other_value = '[contains(@%s,"%s")]'%(attribute.split('*')[1],attribute_value)
+                other_value = '[contains(%s,"%s")]'%(attribute.split('*')[1],attribute_value)
                 element_main_body_list.append(other_value)
         #we do the tag on its own  
         #tag_was_given = any("tag" in s for s in parameter_list)
@@ -305,13 +313,21 @@ def _get_xpath_or_css_element(element_query,css_xpath, index_number=False):
     '''
     try: 
         all_matching_elements = []
+        all_matching_elements_visible_invisible = []
         sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
         if css_xpath == "xpath" and driver_type != 'xml':
-            all_matching_elements = generic_driver.find_elements(By.XPATH, element_query)
+            all_matching_elements_visible_invisible = generic_driver.find_elements(By.XPATH, element_query)
         elif css_xpath == "xpath" and driver_type == 'xml':
-            all_matching_elements = generic_driver.xpath(element_query)
+            all_matching_elements_visible_invisible = generic_driver.xpath(element_query)
         elif css_xpath == "css":
-            all_matching_elements = generic_driver.find_elements(By.CSS_SELECTOR, element_query)
+            all_matching_elements_visible_invisible = generic_driver.find_elements(By.CSS_SELECTOR, element_query)
+        # we will filter out all "not visible elements"
+        for each in all_matching_elements_visible_invisible:
+            try:
+                if each.is_displayed():
+                    all_matching_elements.append(each)
+            except:
+                pass
         if len(all_matching_elements)== 0:
             return False
         elif len(all_matching_elements)==1 and index_number == False:
@@ -589,19 +605,30 @@ def _scale_image(file_name, size_w, size_h):
 
 
 '''
-Sample sibling Example1:
-xpath_format = '//<sibling_tag>[<sibling_element>]/ancestor::<immediate_parent_tag>[<immediate_parent_element>]//<target_tag>[<target_element>]'
+#Sample sibling Example1:
+#xpath_format = '//<sibling_tag>[<sibling_element>]/ancestor::<immediate_parent_tag>[<immediate_parent_element>]//<target_tag>[<target_element>]'
 
 #step_data_set =  [( 'tag' , 'parent parameter' , 'tagvale' , False , False ) , ( 'id' , 'element parameter' , 'twotabsearchtextbox' , False , False ) , ( 'text' , 'selenium action' , 'Camera' , False , False ), ( 'class' , 'sibling parameter' , 'twotabsearchtextbox' , False , False ), ( 'class' , 'parent parameter' , 'twotabsearchtextbox' , False , False )]
 
-step_data_set = [ ( 'role' , 'element parameter' , 'checkbox' , False , False , '' ) , ( 'text' , 'sibling parameter' , 'charlie' , False , False , '' ) , ( '*class' , 'parent parameter' , 'md-table-row' , False , False , '' ) , ( 'click' , 'selenium action' , 'click' , False , False , '' ) ] 
+#step_data_set = [ ( 'role' , 'element parameter' , 'checkbox' , False , False , '' ) , ( 'text' , 'sibling parameter' , 'charlie' , False , False , '' ) , ( '*class' , 'parent parameter' , 'md-table-row' , False , False , '' ) , ( 'click' , 'selenium action' , 'click' , False , False , '' ) ] 
+
+
+
+#Sample parent and element:
+#'//*[@bblocalname="deviceActivationPasswordTextBox"]/descendant::*[@type="password"]'
+#step_data_set = [ ( 'typ' , 'element parameter' , 'password' , False , False , '' ) , ( 'text' , 'selenium action' , 'your password' , False , False , '' ) , ( 'bblocalname' , 'parent parameter' , 'deviceActivationPasswordTextBox' , False , False , '' ) ] 
+
+
+'''
+step_data_set = [ ( '*resource-id' , 'element parameter' , 'com.assetscience.androidprodiagnostics.cellmd:id/next' , False , False ) , ( 'click' , 'appium action' , 'na' , False , False ) ]
+
+
 driver = None
 query_debug = True
 global driver_type 
 driver_type = "selenium"
 global debug 
 debug = True
-_construct_query (step_data_set)
+print _construct_query (step_data_set)
 
 
-'''
