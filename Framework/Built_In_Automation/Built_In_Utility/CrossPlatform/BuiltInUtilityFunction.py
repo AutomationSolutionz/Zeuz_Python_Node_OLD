@@ -16,7 +16,7 @@ import string
 from Framework.Utilities import ConfigModule
 import filecmp
 import random
-import requests
+import requests, math, re
 from Framework.Utilities import CommonUtil
 from sys import platform as _platform
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
@@ -1383,40 +1383,14 @@ def Compare_File(step_data):
 def Rename_File_or_Folder(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
-
-    # Recall file attachment, if not already set
-    file_attachment = []
-    if Shared_Resources.Test_Shared_Variables('file_attachment'):
-        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
-
     try:
         if _platform == "linux" or _platform == "linux2" or _platform == "darwin" :
 
-            from_path = str(step_data[0][2]).strip()  # location of the file/folder to be renamed
-            to_path = str(step_data[1][2]).strip()  # location where to rename the file/folder
+            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be renamed
+            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to rename the file/folder
         elif _platform == "win32":
             from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be renamed
             to_path = raw(str(step_data[1][2]).strip())  # location where to rename the file/folder
-
-         # Try to find the file
-        if from_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), from_path)) == False:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Could not find file attachment called %s, and could not find it locally" % from_path, 3)
-            return 'failed'
-        if from_path in file_attachment: from_path = file_attachment[from_path]  # In file is an attachment, get the full path
-
-        if from_path not in file_attachment:
-            from_path = os.path.join(get_home_folder(), from_path)
-
-        # Try to find the file
-        if to_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), to_path)) == False:
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Could not find file attachment called %s, and could not find it locally" % to_path, 3)
-            return 'failed'
-        if to_path in file_attachment: to_path = file_attachment[to_path]  # In file is an attachment, get the full path
-
-        if to_path not in file_attachment:
-            to_path = os.path.join(get_home_folder(), to_path)
 
         file_or_folder = str(step_data[2][2]).strip()  # get if it is file/folder to rename
         if file_or_folder.lower() == 'file':
@@ -1445,6 +1419,7 @@ def Rename_File_or_Folder(step_data):
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 
 # Method to zip file/folder
@@ -2212,5 +2187,44 @@ def count_no_of_files_in_folder(step_data):
         CommonUtil.ExecLog(sModuleInfo, "Could not count no of files in the directory.  Error: %s" % (Error_Detail), 3)
         return "failed"
 
+def pattern_matching(dataset):
+    ''' Perform user provided regular expression on a string '''
+    
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
 
+    # Parse dataset
+    try:
+        pattern = ''
+        shared_var = ''
+        strg = ''
+        
+        for row in dataset:
+            if row[0].lower().strip() == 'pattern': # Regular expression pattern
+                pattern = row[2].strip()
+            elif row[0].lower().strip() == 'variable': # Shared variable to save any matches to
+                shared_var = row[2].strip()
+            elif row[0].lower().strip() == 'string': # String to search
+                strg = row[2].strip()
+    
+        if pattern == '' or shared_var == '' or strg == '':
+            return CommonUtil.Exception_Handler(sys.exc_info(), None, "Missing one of the inputs. Expected 3 element parameters: 'pattern', 'variable', and 'string'")
+            return 'failed'
+        
+    except:
+        CommonUtil.ExecLog(sModuleInfo, "Error parsing dataset", 3)
+        
+    try:
+        p = re.compile(pattern, re.M)
+        m = p.findall(strg)
+        if m == [] or m == None:
+            CommonUtil.ExecLog(sModuleInfo, "Pattern did not produce a match", 3)
+            return 'failed'
+        else:
+            Shared_Resources.Set_Shared_Variables(shared_var, m[0]) # !!! Idealy would save the entire list, but we need a way to access a single element
+            CommonUtil.ExecLog(sModuleInfo, "Pattern matched: %s - Saved to Shared variable: %s" % (str(m[0]), shared_var), 1)
+            return 'passed'
+    except:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error performing pattern match")
+        
 

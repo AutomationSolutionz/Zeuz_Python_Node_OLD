@@ -31,6 +31,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     110: {'module': 'common', 'name': 'delete shared variables', 'function': 'delete_all_shared_variables'},
     111: {'module': 'common', 'name': 'append list', 'function': 'append_list_shared_variable'},
     112: {'module': 'common', 'name': 'settings', 'function': 'sequential_actions_settings'},
+    113: {'module': 'common', 'name': 'step exit', 'function': 'step_exit'},
     
     200: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
@@ -128,6 +129,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     528: {'module': 'utility', 'name': 'read name_value', 'function': 'Read_line_name_and_value' },
     529: {'module': 'utility', 'name': 'text replace', 'function': 'replace_Substring' },
     530: {'module': 'utility', 'name': 'count files in folder', 'function': 'count_no_of_files_in_folder'},
+    531: {'module': 'utility', 'name': 'search string', 'function': 'pattern_matching'},
 
     600: {'module': 'xml', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'name': 'add', 'function': 'add_element'},
@@ -157,6 +159,7 @@ action_support = [
     'loop action',
     'element parameter',
     'child parameter',
+    'sibling parameter',
     'parent parameter',
     'target parameter',
     'method',
@@ -192,9 +195,6 @@ from Framework.Built_In_Automation.Shared_Resources import LocateElement
 dependency = None
 if sr.Test_Shared_Variables('dependency'): # Check if driver is already set in shared variables
     dependency = sr.Get_Shared_Variables('dependency') # Retreive appium driver
-
-# Set default variables
-sr.Set_Shared_Variables('element_wait', 10) # Default time for get_element() to find the element
 
 # Initialize bypass data set (need to be global, so separate test cases can access them)
 bypass_data_set = []
@@ -273,6 +273,9 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = {}, _file
             sr.Set_Shared_Variables('screen_capture', screen_capture.lower().strip()) # Save the screen capture type
             CommonUtil.set_screenshot_vars(sr.Shared_Variable_Export()) # Get all the shared variables, and pass them to CommonUtil
     
+        # Set default variables (Must be defined here in case anyone destroys all shared variables)
+        sr.Set_Shared_Variables('element_wait', 10) # Default time for get_element() to find the element
+
         # Prepare step data for processing
         step_data = common.sanitize(step_data, column = 1) # Sanitize Sub-Field
         step_data = common.adjust_element_parameters(step_data, supported_platforms) # Parse any mobile platform related fields
@@ -294,7 +297,7 @@ def Run_Sequential_Actions(step_data):
         skip_tmp = [] # Temporarily holds skip data sets
         
         for dataset_cnt in range(len(step_data)): # For each data set within step data
-            CommonUtil.ExecLog(sModuleInfo, "********** Starting Data Set #%d **********" % dataset_cnt, 1)
+            CommonUtil.ExecLog(sModuleInfo, "********** Starting Data Set #%d **********" % (dataset_cnt + 1), 1) # Offset by one to make it look proper
             data_set = step_data[dataset_cnt] # Save data set to variable
             if dataset_cnt in skip: continue # If this data set is in the skip list, do not process it
             
@@ -352,6 +355,9 @@ def Run_Sequential_Actions(step_data):
                 elif "action" in action_name: # Must be last, since it's a single word that also exists in other action types
                     CommonUtil.ExecLog(sModuleInfo, "Checking the action to be performed in the action row: %s" % str(row), 0)
                     result = Action_Handler(data_set, row) # Pass data set, and action_name to action handler
+                    if row[0].lower().strip() == 'step exit':
+                        CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
+                        return result
 
                     # Check if user wants to store the result for later use
                     stored = False
@@ -632,8 +638,14 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row):
                 
                 if step_data[data_set_index] == data_set: # If the data set we are GOING to pass back to sequential_actions() is the same one that called THIS function in the first place, then the step data is calling itself again, and we must pass all of the step data instead, so it doesn't crash later when it tries to refer to data sets that don't exist
                     result = Run_Sequential_Actions(step_data) # Pass the step data to sequential_actions() - Mainly used when the step data is in a deliberate recursive loop of conditional actions
+                    if row[0].lower().strip() == 'step exit':
+                        CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
+                        return result
                 else: # Normal process - most conditional actions will come here
                     result = Run_Sequential_Actions([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+                    if row[0].lower().strip() == 'step exit':
+                        CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
+                        return result
                     
                 if result in failed_tag_list: return result # Return on any failure
             return result # Return only the last result of the last row of the last data set processed - This should generally be a "step result action" command
