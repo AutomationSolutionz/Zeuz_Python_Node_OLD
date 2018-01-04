@@ -6,7 +6,7 @@ Created on April 10, 2017
 @author: Built_In_Automation Solutionz Inc.
 '''
 
-import sys
+import sys,json
 import os
 import requests
 
@@ -129,9 +129,58 @@ def get_value_as_list(data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: get value as list", 1)
     try:
-        return ast.literal_eval(data)
+        return json.loads(data)
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+def get_val(x,target):
+    for key,value in x.items():
+        if str(key) == target:
+            return value
+        else:
+            if isinstance(value,dict):
+                result = get_val(value,target)
+                if not result:
+                    continue
+                else:
+                    return result
+            elif isinstance(value,list):
+                for each in value:
+                    result = get_val(each,target)
+                    if not result:
+                        continue
+                    else:
+                        return result
+            else:
+                continue
+    return False
+
+
+def search_val(x,target,target_val,equal=True):
+    for key,value in x.items():
+        if str(key) == target and str(value) == target_val:
+            return True
+        else:
+            if isinstance(value,dict):
+                result = search_val(value,target,target_val)
+                if not result:
+                    continue
+                else:
+                    return result
+            elif isinstance(value,list):
+                for each in value:
+                    result = search_val(each,target,target_val)
+                    if not result:
+                        continue
+                    else:
+                        return result
+            else:
+                continue
+    if equal:
+        return False
+    else:
+        return True
 
 
 # Method to save rest call parameters
@@ -152,9 +201,12 @@ def save_fields_from_rest_call(result_dict, fields_to_be_saved):
             which_are_saved = []
             for each in fields_to_be_saved:
                 field = each.strip()
-                if field in result_dict:
+                value_to_be_saved = get_val(result_dict,field)
+                if not value_to_be_saved:
+                    CommonUtil.ExecLog(sModuleInfo,"Couldn't find  response field, ignoring it %s" %field, 2)
+                else:
                     which_are_saved.append(field)
-                    Shared_Resources.Set_Shared_Variables(field, result_dict[field])
+                    Shared_Resources.Set_Shared_Variables(field, value_to_be_saved)
 
             CommonUtil.ExecLog(sModuleInfo, "%s response fields are saved"%(", ".join(str(x) for x in which_are_saved)),1)
 
@@ -280,7 +332,7 @@ def Insert_Into_List(step_data):
 
 
 # Method to handle rest calls
-def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name = ""):
+def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name = "",search=False,search_key="",search_value="",equal=True):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: handle rest call", 1)
     try:
@@ -315,19 +367,32 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
         CommonUtil.ExecLog(sModuleInfo,'Post Call returned status code: %d'%status_code,1)
         try:
             if result.json():
-                '''if status_code >=400:
-                    CommonUtil.ExecLog(sModuleInfo,'Post Call Returned Bad Response',3)
-                    return "failed"
-                else:'''
                 CommonUtil.ExecLog(sModuleInfo, 'Post Call Returned Response Successfully', 1)
                 CommonUtil.ExecLog(sModuleInfo,"Received Response: %s"%result.json(),1)
-                if not save_into_list:
-                    save_fields_from_rest_call(result.json(), fields_to_be_saved)
+                if search:
+                    search_result = search_val(result.json(),search_key,search_value,equal)
+                    if equal:
+                        if search_result:
+                            CommonUtil.ExecLog(sModuleInfo, 'Got "%s":"%s" in response'%(search_key,search_value), 1)
+                            return "passed"
+                        else:
+                            CommonUtil.ExecLog(sModuleInfo, 'Couldnt Get "%s":"%s" in response' % (search_key, search_value), 3)
+                            return "failed"
+                    else:
+                        if search_result:
+                            CommonUtil.ExecLog(sModuleInfo, 'No "%s":"%s" in response' % (search_key, search_value), 1)
+                            return "passed"
+                        else:
+                            CommonUtil.ExecLog(sModuleInfo,'Got "%s":"%s" in response' % (search_key, search_value), 3)
+                            return "failed"
                 else:
-                    if list_name == "":
-                        CommonUtil.ExecLog(sModuleInfo,"List name not defined!",3)
-                        return "failed"
-                    insert_fields_from_rest_call_into_list(result.json(), fields_to_be_saved, list_name)
+                    if not save_into_list:
+                        save_fields_from_rest_call(result.json(), fields_to_be_saved)
+                    else:
+                        if list_name == "":
+                            CommonUtil.ExecLog(sModuleInfo,"List name not defined!",3)
+                            return "failed"
+                        insert_fields_from_rest_call_into_list(result.json(), fields_to_be_saved, list_name)
                 return "passed"
         except Exception:
             CommonUtil.ExecLog(sModuleInfo,"REST Call did not respond in json format",1)
@@ -358,6 +423,55 @@ def Get_Response(step_data):
         else:
             try:
                 return_result = handle_rest_call(returned_step_data_list, fields_to_be_saved)
+                return return_result
+            except Exception:
+                return CommonUtil.Exception_Handler(sys.exc_info())
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+# Method to search responses, if certain key value pair exists in REST response
+def Search_Response(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function: Search_Response", 1)
+    try:
+        fields_to_be_saved = ''
+        key = ''
+        value = ''
+        equal = True
+        for row in step_data:
+            if row[1] == 'action':
+                key_value_pair = row[2]
+                l = str(key_value_pair).split("==")
+                if len(l) == 2:
+                    equal = True
+                    key = l[0].strip()
+                    value = l[1].strip()
+                    if key == '' or value == '':
+                        CommonUtil.ExecLog(sModuleInfo,"Error in key value step data for search response.. Try 'key == value' format...",3)
+                        return "failed"
+                else:
+                    l = str(key_value_pair).split("!=")
+                    if len(l) == 2:
+                        equal = False
+                        key = l[0].strip()
+                        value = l[1].strip()
+                        if key == '' or value == '':
+                            CommonUtil.ExecLog(sModuleInfo,"Error in key value step data for search response.. Try 'key != value' format...",3)
+                            return "failed"
+                    else:
+                        CommonUtil.ExecLog(sModuleInfo,"Error in key value step data for search response.. Try 'key == value' format...",3)
+                        return "failed"
+
+        element_step_data = Get_Element_Step_Data(step_data)
+
+        returned_step_data_list = Validate_Step_Data(element_step_data)
+
+        if ((returned_step_data_list == []) or (returned_step_data_list == "failed")):
+            return "failed"
+        else:
+            try:
+                return_result = handle_rest_call(returned_step_data_list, fields_to_be_saved,search=True, search_key=key, search_value=value,equal=equal)
                 return return_result
             except Exception:
                 return CommonUtil.Exception_Handler(sys.exc_info())
@@ -526,20 +640,20 @@ def Validate_Step_Data(step_data):
                     body = each[2]
                     plain_body_text = True
                 else:
-                    if body == "{":
-                           body+="'%s' : '%s'"%(each[0], each[2])
+                    if body == '{':
+                           body+='"%s" : "%s"'%(each[0], each[2])
                     else:
-                           body += ", '%s' : '%s'" % (each[0], each[2])
+                           body += ', "%s" : "%s"' % (each[0], each[2])
 
             elif each[1].lower().strip() == 'header' or each[1].lower().strip() == 'headers':
-                if headers == "{":
-                   headers+="'%s' : '%s'"%(each[0], each[2])
+                if headers == '{':
+                   headers+='"%s" : "%s"'%(each[0], each[2])
                 else:
-                    headers += ", '%s' : '%s'" % (each[0], each[2])
+                    headers += ', "%s" : "%s"' % (each[0], each[2])
 
-        headers += "}"
+        headers += '}'
         if not plain_body_text:
-            body += "}"
+            body += '}'
 
 
         validated_data = (url, method, body, headers)

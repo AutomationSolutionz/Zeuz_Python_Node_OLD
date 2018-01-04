@@ -143,6 +143,7 @@ def ExecLog(sModuleInfo, sDetails, iLogLevel=1, _local_run="", sStatus=""):
         # ";" is not supported for logging.  So replacing them
         sDetails = sDetails.replace(";", ":")
         sDetails = sDetails.replace("=", "~")
+        sDetails = sDetails.replace("%22", "'")
         sDetails = encode_to_exclude_symbol(to_unicode(sDetails))
         
         #Convert logLevel from int to string for clarity
