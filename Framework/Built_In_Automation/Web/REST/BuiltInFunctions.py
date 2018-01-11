@@ -23,6 +23,9 @@ requests.packages.urllib3.disable_warnings()
 from Framework.Utilities import CommonUtil
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
 
+count=1
+index=1
+all_val = set()
 
 '============================= Sequential Action Section Begins=============================='
 
@@ -134,53 +137,109 @@ def get_value_as_list(data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-def get_val(x,target):
+def get_all_val(x,target):
+    global all_val
     for key,value in x.items():
         if str(key) == target:
-            return value
+            all_val.add(value)
+        else:
+            if isinstance(value,dict):
+                get_all_val(value,target)
+            elif isinstance(value,list):
+                for each in value:
+                    if isinstance(each,unicode) or isinstance(each,str):
+                        if str(key) == target:
+                            all_val.add(each)
+                    else:
+                        get_all_val(each,target)
+            else:
+                continue
+
+
+def get_val(x,target):
+    global count,index
+    for key,value in x.items():
+        if str(key) == target:
+            if count == index:
+                return value
+            else:
+                count+=1
+                continue
         else:
             if isinstance(value,dict):
                 result = get_val(value,target)
                 if not result:
                     continue
                 else:
-                    return result
+                    if count == index:
+                        return result
+                    else:
+                        count += 1
+                        continue
             elif isinstance(value,list):
                 for each in value:
-                    result = get_val(each,target)
-                    if not result:
-                        continue
+                    if isinstance(each,unicode) or isinstance(each,str):
+                        if str(key) == target:
+                            if count == index:
+                                return each
+                            else:
+                                count += 1
+                                continue
+                        else:
+                            continue
                     else:
-                        return result
+                        result = get_val(each,target)
+                        if not result:
+                            continue
+                        else:
+                            if count == index:
+                                return result
+                            else:
+                                count += 1
+                                continue
             else:
                 continue
     return False
 
 
-def search_val(x,target,target_val,equal=True):
+def search_val(x,target,target_val):
     for key,value in x.items():
         if str(key) == target and str(value) == target_val:
             return True
+
         else:
             if isinstance(value,dict):
-                result = search_val(value,target,target_val)
+                result =  search_val(value,target,target_val)
                 if not result:
                     continue
                 else:
                     return result
             elif isinstance(value,list):
                 for each in value:
-                    result = search_val(each,target,target_val)
-                    if not result:
-                        continue
+                    if isinstance(each,unicode) or isinstance(each,str):
+                        if str(key) == target and str(each) == target_val:
+                            return True
+                        else:
+                            continue
                     else:
-                        return result
+                        result =  search_val(each,target,target_val)
+                        if not result:
+                            continue
+                        else:
+                            return result
             else:
                 continue
+
+    return False
+
+
+def search_val_wrapper(x,target,target_val,equal=True):
+    result = search_val(x,target,target_val)
     if equal:
-        return False
+        return result
     else:
-        return True
+        return not result
+
 
 
 # Method to save rest call parameters
@@ -188,6 +247,7 @@ def save_fields_from_rest_call(result_dict, fields_to_be_saved):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: save fields from rest call", 1)
     try:
+        global index,count
         fields_to_be_saved = fields_to_be_saved.split(",")
         if fields_to_be_saved[0].lower().strip() == 'all':
             for each in result_dict:
@@ -201,7 +261,27 @@ def save_fields_from_rest_call(result_dict, fields_to_be_saved):
             which_are_saved = []
             for each in fields_to_be_saved:
                 field = each.strip()
-                value_to_be_saved = get_val(result_dict,field)
+                i = 1
+                temp_field= ''
+                multiple = False
+                if "-" in field:
+                    l = field.split("-")
+                    if len(l) == 2:
+                       try:
+                           i = int(l[1].strip())
+                           temp_field = l[0].strip()
+                           multiple = True
+                       except:
+                           i = 1
+
+                if multiple:
+                    index = i
+                    count = 1
+                    value_to_be_saved = get_val(result_dict, temp_field)
+                else:
+                    index = 1
+                    count = 1
+                    value_to_be_saved = get_val(result_dict,field)
                 if not value_to_be_saved:
                     CommonUtil.ExecLog(sModuleInfo,"Couldn't find  response field, ignoring it %s" %field, 2)
                 else:
@@ -219,6 +299,7 @@ def insert_fields_from_rest_call_into_list(result_dict, fields_to_be_saved, list
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: save fields from rest call", 1)
     try:
+        global index, count,all_val
         fields_to_be_saved = fields_to_be_saved.split(",")
         if fields_to_be_saved[0].lower().strip() == 'all':
             for each in result_dict:
@@ -232,9 +313,49 @@ def insert_fields_from_rest_call_into_list(result_dict, fields_to_be_saved, list
             which_are_saved = []
             for each in fields_to_be_saved:
                 field = each.strip()
-                if field in result_dict:
-                    which_are_saved.append(field)
-                    Shared_Resources.Set_List_Shared_Variables(list_name, field, result_dict[field])
+                i = 1
+                temp_field = ''
+                multiple = False
+                if "-" in field:
+                    l = field.split("-")
+                    if len(l) == 2:
+                        try:
+                            i = l[1].strip()
+                            if i=='all':
+                                i = 0 #0 for all
+                            else:
+                                i = int(i)
+                            temp_field = l[0].strip()
+                            multiple = True
+                        except:
+                            i = 1
+
+                if multiple:
+                    if i == 0:
+                        index = 0
+                        all_val = set()
+                        get_all_val(result_dict, temp_field)
+                    else:
+                        index = i
+                        count = 1
+                        value_to_be_saved = get_val(result_dict, temp_field)
+                else:
+                    index = 1
+                    count = 1
+                    value_to_be_saved = get_val(result_dict, field)
+
+                if index == 0: #save all into list
+                    which_are_saved.append(temp_field)
+                    Shared_Resources.Set_Shared_Variables(list_name, []) #initializes the list
+                    for each in all_val:
+                        Shared_Resources.Append_List_Shared_Variables(list_name, each)
+                else:
+                    if not value_to_be_saved:
+                        CommonUtil.ExecLog(sModuleInfo, "Couldn't find  response field, ignoring it %s" % field, 2)
+                    else:
+                        which_are_saved.append(field)
+                        Shared_Resources.Set_Shared_Variables('list_name')
+                        Shared_Resources.Set_List_Shared_Variables(list_name, field, value_to_be_saved)
 
             CommonUtil.ExecLog(sModuleInfo, "%s response fields are saved"%(", ".join(str(x) for x in which_are_saved)),1)
 
@@ -336,6 +457,7 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function: handle rest call", 1)
     try:
+        global index,count
         Shared_Resources.Set_Shared_Variables('status_code', 0) # Reset this shared variable, so we do not get confused with any previous run
         url = data[0]
         method = data[1]
@@ -370,7 +492,7 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
                 CommonUtil.ExecLog(sModuleInfo, 'Post Call Returned Response Successfully', 1)
                 CommonUtil.ExecLog(sModuleInfo,"Received Response: %s"%result.json(),1)
                 if search:
-                    search_result = search_val(result.json(),search_key,search_value,equal)
+                    search_result = search_val_wrapper(result.json(),search_key,search_value,equal)
                     if equal:
                         if search_result:
                             CommonUtil.ExecLog(sModuleInfo, 'Got "%s":"%s" in response'%(search_key,search_value), 1)
