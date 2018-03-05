@@ -13,8 +13,9 @@
 #                       #
 #########################
 
-sys.path.append("..")
+
 import sys, datetime, time, inspect, zipfile, string, filecmp, random, requests, math, re, os, subprocess, shutil, ast
+sys.path.append("..")
 from sys import platform as _platform
 from Framework.Utilities import ConfigModule
 from Framework.Utilities import CommonUtil
@@ -147,7 +148,7 @@ def RenameFile(file_to_be_renamed, new_name_of_the_file):
         Wrapper for MoveFile
     """
     
-    result = MoveFile(file_to_be_moved, new_name_of_the_file)
+    result = MoveFile(file_to_be_renamed, new_name_of_the_file)
     return result
 
 
@@ -186,7 +187,7 @@ def RenameFolder(folder_to_be_renamed, new_name_of_the_folder):
         Wrapper for MoveFolder
     """
     
-    result = MoveFolder(folder_to_be_moved, new_name_of_the_folder)
+    result = MoveFolder(folder_to_be_renamed, new_name_of_the_folder)
     return result
 
 # function to unzip in linux
@@ -493,75 +494,141 @@ def empty_recycle_bin():
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-def run_win_cmd(cmd): #!!!!merge with run_cmd
-    """
-        :param cmd: admin command to run
-        :return: Exception if Exception occurs 
-    """
-    
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
-    
-    try:
-        result = []
-        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        for line in process.stdout:
-            result.append(line)
-        errcode = process.returncode
-        for line in result:
-            # print(line)
-            CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
-        if errcode is not None:
-            CommonUtil.ExecLog(sModuleInfo, 'cmd %s failed, see above for details' % cmd, 3)
-            raise Exception('cmd %s failed, see above for details', cmd)
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+# def run_win_cmd(cmd): #!!!!merge with run_cmd
+#     """
+#         :param cmd: admin command to run
+#         :return: Exception if Exception occurs 
+#     """
+#     
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+#     
+#     try:
+#         result = []
+#         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#         for line in process.stdout:
+#             result.append(line)
+#         errcode = process.returncode
+#         for line in result:
+#             # print(line)
+#             CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
+#         if errcode is not None:
+#             CommonUtil.ExecLog(sModuleInfo, 'cmd %s failed, see above for details' % cmd, 3)
+#             raise Exception('cmd %s failed, see above for details', cmd)
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
+# 
+# 
+# def run_win_cmd_and_save_in_shared_var(cmd,Save_in_var):  # !!!!merge with run_cmd
+#     """
+#         :param cmd: admin command to run
+#         :return: Exception if Exception occurs 
+#     """
+# 
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+# 
+#     try:
+#         result = []
+#         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#         for line in process.stdout:
+#             result.append(line)
+#         errcode = process.returncode
+#         Shared_Resources.Set_Shared_Variables(Save_in_var, result)
+#         if errcode is not None:
+#             CommonUtil.ExecLog(sModuleInfo, 'cmd %s failed, see above for details' % cmd, 3)
+#             raise Exception('cmd %s failed, see above for details', cmd)
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
 
-
-def run_cmd(command, return_status=False, is_shell=True, stdout_val=subprocess.PIPE, local_run=False):
-    """
-        :param command: sudo command to run
-        :return: Exception if Exception occurs otherwise return result 
-    """
-    
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
-    
-    '''Begin Constants'''
-    Passed = "Passed" # !!!remove this nad use passed_tag_list,e tc
-    Failed = "Failed"
-    Running = 'running'
-    '''End Constants'''
-
-    # Run 'command' via command line in a bash shell, and store outputs to stdout_val
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    subprocess_dict = {}
-    try:
-        # global subprocess_dict
-        result = []
-
-        # open a subprocess with command, and assign a session id to the shell process
-        # this is will make the shell process the group leader for all the child processes spawning from it
-        status = subprocess.Popen(command, shell=is_shell, stdout=stdout_val, preexec_fn=os.setsid)
-        subprocess_dict[status] = Running
-        status.wait() # Wait for process to complete, and populate returncode
-        errcode = status.returncode
-        
-        for line in status.stdout:
-            result.append(line)
-        
-        for line in result:
-            CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
-        
-        if return_status:
-            return errcode, result
-        elif errcode == 0:
-            return Passed
-        else:
-            return Failed
-
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+# def run_cmd(command, return_status=False, is_shell=True, stdout_val=subprocess.PIPE, local_run=False):
+#     """
+#         :param command: sudo command to run
+#         :return: Exception if Exception occurs otherwise return result 
+#     """
+#     
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+#     
+#     '''Begin Constants'''
+#     Passed = "Passed" # !!!remove this nad use passed_tag_list,e tc
+#     Failed = "Failed"
+#     Running = 'running'
+#     '''End Constants'''
+# 
+#     # Run 'command' via command line in a bash shell, and store outputs to stdout_val
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     subprocess_dict = {}
+#     try:
+#         # global subprocess_dict
+#         result = []
+# 
+#         # open a subprocess with command, and assign a session id to the shell process
+#         # this is will make the shell process the group leader for all the child processes spawning from it
+#         status = subprocess.Popen(command, shell=is_shell, stdout=stdout_val, preexec_fn=os.setsid)
+#         subprocess_dict[status] = Running
+#         status.wait() # Wait for process to complete, and populate returncode
+#         errcode = status.returncode
+#         
+#         for line in status.stdout:
+#             result.append(line)
+#         
+#         for line in result:
+#             CommonUtil.ExecLog(sModuleInfo, "%s" % line, 1)
+#         
+#         if return_status:
+#             return errcode, result
+#         elif errcode == 0:
+#             return Passed
+#         else:
+#             return Failed
+# 
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
+# 
+# def run_cmd_and_save_in_Shared_var(Save_in_var, command, return_status=False, is_shell=True, stdout_val=subprocess.PIPE, local_run=False):
+#     """
+#         :param command: sudo command to run
+#         :return: Exception if Exception occurs otherwise return result 
+#     """
+# 
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+# 
+#     '''Begin Constants'''
+#     Passed = "Passed" # !!!remove this nad use passed_tag_list,e tc
+#     Failed = "Failed"
+#     Running = 'running'
+#     '''End Constants'''
+# 
+#     # Run 'command' via command line in a bash shell, and store outputs to stdout_val
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     subprocess_dict = {}
+#     try:
+#         # global subprocess_dict
+#         result = []
+# 
+#         # open a subprocess with command, and assign a session id to the shell process
+#         # this is will make the shell process the group leader for all the child processes spawning from it
+#         status = subprocess.Popen(command, shell=is_shell, stdout=stdout_val, preexec_fn=os.setsid)
+#         subprocess_dict[status] = Running
+#         status.wait() # Wait for process to complete, and populate returncode
+#         errcode = status.returncode
+# 
+#         for line in status.stdout:
+#             result.append(line)
+# 
+#         Shared_Resources.Set_Shared_Variables(Save_in_var, result)
+# 
+#         if return_status:
+#             return errcode, result
+#         elif errcode == 0:
+#             return Passed
+#         else:
+#             return Failed
+# 
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
 # function to generate random string
@@ -607,84 +674,75 @@ def download_file_using_url(file_url, location_of_file):
         ''' Setting stream parameter to True will cause the download of response headers only and the connection remains open.
           This avoids reading the content all at once into memory for large responses.
          A fixed chunk will be loaded each time while r.iter_content is iterated.'''
-        r = requests.get(file_url, stream=True)
+        r = requests.get(file_url, stream=True) # Open connection
 
-        list_the_parts_of_url = file_url.split("/") #get file name from the url
-
-        file_name = os.path.join(location_of_file , list_the_parts_of_url[len(list_the_parts_of_url) - 1]) #complete file location
-
-        with open(file_name, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024):
-
-            # writing one chunk at a time to pdf file
-                if chunk:
-                    f.write(chunk)
-        # after performing the download operation we have to check that if the file with new name exists in correct location.
-        # if the file exists in correct position then return passed
-        # if the file doesn't exist in correct position then return failed
+        # Download file and save to disk
+        file_name = os.path.join(location_of_file , str(file_url.split("/")[-1:][0])) #complete file location
+        CommonUtil.ExecLog(sModuleInfo, "Path of file to download: %s" % file_name, 0)
+        with open(file_name, "wb") as f: # Open new binary file
+            for chunk in r.iter_content(chunk_size=1048576): # Grab chunk of received data
+                if chunk: f.write(chunk) # Write chunk of data to disk
+        
+        # Verify file exists
         if os.path.isfile(file_name):
-            CommonUtil.ExecLog(sModuleInfo, "file exists... downloading file using url function is done properly", 1)
-            Shared_Resources.Set_Shared_Variables("downloaded_file", file_name)
-            Shared_Resources.Show_All_Shared_Variables()
-            return "passed"
+            return file_name
         else:
-            CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... downloading file using url function is not done properly", 3)
             return "failed"
 
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error downloading file")
 
 #Method to download and unzip file
-def download_and_unzip_file(file_url, location_of_file): #!!!change this to call download_file_using_url instead of duplicating work, or just remove download part, and whatever is calling this can call the two pieces separately
-    
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
-    
-    try:
-        ''' Setting stream parameter to True will cause the download of response headers only and the connection remains open.
-          This avoids reading the content all at once into memory for large responses.
-         A fixed chunk will be loaded each time while r.iter_content is iterated.'''
-        r = requests.get(file_url, stream=True)
-
-        list_the_parts_of_url = file_url.split("/") #get file name from the url
-        file_name = os.path.join(location_of_file, list_the_parts_of_url[len(list_the_parts_of_url) - 1])
-        actual_file_name = list_the_parts_of_url[len(list_the_parts_of_url) - 1]
-        with open(file_name, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024):
-
-            # writing one chunk at a time to pdf file
-                if chunk:
-                    f.write(chunk)
-        # after performing the download operation we have to check that if the file with new name exists in correct location.
-        # if the file exists in correct position then return passed
-        # if the file doesn't exist in correct position then return failed
-        if os.path.isfile(file_name):
-            CommonUtil.ExecLog(sModuleInfo, "file exists... downloading file using url function is done properly", 0)
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... downloading file using url function is not done properly", 3)
-            return "failed"
-        unzip_location = os.path.join(location_of_file,"latest_directory" )
-        CommonUtil.ExecLog(sModuleInfo, "Creating the directory '%s' " % unzip_location, 0)
-        result1 = CreateFolder(unzip_location)
-        if result1 in failed_tag_list:
-            CommonUtil.ExecLog(sModuleInfo, "Can't not create folder '%s' " % unzip_location, 3)
-            return "failed"
-        CommonUtil.ExecLog(sModuleInfo, "Folder '%s' is created " % unzip_location, 1)
-        result = UnZip(file_name,unzip_location)
-        if result in failed_tag_list:
-            CommonUtil.ExecLog(sModuleInfo, "Can't not unzip file '%s' to '%s'" % (file_name, unzip_location), 3)
-            return "failed"
-        CommonUtil.ExecLog(sModuleInfo, "Unzipping file '%s' to '%s' is complete" % (file_name, unzip_location), 0)
-        CommonUtil.ExecLog(sModuleInfo, "Saving directory location to shared resources" , 1)
-        #Shared_Resources.Set_Shared_Variables("latest_directory", unzip_location)
-        downloaded_file = os.path.join(unzip_location,actual_file_name )
-        Shared_Resources.Set_Shared_Variables("downloaded_file", downloaded_file)
-        Shared_Resources.Show_All_Shared_Variables()
-        return "passed"
-
-
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+# def download_and_unzip_file(file_url, location_of_file): #!!!change this to call download_file_using_url instead of duplicating work, or just remove download part, and whatever is calling this can call the two pieces separately
+#     
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+#     
+#     try:
+#         ''' Setting stream parameter to True will cause the download of response headers only and the connection remains open.
+#           This avoids reading the content all at once into memory for large responses.
+#          A fixed chunk will be loaded each time while r.iter_content is iterated.'''
+#         r = requests.get(file_url, stream=True)
+# 
+#         list_the_parts_of_url = file_url.split("/") #get file name from the url
+#         file_name = os.path.join(location_of_file, list_the_parts_of_url[len(list_the_parts_of_url) - 1])
+#         actual_file_name = list_the_parts_of_url[len(list_the_parts_of_url) - 1]
+#         with open(file_name, "wb") as f:
+#             for chunk in r.iter_content(chunk_size=1024):
+# 
+#             # writing one chunk at a time to pdf file
+#                 if chunk:
+#                     f.write(chunk)
+#         # after performing the download operation we have to check that if the file with new name exists in correct location.
+#         # if the file exists in correct position then return passed
+#         # if the file doesn't exist in correct position then return failed
+#         if os.path.isfile(file_name):
+#             CommonUtil.ExecLog(sModuleInfo, "file exists... downloading file using url function is done properly", 0)
+#         else:
+#             CommonUtil.ExecLog(sModuleInfo, "file doesn't exist... downloading file using url function is not done properly", 3)
+#             return "failed"
+#         unzip_location = os.path.join(location_of_file,"latest_directory" )
+#         CommonUtil.ExecLog(sModuleInfo, "Creating the directory '%s' " % unzip_location, 0)
+#         result1 = CreateFolder(unzip_location)
+#         if result1 in failed_tag_list:
+#             CommonUtil.ExecLog(sModuleInfo, "Can't not create folder '%s' " % unzip_location, 3)
+#             return "failed"
+#         CommonUtil.ExecLog(sModuleInfo, "Folder '%s' is created " % unzip_location, 1)
+#         result = UnZip(file_name,unzip_location)
+#         if result in failed_tag_list:
+#             CommonUtil.ExecLog(sModuleInfo, "Can't not unzip file '%s' to '%s'" % (file_name, unzip_location), 3)
+#             return "failed"
+#         CommonUtil.ExecLog(sModuleInfo, "Unzipping file '%s' to '%s' is complete" % (file_name, unzip_location), 0)
+#         CommonUtil.ExecLog(sModuleInfo, "Saving directory location to shared resources" , 1)
+#         #Shared_Resources.Set_Shared_Variables("latest_directory", unzip_location)
+#         downloaded_file = os.path.join(unzip_location,actual_file_name )
+#         Shared_Resources.Set_Shared_Variables("downloaded_file", downloaded_file)
+#         Shared_Resources.Show_All_Shared_Variables()
+#         return "passed"
+# 
+# 
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
 # not done properly...need more works
@@ -871,6 +929,90 @@ def Copy_File_or_Folder(step_data):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+# Method to unzip
+def Unzip_File_or_Folder(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
+    try:
+        if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+            from_path = str(step_data[0][2]).strip()  # location of the file/folder to be copied
+            if from_path[0]=="/": from_path=from_path.lstrip('/')
+
+        elif _platform == "win32":
+            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be copied
+
+
+        # Try to find the file
+        if from_path not in file_attachment and os.path.exists(os.path.join(get_home_folder(), from_path)) == False:
+            CommonUtil.ExecLog(sModuleInfo,"Could not find file attachment called %s, and could not find it locally" % from_path, 3)
+            return 'failed'
+        if from_path not in file_attachment:
+            from_path = os.path.join(get_home_folder(), from_path)
+            if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+                to_path = str(step_data[1][2]).strip()
+                if to_path[0] == "/": to_path = to_path.lstrip('/')
+                to_path = os.path.join(get_home_folder(), to_path)  # location where to copy the file/folder
+            elif _platform == "win32":
+                to_path = os.path.join(get_home_folder(),raw(str(step_data[1][2]).strip()))  # location where to copy the file/folder
+        if from_path in file_attachment:
+            file_name = from_path
+            from_path = file_attachment[from_path]  # In file is an attachment, get the full path
+            to_path = from_path[0 : len(from_path)-(len(file_name)+1)]
+            Save_in_variable = step_data[1][2]
+
+
+
+
+        result = UnZip(from_path, to_path)
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Can't not unzip '%s' to '%s'" % (from_path, to_path), 3)
+            return "failed"
+        else:
+            Shared_Resources.Set_Shared_Variables(Save_in_variable, to_path)
+            CommonUtil.ExecLog(sModuleInfo, "'%s' is unzipped to '%s' successfully" % (from_path, to_path), 1)
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+def Get_Attachment_Path(step_data):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+        # Recall file attachment, if not already set
+    file_attachment = []
+    if Shared_Resources.Test_Shared_Variables('file_attachment'):
+        file_attachment = Shared_Resources.Get_Shared_Variables('file_attachment')
+
+    try:
+        for row in step_data:
+
+            if row[1] == 'path':
+                from_path = row[2]
+            if row[1] == 'value':
+                Save_in_variable = row[2]
+
+
+            # Try to find the file
+        if from_path not in file_attachment :
+            CommonUtil.ExecLog(sModuleInfo,
+                                   "Could not find file attachment called %s, " % from_path,
+                                   3)
+            return 'failed'
+        if from_path in file_attachment: from_path = file_attachment[from_path]  # In file is an attachment, get the full path
+
+        Shared_Resources.Set_Shared_Variables(Save_in_variable, from_path)
+
+        return "passed"
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
 
 # Method to delete file/folder
 def Delete_File_or_Folder(data_set):
@@ -935,87 +1077,41 @@ def Create_File_or_Folder(step_data):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
     try:
-        if _platform == "linux" or _platform == "linux2": #!!!merge these if statements, duplicating work
-            # linux
-            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
+        if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
             path = get_home_folder() + str(step_data[0][2]).strip()  # path of the file/folder to be created
             file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to create
-            if file_or_folder.lower() == 'file':
-                # create file "path"
-                result = CreateFile(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
-                    return "passed"
-            elif file_or_folder.lower() == 'folder':
-                # create folder "path"
-                result = CreateFolder(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
-                    return "passed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
-                return 'failed'
         elif _platform == "win32":
-            # windows
-            CommonUtil.ExecLog(sModuleInfo, "windows", 1)
             path = raw(str(step_data[0][2]).strip())  # path of the file/folder to be created
             file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to create
-            if file_or_folder.lower() == 'file':
+
+
+        if file_or_folder.lower() == 'file':
                 # create file "path"
-                result = CreateFile(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
-                    return "passed"
-            elif file_or_folder.lower() == 'folder':
-                # create folder "path"
-                result = CreateFolder(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
-                    return "passed"
+            result = CreateFile(path)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
+                return "failed"
             else:
-                CommonUtil.ExecLog(sModuleInfo,"The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.",3)
-                return 'failed'
-        elif _platform == "darwin":
-            # mac
-            CommonUtil.ExecLog(sModuleInfo, "mac", 1)
-            path = get_home_folder() + str(step_data[0][2]).strip()  # path of the file/folder to be created
-            file_or_folder = str(step_data[1][2]).strip()  # get if it is file/folder to create
-            if file_or_folder.lower() == 'file':
-                # create file "path"
-                result = CreateFile(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create file '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
-                    return "passed"
-            elif file_or_folder.lower() == 'folder':
+                CommonUtil.ExecLog(sModuleInfo, "File '%s' created successfully" % (path), 1)
+                return "passed"
+        elif file_or_folder.lower() == 'folder':
                 # create folder "path"
-                result = CreateFolder(path)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
-                    return "passed"
+            result = CreateFolder(path)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo, "Could not create folder '%s'" % (path), 3)
+                return "failed"
             else:
-                CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
-                return 'failed'
+                CommonUtil.ExecLog(sModuleInfo, "Folder '%s' created successfully" % (path), 1)
+                return "passed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "The information in the data-set(s) are incorrect. Please provide accurate data set(s) information.", 3)
+            return 'failed'
+
 
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
+
+
 
 
 # Method to find file
@@ -1142,42 +1238,125 @@ def Calculate(step_data):
 
 
 # Method to Run Command
-def Run_Command(step_data):
+def Run_Command(data_set):
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+
+    # Parse data set
     try:
-        if step_data[0][0] == "run command":
-            if _platform == "win32":
-                # windows
-                command = str(step_data[0][2]).strip()
-                result = run_win_cmd(command)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
-                    return "passed"
-            elif _platform == "linux" or _platform == "linux2" or _platform == "darwin":
-
-                CommonUtil.ExecLog(sModuleInfo, "Could not run admin command for linux/mac", 3)
-                return "failed"
-        elif step_data[0][0] == "run sudo":
-            if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
-                command = str(step_data[0][2]).strip()
-                result = run_cmd(command)
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
-                    return "failed"
-                else:
-                    CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
-                    return "passed"
-            elif _platform == "win32":
-                # windows
-                CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command as it is windows", 3)
-                return "failed"
+        commands = [] # Need at least one command, multiple commands will be executed in order
+        shared_var = '' # Optional - store output of command in shared variable
+        for row in data_set:
+            op = row[0].lower().strip()
+            cmd = row[2].strip()
+            if op == 'command':
+                commands.append(cmd)
+            elif op in ('shared var', 'shared variable', 'var', 'variable', 'save'):
+                shared_var = cmd.replace('%|', '').replace('|%', '') # Save variable name, remove identifying characters if accidentally provided
+        if len(commands) == 0:
+            CommonUtil.ExecLog(sModuleInfo, "No commands specified. Expected at least one row to contain 'command' in the Field, and the command to execute in the Value field", 3)
+            return 'failed'
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
 
+    # Execute command    
+    try:
+        # Set command deliminator
+        if _platform == 'win32': delim = '&'
+        else: delim = ';'
+        
+        # Execute commands as a single command line command, separated by the OS's shell deliminator. This allows us to maintain a shell history, so all commands work as expected
+        h = subprocess.Popen(delim.join(commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) # Execute commands, collect STDERR and redirect it to STDOUT, so it's all together
+        h.wait() # Wait for process to complete
+        result = h.returncode # Get last command result
+        output = ''
+        for line in h.stdout: output += line # Get command output from STDOUT and STDERR
+        
+        CommonUtil.ExecLog(sModuleInfo, "Command output: %s" % output, 1) # Write output to log
+        if shared_var:
+            output = output.replace('\n', '')  # replace any new line in string that may have came from terminal
+            Shared_Resources.Set_Shared_Variables(shared_var, output) # Save command output to shared variable, if user specified it
+        
+        # Exit
+        if result != 0:
+            CommonUtil.ExecLog(sModuleInfo, "Command failed. See above for command output", 3)
+            return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Command executed successfully", 1)
+            return 'passed'
+        
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error executing command")
+
+
+# def Run_Command(step_data):
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+#     try:
+#         if step_data[0][0] == "run command":
+#             if _platform == "win32":
+#                 # windows
+#                 command = str(step_data[0][2]).strip()
+#                 result = run_win_cmd(command)
+#                 if result in failed_tag_list:
+#                     CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
+#                     return "failed"
+#                 else:
+#                     CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
+#                     return "passed"
+#             elif _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+# 
+#                 CommonUtil.ExecLog(sModuleInfo, "Could not run admin command for linux/mac", 3)
+#                 return "failed"
+#         elif step_data[0][0] == "run sudo":
+#             if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+#                 command = str(step_data[0][2]).strip()
+#                 result = run_cmd(command)
+#                 if result in failed_tag_list:
+#                     CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
+#                     return "failed"
+#                 else:
+#                     CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
+#                     return "passed"
+#             elif _platform == "win32":
+#                 # windows
+#                 CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command as it is windows", 3)
+#                 return "failed"
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
+# 
+# # Method to Run Command
+# def Run_Command_and_Save(step_data):
+#     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+#     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+#     try:
+# 
+#             if _platform == "win32":
+#                 # windows
+#                 command = str(step_data[0][2]).strip()
+#                 Shared_var= str(step_data[1][2]).strip()
+#                 result = run_win_cmd_and_save_in_shared_var(command,Shared_var)
+#                 if result in failed_tag_list:
+#                     CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
+#                     return "failed"
+#                 else:
+#                     CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
+#                     return "passed"
+# 
+# 
+#             elif _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+#                 command = str(step_data[0][2]).strip()
+#                 Shared_var = str(step_data[1][2]).strip()
+#                 result = run_cmd_and_save_in_Shared_var(Shared_var,command)
+#                 if result in failed_tag_list:
+#                     CommonUtil.ExecLog(sModuleInfo, "Could not run sudo command '%s'" % (command), 3)
+#                     return "failed"
+#                 else:
+#                     CommonUtil.ExecLog(sModuleInfo, "sudo command is run properly '%s'" % (command), 1)
+#                     return "passed"
+# 
+#     except Exception:
+#         return CommonUtil.Exception_Handler(sys.exc_info())
 
 # Method to Get Home Directory
 def Get_Home_Directory(data_set):
@@ -1402,29 +1581,7 @@ def Zip_File_or_Folder(data_set):
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error zipping")
 
 
-# Method to unzip
-def Unzip_File_or_Folder(step_data):
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
-    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
-    try:
-        if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
-            # linux
-            CommonUtil.ExecLog(sModuleInfo, "linux", 1)
-            from_path = get_home_folder() + str(step_data[0][2]).strip()  # location of the file/folder to be unzipped
-            to_path = get_home_folder() + str(step_data[1][2]).strip()  # location where to unzip the file/folder
-        elif _platform == "win32":
-            from_path = raw(str(step_data[0][2]).strip())  # location of the file/folder to be unzipped
-            to_path = raw(str(step_data[1][2]).strip())  # location where to unzip the file/folder
 
-        result = UnZip(from_path, to_path)
-        if result in failed_tag_list:
-            CommonUtil.ExecLog(sModuleInfo, "Can't not unzip '%s' to '%s'" % (from_path, to_path), 3)
-            return "failed"
-        else:
-            CommonUtil.ExecLog(sModuleInfo, "'%s' is unzipped to '%s' successfully" % (from_path, to_path), 1)
-            return "passed"
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
 
 
 # Method to move file/folder
@@ -1532,13 +1689,6 @@ def Upload(step_data):
             list = from_path.split("/")
             to_path = ConfigModule.get_config_value('sectionOne', 'test_case_folder', temp_ini_file) +"/"+ list[len(list) - 1]  # location where to copy the file/folder
 
-            result = copy_file(from_path, to_path)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo,"Could not copy file '%s' to the log uploader '%s'" % (from_path, to_path), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"File '%s' copied to the log uploader '%s' successfully" % (from_path, to_path), 1)
-                return "passed"
         elif _platform == "win32":
             # windows
             CommonUtil.ExecLog(sModuleInfo, "windows", 1)
@@ -1547,13 +1697,13 @@ def Upload(step_data):
             list = from_path.split("\\")
             to_path = ConfigModule.get_config_value('sectionOne', 'test_case_folder', temp_ini_file) + "\\" + list[len(list) - 1]
 
-            result = copy_file(from_path, to_path)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo,"Could not copy file '%s' to the log uploader '%s'" % (from_path, to_path), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"File '%s' copied to the log uploader '%s' successfully" % (from_path, to_path), 1)
-                return "passed"
+        result = copy_file(from_path, to_path)
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo,"Could not copy file '%s' to the log uploader '%s'" % (from_path, to_path), 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo,"File '%s' copied to the log uploader '%s' successfully" % (from_path, to_path), 1)
+            return "passed"
 
 
     except Exception:
@@ -1692,65 +1842,109 @@ def Save_Text(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 # Method to download file
-def Download_file(step_data):
+def Download_file(data_set):
+    ''' Download file from URL '''
+    
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    
+    # Parse data set
     try:
-        url = str(step_data[0][2]).strip()  # url to be downloaded
-        file_location = str(step_data[1][2]).strip()  # location where to download the file/folder
-        if file_location == "":
-            # if no location is given
-            file_location = os.path.join(get_home_folder(), 'Downloads')  # download to the Downloads folder
-            result = download_file_using_url(url, file_location)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is done" % (url, file_location), 1)
-                return "passed"
-        else:
-            # if location to download is given
-            file_location = os.path.join(get_home_folder(), file_location)
-            result = download_file_using_url(url, file_location)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo, "Download from url '%s' to location '%s' is not done" % (url, file_location), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' is not done" % (url, file_location),1)
-                return "passed"
+        url = '' # Mandatory
+        file_location = '' # Optional - default will be used if omited
+        shared_var = '' # Optional
+        
+        for row in data_set:
+            op = row[0].strip().lower()
+            if op == 'url':
+                url = row[2].strip()
+            elif op in ('folder', 'location', 'directory'):
+                file_location = row[2].strip()
+            elif op in ('shared variable', 'shared var', 'variable', 'var', 'save'):
+                shared_var = row[2].strip()
+        
+        # Verify input
+        if file_location == '': file_location = os.path.join(get_home_folder(), 'Downloads') # if no location is given, set default to Downloads directory
+        if url == '': # Make sure we have a URL
+            CommonUtil.ExecLog(sModuleInfo,"Expected Field to contain 'url' and Value to contain a valid URL to a file", 3)
+            return 'failed'
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    try:
+        # Download file and get path/filename
+        file_name = download_file_using_url(url, file_location)
+        
+        # Verify download
+        if file_name in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo,"Failed to save file from (%s) to disk (%s)" % (url, file_location), 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "File downloaded successfully to %s" % file_name, 1)
+            if shared_var: Shared_Resources.Set_Shared_Variables(shared_var, file_name) # Store path/file in shared variables if variable name was set by user
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error downloading file")
 
 # Method to download file and unzip
-def Download_File_and_Unzip(step_data):
+def Download_File_and_Unzip(data_set):
+    ''' Download file and unzip to specified path '''
+
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    
+    # Parse data set
     try:
-        url = str(step_data[0][2]).strip()  # url to be downloaded
-        file_location = str(step_data[1][2]).strip()  # location where to download the file/folder
-        if file_location == "":
-            # if no location is given
-            file_location = os.path.join(get_home_folder(), 'Downloads')  # download to the Downloads folder
-            result = download_and_unzip_file(url, file_location)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo, "Downloading from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is done" % (url, file_location),1)
-                return "passed"
-        else:
-            # if location to download is given
-            file_location = os.path.join(get_home_folder(), file_location)
-            result = download_and_unzip_file(url, file_location)
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(sModuleInfo, "Download from url '%s' to location '%s' and unzipping is not done" % (url, file_location), 3)
-                return "failed"
-            else:
-                CommonUtil.ExecLog(sModuleInfo,"Download from url '%s' to location '%s' and unzipping is done" % (url, file_location),1)
-                return "passed"
-
+        url = '' # Mandatory
+        unzip_location = '' # Optional - default will be used if omited
+        shared_var = '' # Optional
+        file_location = os.path.join(get_home_folder(), 'Downloads') # Set location of download to Downloads directory
+        
+        for row in data_set:
+            op = row[0].strip().lower()
+            if op == 'url':
+                url = row[2].strip()
+            elif op in ('folder', 'location', 'directory'):
+                unzip_location = row[2].strip()
+            elif op in ('shared variable', 'shared var', 'variable', 'var', 'save'):
+                shared_var = row[2].strip()
+        
+        # Verify input
+        
+        if url == '': # Make sure we have a URL
+            CommonUtil.ExecLog(sModuleInfo,"Expected Field to contain 'url' and Value to contain a valid URL to a file", 3)
+            return 'failed'
+        if unzip_location == '': unzip_location = file_location # Set unzip location to Downloads by default if omited 
     except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error parsing data set")
+
+    # Download
+    try:
+        # Download file and get path/filename
+        file_name = download_file_using_url(url, file_location)
+        
+        # Verify download
+        if file_name in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo,"Failed to save file from (%s) to disk (%s)" % (url, file_location), 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "File downloaded successfully to %s" % file_name, 1)
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error downloading file")
+    
+    # Unzip
+    try:
+        result = UnZip(file_name, unzip_location)
+        
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Failed to unzip %s to %s" % (file_name, unzip_location), 3)
+            return "failed"
+        else:
+            CommonUtil.ExecLog(sModuleInfo,"Successfully unzipped to %s" % unzip_location,1)
+            if shared_var: Shared_Resources.Set_Shared_Variables(shared_var, unzip_location) # Store path in shared variables if variable name was set by user
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error unzipping file")
 
 
 def replace_Substring(data_set):
@@ -2164,5 +2358,63 @@ def pattern_matching(dataset):
             return 'passed'
     except:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error performing pattern match")
+
+
+def save_substring(data_set):
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    # Parse data set
+    try:
+        from_var = '' #the varibale from which string will be copied
+        to_var = '' #the variable wher estring will be saved
+        index_string = '' #index of the substring operation like '5'-> will copy from index 5 to last of string, '5,8' -> will copy from index 5 to index before 8, which is 7, likeany programming language
+        substring = ''
+        from_index = -1
+        to_index = -1
+        for row in data_set:
+            if row[1] == 'element parameter':
+                if row[0] == 'from':
+                    from_var = str(row[2])
+                elif row[0] == 'to':
+                    to_var = str(row[2])
+            elif row[1] == 'action':
+                index_string = str(row[2])
+
+        if Shared_Resources.Test_Shared_Variables(from_var):
+            from_var = Shared_Resources.Get_Shared_Variables(from_var) #save the value of 'from_var' shared varibale to 'from_var'
+        else:
+            CommonUtil.ExecLog(sModuleInfo,"Could not find the variable named '%s'"%from_var, 3)
+            return "failed"
+
+        #process index_string
+        if "," in index_string:
+            splitted = index_string.split(",")
+            from_index = int(splitted[0].strip())
+            to_index = int(splitted[1].strip())
+        else:
+            from_index = int(index_string.strip())
+
+        if from_index == -1:
+            CommonUtil.ExecLog(sModuleInfo, "From Index for getting substing can't be negative", 3)
+            return "failed"
+        else:
+            if to_index == -1:
+                try:
+                    substring = from_var[from_index:]
+                except:
+                    CommonUtil.ExecLog(sModuleInfo, "Can't get substring.Index out of range for string '%s'" % from_var, 3)
+                    return "failed"
+            else:
+                try:
+                    substring = from_var[from_index:to_index]
+                except:
+                    CommonUtil.ExecLog(sModuleInfo, "Can't get substring. Index out of range for string '%s'" % from_var, 3)
+                    return "failed"
+
+        #now save the substing to new variable
+        return Shared_Resources.Set_Shared_Variables(to_var,substring)
+
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
         
 

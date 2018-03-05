@@ -118,7 +118,6 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     514: {'module': 'utility', 'name': 'current documents', 'function': 'Get_Current_Documents'},
     515: {'module': 'utility', 'name': 'current desktop', 'function': 'Get_Current_Desktop'},
     516: {'module': 'utility', 'name': 'home directory', 'function': 'Get_Home_Directory'},
-    517: {'module': 'utility', 'name': 'run sudo', 'function': 'Run_Command'},
     518: {'module': 'utility', 'name': 'run command', 'function': 'Run_Command'},
     519: {'module': 'utility', 'name': 'download', 'function': 'Download_file'},
     520: {'module': 'utility', 'name': 'log 2', 'function': 'Add_Log'},
@@ -133,6 +132,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     529: {'module': 'utility', 'name': 'text replace', 'function': 'replace_Substring' },
     530: {'module': 'utility', 'name': 'count files in folder', 'function': 'count_no_of_files_in_folder'},
     531: {'module': 'utility', 'name': 'search string', 'function': 'pattern_matching'},
+    532: {'module': 'utility', 'name': 'save substring', 'function': 'save_substring'},
+    533: {'module': 'utility', 'name': 'get attachment path', 'function': 'Get_Attachment_Path'},
 
     600: {'module': 'xml', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'name': 'add', 'function': 'add_element'},
@@ -176,7 +177,8 @@ action_support = [
     'result',
     'table parameter',
     'source parameter',
-    'input parameter'
+    'input parameter',
+    'custom action'
 ]
 
 # List of supported mobile platforms - must be lower case
@@ -189,7 +191,7 @@ supported_platforms = (
 
 # Import modules
 import inspect, sys, os
-from Framework.Utilities import CommonUtil
+from Framework.Utilities import CommonUtil, ConfigModule
 import common_functions as common # Functions that are common to all modules
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list # Allowed return strings, used to normalize pass/fail
@@ -204,6 +206,11 @@ if sr.Test_Shared_Variables('dependency'): # Check if driver is already set in s
 bypass_data_set = []
 bypass_row = []
 loaded_modules = []
+
+# Get node ID and set as a Shared Variable
+machineInfo = CommonUtil.MachineInfo() # Create instance
+node_id = machineInfo.getLocalUser() # Get Username+Node ID
+sr.Set_Shared_Variables('node_id', node_id, protected = True) # Save as protected shared variable
 
 def load_sa_modules(module): # Load module "AS" must match module name we get from step data (See actions variable above)
     ''' Dynamically loads modules when needed '''
@@ -252,6 +259,7 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = {}, _file
     try:
         # Set dependency, file_attachemnt, run_time_parameters as global variables
         global dependency, file_attachment, device_details, run_time_params
+        dependency, file_attachment, device_details, run_time_params = {}, {}, {}, {}
         if _dependency != {}:
             dependency = _dependency # Save to global variable
             sr.Set_Shared_Variables('dependency', _dependency, protected = True) # Save in Shared Variables
@@ -291,7 +299,7 @@ def Sequential_Actions(step_data, _dependency = {}, _run_time_params = {}, _file
     # Process step data
     return Run_Sequential_Actions(step_data)
     
-def Run_Sequential_Actions(step_data):
+def Run_Sequential_Actions(step_data, data_set_no=-1): #data_set_no will used in recursive conditional action call
     
     sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
     try:
@@ -299,6 +307,10 @@ def Run_Sequential_Actions(step_data):
         skip = [] # List of data set numbers that have been processed, and need to be skipped, so they are not processed again
         logic_row=[] # Holds conditional actions
         skip_tmp = [] # Temporarily holds skip data sets
+
+        if data_set_no!=-1:
+            full_step_data = step_data
+            step_data = [step_data[data_set_no]]
         
         for dataset_cnt in range(len(step_data)): # For each data set within step data
             CommonUtil.ExecLog(sModuleInfo, "********** Starting Data Set #%d **********" % (dataset_cnt + 1), 1) # Offset by one to make it look proper
@@ -313,7 +325,7 @@ def Run_Sequential_Actions(step_data):
                 action_name = row[1] # Get Sub-Field
                 
                 # Don't process these suport items right now, but also don't fail
-                if action_name in action_support:
+                if action_name in action_support and 'custom' not in action_name:
                     continue
 
                 # If middle coloumn = bypass action, store the data set for later use if needed
@@ -341,7 +353,10 @@ def Run_Sequential_Actions(step_data):
                     # Only run this when we have two conditional actions for this data set (a true and a false preferably)
                     if len(logic_row) == 2:
                         CommonUtil.ExecLog(sModuleInfo, "Found 2 conditional actions - moving ahead with them", 1)
-                        result = Conditional_Action_Handler(step_data, data_set, row, logic_row) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
+                        if data_set_no!=-1:
+                            result = Conditional_Action_Handler(full_step_data, data_set, row, logic_row) # send full data for recursive conditional call
+                        else:
+                            result = Conditional_Action_Handler(step_data, data_set, row, logic_row) # Pass step_data, and current iteration of data set to decide which data sets will be processed next
                         CommonUtil.ExecLog(sModuleInfo, "Conditional Actions complete", 1)
                         if result in failed_tag_list:
                             CommonUtil.ExecLog(sModuleInfo, "Returned result from Conditional Action Failed", 3)
@@ -354,6 +369,52 @@ def Run_Sequential_Actions(step_data):
                 elif 'loop action' in action_name:
                     result, skip = Loop_Action_Handler(step_data, row, dataset_cnt)
                     if result in failed_tag_list: return 'failed'
+                    
+                # Special custom functions can be executed in a specified file
+                elif "custom" in action_name:
+                    CommonUtil.ExecLog(sModuleInfo, "Custom Action Start", 2)
+                    if row[0].lower().strip() == 'file': # User specified file to run from (only needed once)
+                        # Try to find the image file
+                        custom_file_name = row[2].strip()
+                        if custom_file_name not in file_attachment and os.path.exists(custom_file_name) == False:
+                            CommonUtil.ExecLog(sModuleInfo, "Could not find file attachment called %s, and could not find it locally" % custom_file_name, 3)
+                            return 'failed'
+                        if custom_file_name in file_attachment: custom_file_name = file_attachment[custom_file_name] # In file is an attachment, get the full path
+                        CommonUtil.ExecLog(sModuleInfo, "Custom file set to %s" % custom_file_name, 0)
+
+                        # Import the module
+                        from imp import load_source
+                        try:
+                            global custom_module # Need to remember this value between Test Steps
+                            custom_mod_name = os.path.splitext(os.path.basename(custom_file_name))[0] # Get module name by removing path and extension
+                            CommonUtil.ExecLog(sModuleInfo, "Importing %s from %s" % (custom_mod_name, custom_file_name), 0)
+                            custom_module = load_source(custom_mod_name, custom_file_name) # Load module user specified
+                            CommonUtil.ExecLog(sModuleInfo, "Import successful", 1)
+                            result = 'passed'
+                        except:
+                            CommonUtil.ExecLog(sModuleInfo, "Error occurred while importing: %s. It may have a compile error or an import naming issue" % custom_file_name, 3)
+                            return 'failed'
+                        
+                    elif custom_module != '': # If custom module is set, then we are good to use it
+                        # User specified filename already and it's imported, so we can move ahead with executing functions
+                        custom_var = ''
+                        custom_function = row[0].strip().replace('()', '').replace(' ', '') # Function name, can't have brackets
+                        if '=' in custom_function: custom_var, custom_function = custom_function.split('=') # If shared variable name included with function, separate them
+                        custom_params = row[2].strip().replace("'", "\'") # Escape single quotes in the parameters
+                        CommonUtil.ExecLog(sModuleInfo, "Executing function: %s with parameters: %s" % (custom_function, custom_params), 0)
+                        try:
+                            custom_output = ''
+                            exec('custom_output = custom_module.%s(%s)' % (custom_function, custom_params)) # Execute the function from the custom module
+                            if custom_output != '': sr.Set_Shared_Variables(custom_var, custom_output) # Save output to user specified shared variable name
+                            CommonUtil.ExecLog(sModuleInfo, "Function executed successfully: %s" % str(custom_output), 1)
+                            result = 'passed'
+                        except Exception, e:
+                            CommonUtil.ExecLog(sModuleInfo, "Failed to execute function %s from the custom module: %s" % (custom_module, e), 3)
+                            return 'failed'
+                    
+                    else: # Function executed but user didn't specify the file to import
+                        CommonUtil.ExecLog(sModuleInfo, "No Python file specified for custom function execution. Expected a Data Set in the format of: 'file', 'custom', 'directory/filename'", 3)
+                        return "failed"
                     
                 # If middle column = action, call action handler
                 elif "action" in action_name: # Must be last, since it's a single word that also exists in other action types
@@ -648,7 +709,7 @@ def Conditional_Action_Handler(step_data, data_set, row, logic_row):
                         CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
                         return result
                 else: # Normal process - most conditional actions will come here
-                    result = Run_Sequential_Actions([step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
+                    result = Run_Sequential_Actions(step_data,data_set_index) #[step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
                     if row[0].lower().strip() == 'step exit':
                         CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
                         return result
