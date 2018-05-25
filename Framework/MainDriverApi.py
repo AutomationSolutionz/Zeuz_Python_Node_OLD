@@ -3,12 +3,12 @@
 
 import inspect,os,time,sys,urllib2,Queue,importlib,requests,threading
 from datetime import datetime
-from Utilities import ConfigModule,FileUtilities as FL,CommonUtil,RequestFormatter,All_Device_Info
+from Utilities import ConfigModule,FileUtilities as FL, CommonUtil, RequestFormatter
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as shared
 top_path=os.path.dirname(os.getcwd())
 drivers_path=os.path.join(top_path,'Drivers')
 sys.path.append(drivers_path)
-import Drivers
+
 '''Constants'''
 PROGRESS_TAG = 'In-Progress'
 PASSED_TAG='Passed'
@@ -80,8 +80,8 @@ def get_all_automated_test_cases_in_run_id(run_id):
 
 
 #checks if a step of a test case is the verification point of that test case
-def check_if_step_is_verification_point(run_id, datasetid):
-    return RequestFormatter.Get('if_failed_at_verification_point_api', {'run_id': run_id, 'data_id': datasetid})
+def check_if_step_is_verification_point(run_id, tc_id, step_sequence):
+    return RequestFormatter.Get('if_failed_at_verification_point_api', {'run_id': run_id, 'tc_id': tc_id, 'step_sequence': step_sequence})
 
 
 #if run is cancelled then it can be called, it cleans up the runid from database
@@ -158,10 +158,10 @@ def update_test_case_result_on_server(run_id, sTestSetEndTime, TestSetDuration):
 
 
 #returns step data of a test step in a test case
-def get_test_step_data(run_id, test_case, current_step_sequence, StepSeq):
+def get_test_step_data(run_id, test_case, current_step_sequence):
     return RequestFormatter.Get('get_test_step_data_based_on_test_case_run_id_api',
                          {'run_id': run_id, 'test_case': test_case,
-                          'step_sequence': current_step_sequence, 'step_iteration': StepSeq})
+                          'step_sequence': current_step_sequence})
 
 
 #updates current test step result(like pass/fail etc.) on server database
@@ -192,20 +192,6 @@ def get_run_params_list(run_params):
         m_.update({'value': each[2]})
         run_para.append(m_)
     return run_para
-
-
-#check if a test step has 'continue on fail' feature or not
-def check_continue_on_fail_value_of_a_step(step_meta_data):
-    continue_value = filter(lambda x: x[0] == 'continue' and x[1] == 'point', step_meta_data)
-    if continue_value:
-        if continue_value[0][2] == 'yes':
-            test_case_continue = True
-        else:
-            test_case_continue = False
-    else:
-        test_case_continue = False
-
-    return test_case_continue
 
 
 #uploads zip file to server
@@ -446,7 +432,16 @@ def run_all_test_steps_in_a_test_case(Stepscount, test_case, sModuleInfo, run_id
         CommonUtil.ExecLog(sModuleInfo, "Step : %s" % current_step_name, 1)
         step_meta_data = get_step_meta_data_of_a_step(run_id, test_case, StepSeq)
 
-        test_case_continue = check_continue_on_fail_value_of_a_step(step_meta_data)
+        try:
+            test_case_continue = step_meta_data[0][1]
+            step_time = step_meta_data[0][2]
+            if str(step_time) != '' and step_time != None:
+                step_time = int(step_time)
+            else:
+                step_time = 59
+        except:
+            test_case_continue = False
+            step_time = 59
 
         ConfigModule.add_config_value('sectionOne', 'sTestStepExecLogId',
                                       run_id + "|" + test_case + "|" + str(current_step_id) + "|" + str(StepSeq),
@@ -465,14 +460,9 @@ def run_all_test_steps_in_a_test_case(Stepscount, test_case, sModuleInfo, run_id
 
         update_test_step_status(run_id, test_case, current_step_id, current_step_sequence, Dict)
 
-        test_steps_data = get_test_step_data(run_id, test_case, current_step_sequence, StepSeq)
+        test_steps_data = get_test_step_data(run_id, test_case, current_step_sequence)
 
         CommonUtil.ExecLog(sModuleInfo, "********** steps data for Step #%d: %s **********" % (StepSeq, str(test_steps_data)), 1)
-        step_time = filter(lambda x: x[0] == 'estimated' and x[1] == 'time', step_meta_data)
-        if str(step_time)!='' and step_time!=None:
-            step_time = int(step_time[0][2])
-        else:
-            step_time = 0
         auto_generated_image_name = ('_').join(current_step_name.split(" ")) + '_started.png'
         CommonUtil.TakeScreenShot(str(auto_generated_image_name))
 
@@ -578,8 +568,9 @@ def calculate_test_case_result(sModuleInfo, TestCaseID, run_id, sTestStepResultL
                 break
             else:
                 step_index += 1
-        datasetid = TestCaseID[0] + '_s' + str(step_index)
-        status = check_if_step_is_verification_point(run_id,datasetid)
+                
+        status = check_if_step_is_verification_point(run_id, TestCaseID, step_index)
+        
         if status:
             sTestCaseStatus = 'Failed'
         else:
@@ -763,7 +754,7 @@ def run_test_case(TestCaseID, sModuleInfo, run_id, driver_list, final_dependency
         if cleanup == "YES":
             cleanup_drivers_during_debug = True
 
-        debug_steps = debug_steps.split("|")
+        debug_steps = str(debug_steps[1:-1]).split(",")
         debug = True
 
     if not debug or cleanup_drivers_during_debug: #if normal run, the write log file and cleanup driver instances
