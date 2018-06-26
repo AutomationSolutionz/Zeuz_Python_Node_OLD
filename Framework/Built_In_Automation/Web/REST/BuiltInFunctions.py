@@ -522,9 +522,10 @@ def search_condition_wrapper(data,condition_string):
                 for data in search_area:
                     list_result = True
                     for each in conditions:
-                        key = each[0]
-                        value = each[1]
-                        equal = each[2]
+                        key = each[0].replace("[[","(")
+                        key = key.replace("]]", ")")
+                        value = each[1].replace("[[","(")
+                        value = value.replace("]]", ")")
                         if isinstance(data,dict):
                             if key in data.keys():
                                 if equal:
@@ -602,7 +603,7 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
                 if search:
                     if apply_condition:
                         search_result = search_condition_wrapper(result.json(),condition)
-                        if search_result:
+                        if search_result in passed_tag_list:
                             CommonUtil.ExecLog(sModuleInfo, 'Condition "%s" is TRUE in response' % (condition), 1)
                             return "passed"
                         else:
@@ -619,7 +620,7 @@ def handle_rest_call(data, fields_to_be_saved, save_into_list = False, list_name
                                 CommonUtil.ExecLog(sModuleInfo, 'Couldnt Get "%s":"%s" in response' % (search_key, search_value), 3)
                                 return "failed"
                         else:
-                            if search_result:
+                            if search_result in passed_tag_list:
                                 CommonUtil.ExecLog(sModuleInfo, 'No "%s":"%s" in response' % (search_key, search_value), 1)
                                 return "passed"
                             else:

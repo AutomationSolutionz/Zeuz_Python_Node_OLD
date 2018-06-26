@@ -32,7 +32,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     111: {'module': 'common', 'name': 'append list', 'function': 'append_list_shared_variable'},
     112: {'module': 'common', 'name': 'settings', 'function': 'sequential_actions_settings'},
     113: {'module': 'common', 'name': 'step exit', 'function': 'step_exit'},
-    
+    114: {'module': 'common', 'name': 'save time', 'function': 'Save_Current_Time'},
+
     200: {'module': 'appium', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'name': 'text', 'function': 'Enter_Text_Appium'},
     202: {'module': 'appium', 'name': 'tap', 'function': 'Tap_Appium'},
@@ -190,12 +191,15 @@ supported_platforms = (
 
 
 # Import modules
-import inspect, sys, os
-from Framework.Utilities import CommonUtil, ConfigModule
+import inspect
+import os
+import sys
+
 import common_functions as common # Functions that are common to all modules
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as sr
-from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list # Allowed return strings, used to normalize pass/fail
 from Framework.Built_In_Automation.Shared_Resources import LocateElement
+from Framework.Utilities import CommonUtil
+from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list  # Allowed return strings, used to normalize pass/fail
 
 # Recall dependency, if not already set
 dependency = None
