@@ -1,0 +1,7 @@
+*.pyc
+.idea/
+
+.settings/
+.project
+.pydevproject
+/settings.conf
