@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 4.8
+version = 5.0
 [Release Date]
-date= 2018-08-15
+date= 2018-09-10
 [Release Note]
-Note = New Actions and improvement with click action
+Note = Various new loop actions, and other bug fixes.
