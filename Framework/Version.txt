@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.1
+version = 6.2
 [Release Date]
-date= 2018-11-27
+date= 2018-11-29
 [Release Note]
-Note=Appium Pickerwheel and Swipe option updated..
+Note=Cond. Actions with Loop bug fixed.. Node self updater fixed...
