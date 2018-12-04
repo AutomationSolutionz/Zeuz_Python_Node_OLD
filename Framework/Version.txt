@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.2
+version = 6.3
 [Release Date]
-date= 2018-11-29
+date= 2018-12-4
 [Release Note]
-Note=Cond. Actions with Loop bug fixed.. Node self updater fixed...
+Note=Wait for server variable bug fixed...
