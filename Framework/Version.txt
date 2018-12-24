@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.3
+version = 6.4
 [Release Date]
-date= 2018-12-4
+date= 2018-12-24
 [Release Note]
-Note=Wait for server variable bug fixed...
+Note=Rest API first bracket update in conditioning, Unique Parameter issue solved for appium..
