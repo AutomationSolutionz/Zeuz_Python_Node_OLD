@@ -3,4 +3,4 @@ version = 6.5
 [Release Date]
 date= 2018-11-27
 [Release Note]
-Note=Linked test case status update, Log changes in wait for server varaible..
+Note=Linked test case status update, Log changes in wait for server variable..
