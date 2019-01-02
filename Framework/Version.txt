@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.5
+version = 6.6
 [Release Date]
-date= 2018-11-27
+date= 2019-01-02
 [Release Note]
-Note=Linked test case status update, Log changes in wait for server variable..
+Note=Timestamp bug fixed, Linked TC status check at beginning of step, skip updating iosSimulator Folder..
