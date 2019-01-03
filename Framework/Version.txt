@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.6
+version = 6.7
 [Release Date]
-date= 2019-01-02
+date= 2019-01-03
 [Release Note]
-Note=Timestamp bug fixed, Linked TC status check at beginning of step, skip updating iosSimulator Folder..
+Note=Empty step data and empty test run issue fixed..
