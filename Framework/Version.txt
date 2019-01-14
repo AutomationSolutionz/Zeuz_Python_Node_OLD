@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 6.7
+version = 6.8
 [Release Date]
-date= 2019-01-03
+date= 2019-1-14
 [Release Note]
-Note=Empty step data and empty test run issue fixed..
+Note=Open new tab, switch tab for selenium done...
