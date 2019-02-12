@@ -3,4 +3,4 @@ version = 7.3
 [Release Date]
 date= 2019-02-12
 [Release Note]
-Note =  Drang and Drop for Web
+Note =  Drag and Drop for Web
