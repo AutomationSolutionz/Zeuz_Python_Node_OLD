@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.3
+version = 7.4
 [Release Date]
-date= 2019-02-12
+date= 2019-02-17
 [Release Note]
-Note =  Drag and Drop for Web
+Note = Element index is out of range logic improved
