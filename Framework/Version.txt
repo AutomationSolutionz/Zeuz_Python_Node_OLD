@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.4
+version = 7.5
 [Release Date]
-date= 2019-02-17
+date= 2019-02-27
 [Release Note]
-Note = Element index is out of range logic improved
+Note =  Scrolling through any web element action implemented
