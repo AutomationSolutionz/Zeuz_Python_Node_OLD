@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.6
+version = 7.7
 [Release Date]
-date= 2019-03-04
+date= 2019-03-06
 [Release Note]
-Note =  Selenium scroll bugFix
+Note =  Scrolling to an element for web implemented
