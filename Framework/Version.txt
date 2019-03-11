@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.7
+version = 7.8
 [Release Date]
-date= 2019-03-06
+date= 2019-03-11
 [Release Note]
-Note =  Scrolling to an element for web implemented
+Note =  Web enter text typewriter added. REST non json response converted to json format
