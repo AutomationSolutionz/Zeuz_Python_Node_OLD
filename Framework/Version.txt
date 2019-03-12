@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.8
+version = 7.9
 [Release Date]
-date= 2019-03-11
+date= 2019-03-12
 [Release Note]
-Note =  Web enter text typewriter added. REST non json response converted to json format
+Note =  Loop until certain status code feature implemented in REST
