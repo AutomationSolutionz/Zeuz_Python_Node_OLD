@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.9
+version = 7.10
 [Release Date]
-date= 2019-03-12
+date= 2019-03-18
 [Release Note]
-Note =  Loop until certain status code feature implemented in REST
+Note =  Temp_config.ini issue resolved
