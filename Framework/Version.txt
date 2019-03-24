@@ -3,4 +3,4 @@ version = 7.12
 [Release Date]
 date= 2019-03-24
 [Release Note]
-Note =  Appium launch will retry in case of failure
+Note =  Appium driver will retry to launch if it fails
