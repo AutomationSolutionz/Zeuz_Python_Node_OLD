@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.11
+version = 7.12
 [Release Date]
-date= 2019-03-21
+date= 2019-03-24
 [Release Note]
-Note =  Payload added for REST calls; Firefox browser will be maximized by default
+Note =  Appium launch will retry in case of failure
