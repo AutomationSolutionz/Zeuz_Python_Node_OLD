@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.12
+version = 7.13
 [Release Date]
-date= 2019-03-24
+date= 2019-03-25
 [Release Note]
-Note =  Appium driver will retry to launch if it fails
+Note =  Log file and log upload issues handled for large run
