@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.14
+version = 7.15
 [Release Date]
 date= 2019-03-31
 [Release Note]
-Note =  Load testing modules added
+Note =  All logging is now done in thread
