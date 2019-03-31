@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.13
+version = 7.14
 [Release Date]
-date= 2019-03-25
+date= 2019-03-31
 [Release Note]
-Note =  Log file and log upload issues handled for large run
+Note =  Load testing modules added
