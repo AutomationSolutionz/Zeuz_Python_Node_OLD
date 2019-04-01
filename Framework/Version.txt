@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.15
+version = 7.16
 [Release Date]
-date= 2019-03-31
+date= 2019-04-01
 [Release Note]
-Note =  All logging is now done in thread
+Note =  Random number/element picker from list added, load testing loop bug fix
