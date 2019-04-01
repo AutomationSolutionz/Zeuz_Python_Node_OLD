@@ -636,7 +636,7 @@ def Loop_Action_Handler(data, row, dataset_cnt):
 
         def build_subset(new_step_data):
             result = Run_Sequential_Actions(new_step_data)
-            if result in passed_tag_list: result = 'passed' # Make sure the result matches the string we set above
+            if result in passed_tag_list or (type(result) == tuple and result[0] in passed_tag_list): result = 'passed' # Make sure the result matches the string we set above
             else:
                 global load_testing
                 if load_testing:
