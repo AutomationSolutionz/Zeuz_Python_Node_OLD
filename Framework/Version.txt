@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.17
+version = 7.18
 [Release Date]
-date= 2019-04-01
+date= 2019-04-03
 [Release Note]
-Note =  Random number/element picker from list added, load testing loop bug fix
+Note =  Log File upload process changed
