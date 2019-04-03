@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.18
+version = 7.19
 [Release Date]
 date= 2019-04-03
 [Release Note]
-Note =  Log File upload process changed
+Note =  Loop boolean logic upgraded
