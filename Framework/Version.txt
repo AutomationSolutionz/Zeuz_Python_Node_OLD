@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.20
+version = 7.21
 [Release Date]
-date= 2019-04-05
+date= 2019-04-16
 [Release Note]
-Note = Randomize List
+Note = Loop bug fixed, clear and enter text issue fixed...
