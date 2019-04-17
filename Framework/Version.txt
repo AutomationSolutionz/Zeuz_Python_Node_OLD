@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.21
+version = 7.22
 [Release Date]
-date= 2019-04-16
+date= 2019-04-17
 [Release Note]
-Note = Loop bug fixed, clear and enter text issue fixed...
+Note = 3d list create and loop done.
