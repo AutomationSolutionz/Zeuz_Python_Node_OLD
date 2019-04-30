@@ -265,7 +265,51 @@ def find_correct_device_on_first_run(serial_or_name, device_info):
         
     except:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to read device information")
-     
+
+
+def unlock_android_device(data_set):
+    ''' Unlocks an androi device with adb commands'''
+
+    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
+
+    global device_serial, appium_details, appium_driver, device_id, device_info
+    # Recall appium details
+    if Shared_Resources.Test_Shared_Variables('device_info'):  # Check if device_info is already set in shared variables
+        device_info = Shared_Resources.Get_Shared_Variables('device_info')  # Retreive device_info
+
+    # Parse data set
+    try:
+        serial = ''  # Serial number (may also be random string like "launch", "na", etc)
+        password = ''
+
+        for row in data_set:  # Find required data
+            if str(row[0]).strip().lower() in ('password', 'pass word'):
+                password = str(row[2])
+            elif str(row[1]).strip().lower() == 'action':
+                serial = str(row[2]).lower().strip()
+
+
+        # Set the global variable for the preferred connected device
+        if find_correct_device_on_first_run(serial, device_info) in failed_tag_list: return 'failed'
+
+        if appium_details[device_id]['type'] == 'android':
+            Shared_Resources.Set_Shared_Variables('device_password',password)
+            result = adbOptions.wake_android(device_serial)
+            if result in failed_tag_list:
+                CommonUtil.ExecLog(sModuleInfo, "Couldn't unlock the android device", 3)
+                return 'failed'
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "The device type is not android", 3)
+            return 'failed'
+
+        CommonUtil.ExecLog(sModuleInfo, "Unlocked android device successfully", 1)
+        return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None,
+                                            "Could not create Appium Driver, Either device is not connected, or authorized, or a capability is incorrect.")
+
+
 def launch_application(data_set):
     ''' Launch the application the appium instance was created with, and create the instance if necessary '''
     
@@ -286,6 +330,7 @@ def launch_application(data_set):
         device_name = ''
         ios = ''
         no_reset= False
+        work_profile=False
 
         for row in data_set: # Find required data
             if str(row[0]).strip().lower() in ('android package','package') and row[1] == 'element parameter':
@@ -294,6 +339,8 @@ def launch_application(data_set):
                 activity_name = row[2]
             elif str(row[0]).strip().lower() in ('ios','ios simulator') and row[1] == 'element parameter':
                 ios = row[2]
+            elif str(row[0]).strip().lower() == 'work profile' and str(row[2]).strip().lower() in ('yes','true'):
+                work_profile = True
             elif str(row[0]).strip().lower() in ('no reset', 'no_reset','noreset') and row[1] == 'element parameter':
                 if str(row[2]).strip().lower() in ('yes', 'true'):
                     no_reset = True
@@ -337,7 +384,7 @@ def launch_application(data_set):
             device_name = appium_details[device_id]['device_name']
         launch_app = True
         if appium_details[device_id]['driver'] == None: # Only create a new appium instance if we haven't already (may be done by install_and_start_driver())
-            result,launch_app = start_appium_driver(package_name, activity_name,platform_version=platform_version,device_name=device_name,ios=ios,no_reset=no_reset)
+            result,launch_app = start_appium_driver(package_name, activity_name,platform_version=platform_version,device_name=device_name,ios=ios,no_reset=no_reset, work_profile=work_profile)
             if result == 'failed':
                 return 'failed'
         
@@ -418,7 +465,7 @@ def start_appium_server():
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error starting Appium server")
 
-def start_appium_driver(package_name = '', activity_name = '', filename = '', platform_version='', device_name='',ios='', no_reset=False):
+def start_appium_driver(package_name = '', activity_name = '', filename = '', platform_version='', device_name='',ios='', no_reset=False, work_profile=False):
     ''' Creates appium instance using discovered and provided capabilities '''
     # Does not execute application
     
@@ -442,11 +489,19 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
             desired_caps['fullReset'] = 'false' # Do not clear application cache when complete
             desired_caps['noReset'] = 'true' # Do not clear application cache when complete
             desired_caps['newCommandTimeout'] = 600 # Command timeout before appium destroys instance
+
             
             if str(appium_details[device_id]['type']).lower() == 'android':
                 if adbOptions.is_android_connected(device_serial) == False:
                     CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
                     return 'failed',launch_app
+
+                if work_profile:
+                    work_profile_from_adb = adbOptions.get_work_profile()
+                    if work_profile_from_adb in failed_tag_list:
+                        CommonUtil.ExecLog(sModuleInfo, "Couldn't get the work profile",3)
+                        return "failed"
+                    desired_caps['userProfile'] = work_profile_from_adb  # Command timeout before appium destroys instance
 
                 CommonUtil.ExecLog(sModuleInfo,"Setting up with Android",1)
                 desired_caps['platformVersion'] = adbOptions.get_android_version(appium_details[device_id]['serial']).strip()
@@ -1988,3 +2043,4 @@ def serial_in_devices(serial,devices):
         return False
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to maximize application")
+

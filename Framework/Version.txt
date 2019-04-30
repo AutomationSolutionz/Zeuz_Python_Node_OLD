@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.22
+version = 7.23
 [Release Date]
-date= 2019-04-17
+date= 2019-04-30
 [Release Note]
-Note = 3d list create and loop done.
+Note = Android unlock device and windows desktop actions updated...
