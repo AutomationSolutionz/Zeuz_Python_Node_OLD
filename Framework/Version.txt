@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.25
+version = 7.26
 [Release Date]
-date= 2019-05-08
+date= 2019-05-10
 [Release Note]
-Note = Run test cases in a loop
+Note = Unlock android phone and unlock android app
