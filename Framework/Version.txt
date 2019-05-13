@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.28
+version = 7.29
 [Release Date]
 date= 2019-05-13
 [Release Note]
-Note = Unlock android phone and unlock android app, bug fixes
+Note = Log upated for wait disable
