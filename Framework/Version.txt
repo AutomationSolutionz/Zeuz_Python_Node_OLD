@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.29
+version = 7.30
 [Release Date]
-date= 2019-05-13
+date= 2019-05-14
 [Release Note]
-Note = Log upated for wait disable
+Note = Scroll to an element for appium done..
