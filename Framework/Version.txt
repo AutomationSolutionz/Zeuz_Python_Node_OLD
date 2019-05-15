@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.30
+version = 7.31
 [Release Date]
-date= 2019-05-14
+date= 2019-05-15
 [Release Note]
-Note = Scroll to an element for appium done..
+Note = Scroll in direction done...
