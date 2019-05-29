@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.31
+version = 7.32
 [Release Date]
-date= 2019-05-15
+date= 2019-05-29
 [Release Note]
-Note = Scroll in direction done...
+Note = Excel, ftp, loop actions added
