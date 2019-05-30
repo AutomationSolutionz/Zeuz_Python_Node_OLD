@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.32
+version = 7.33
 [Release Date]
-date= 2019-05-29
+date= 2019-05-30
 [Release Note]
-Note = Excel, ftp, loop actions added
+Note = Extract number issue handled...
