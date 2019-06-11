@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.33
+version = 7.34
 [Release Date]
-date= 2019-05-30
+date= 2019-06-11
 [Release Note]
-Note = Extract number issue handled...
+Note = Cancelled test run's log issue fixed; username with space issue fixed for appium...
