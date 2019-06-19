@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.34
+version = 7.35
 [Release Date]
-date= 2019-06-11
+date= 2019-06-18
 [Release Note]
-Note = Cancelled test run's log issue fixed; username with space issue fixed for appium...
+Note = Kill Node For TearDown; Check ADB before calling to kill adb server
