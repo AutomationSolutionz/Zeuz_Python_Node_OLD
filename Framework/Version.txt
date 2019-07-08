@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.36
+version = 7.37
 [Release Date]
-date= 2019-07-01
+date= 2019-07-08
 [Release Note]
-Note = Load Testing Support(Locust) Added..
+Note = Rest api new action added
