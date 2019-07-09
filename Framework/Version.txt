@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.38
+version = 7.40
 [Release Date]
 date= 2019-07-09
 [Release Note]
-Note = Windows save text...
+Note = Bug fix in windows action...
