@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.37
+version = 7.38
 [Release Date]
-date= 2019-07-08
+date= 2019-07-09
 [Release Note]
-Note = Rest api new action added
+Note = Windows save text...
