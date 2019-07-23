@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.40
+version = 7.41
 [Release Date]
-date= 2019-07-09
+date= 2019-07-23
 [Release Note]
-Note = Bug fix in windows action...
+Note = Unified actions added for iOS and android...
