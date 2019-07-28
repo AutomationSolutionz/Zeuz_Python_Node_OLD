@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.41
+version = 7.42
 [Release Date]
-date= 2019-07-23
+date= 2019-07-28
 [Release Note]
-Note = Unified actions added for iOS and android...
+Note = Text replace action added for variables
