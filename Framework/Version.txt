@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.42
+version = 7.43
 [Release Date]
-date= 2019-07-28
+date= 2019-07-29
 [Release Note]
-Note = Text replace action added for variables
+Note = More support added for list and dictionary separator...
