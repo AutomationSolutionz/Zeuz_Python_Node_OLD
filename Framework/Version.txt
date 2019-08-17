@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.43
+version = 7.44
 [Release Date]
-date= 2019-07-29
+date= 2019-08-17
 [Release Note]
-Note = More support added for list and dictionary separator...
+Note = Additional separators for list...
