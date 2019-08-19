@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.44
+version = 7.45
 [Release Date]
-date= 2019-08-17
+date= 2019-08-19
 [Release Note]
-Note = Additional separators for list...
+Note = click and enter text added for selenium...
