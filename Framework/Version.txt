@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.45
+version = 7.46
 [Release Date]
-date= 2019-08-19
+date= 2019-08-21
 [Release Note]
-Note = click and enter text added for selenium...
+Note = Validate URL action added
