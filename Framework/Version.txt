@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.46
+version = 7.47
 [Release Date]
-date= 2019-08-21
+date= 2019-06-26
 [Release Note]
-Note = Validate URL action added
+Note = 3d list initialization added, settings added for making machine online on any project...
