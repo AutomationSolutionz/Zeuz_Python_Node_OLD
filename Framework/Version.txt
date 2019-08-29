@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.47
+version = 7.48
 [Release Date]
-date= 2019-06-26
+date= 2019-08-29
 [Release Note]
-Note = 3d list initialization added, settings added for making machine online on any project...
+Note = Screenshould added to individual actions...
