@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 7.48
+version = 7.49
 [Release Date]
-date= 2019-08-29
+date= 2019-09-09
 [Release Note]
-Note = Screenshould added to individual actions...
+Note = Android set text update
