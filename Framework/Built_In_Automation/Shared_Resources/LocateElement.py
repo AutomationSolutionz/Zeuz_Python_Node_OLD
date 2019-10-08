@@ -21,6 +21,10 @@ generic_driver = None
 global driver_type 
 driver_type = None
 
+
+MODULE_NAME = inspect.getmoduleinfo(__file__).name
+
+
 def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
     '''
     This funciton will return "Failed" if something went wrong, else it will always return a single element
@@ -28,7 +32,7 @@ def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
     good when you are just trying to see how your step data would be converted to a query for testing local runs
     '''
     try:
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+        sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
         generic_driver = driver
         global generic_driver
         #Check the driver that is given and set the driver type
@@ -133,7 +137,7 @@ def _construct_query (step_data_set):
     other feature such as child parameter or multiple element parameter to locate the element
     '''
     try:
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+        sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
         collect_all_attribute = [x[0] for x in step_data_set]
         # find out if ref exists.  If it exists, it will set the value to True else False
         child_ref_exits = any("child parameter" in s for s in step_data_set)
@@ -317,7 +321,7 @@ def _construct_xpath_string_from_list(xpath_list):
 def _switch(step_data_set):
     "here we switch the global driver to any of the switch call"
     try:
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+        sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
         # find if frame switch is there.  If user enters more than one frame, it will ignore
         # user should enter multiple frame in this order parent > child > grand child ... and so on
         if "switch frame" in [x[0] for x in step_data_set]: 
@@ -327,6 +331,10 @@ def _switch(step_data_set):
             # we switch each frame in order 
             for each_frame in frame_switch_list:
                 CommonUtil.ExecLog(sModuleInfo, "switching frame; %s"%each_frame, 1)
+                #switch by index.  If index of iframe is provided, then we need to convert to int
+                check_if_index = ['0','1','2','3','4','5']
+                if each_frame in check_if_index:
+                    each_frame = int(each_frame)
                 generic_driver.switch_to_frame(each_frame)
             return  True 
         elif "switch window" in [x[0] for x in step_data_set]: 
@@ -361,7 +369,7 @@ def _get_xpath_or_css_element(element_query,css_xpath, index_number=False):
     try: 
         all_matching_elements = []
         all_matching_elements_visible_invisible = []
-        sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+        sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
 
         if css_xpath == 'unique' and (driver_type == 'appium' or driver_type == 'selenium'): #for unique id
             try:
@@ -483,7 +491,7 @@ def _pyautogui(step_data_set):
     # Only used by desktop, so only import here
     import pyautogui, os.path, re
     
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Recall file attachment, if not already set
@@ -659,7 +667,7 @@ def _pyautogui(step_data_set):
 def _scale_image(file_name, size_w, size_h):
     ''' This function calculates ratio and scales an image for comparison by _pyautogui() '''
     
-    sModuleInfo = inspect.stack()[0][3] + " : " + inspect.getmoduleinfo(__file__).name
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     
     # Only used by desktop, so only import here
     import pyautogui
