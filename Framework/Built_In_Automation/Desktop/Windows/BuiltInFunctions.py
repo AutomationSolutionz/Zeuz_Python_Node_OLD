@@ -14,13 +14,16 @@ from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionShared
 from Framework.Built_In_Automation.Shared_Resources import LocateElement
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
 
-import clr,System, inspect, time,datetime, os, sys
+import inspect, time,datetime, os, sys
+from os import system
 from _elementtree import Element # What is this for?
 from Framework.Utilities import CommonUtil
 
-MODULE_NAME = inspect.getmoduleinfo(__file__).name
+MODULE_NAME = inspect.getmodulename(__file__)
 
 #this needs to be here on top, otherwise will return error
+import clr, System
+
 clr.AddReference('UIAutomationClient')
 clr.AddReference('UIAutomationTypes')
 clr.AddReference('UIAutomationProvider')
@@ -179,7 +182,7 @@ def get_element(MainWindowName_OR_ParentElement, Element_Name, Element_Class,Ele
         
 
         try:
-            if isinstance(MainWindowName_OR_ParentElement, basestring)  == True:
+            if isinstance(MainWindowName_OR_ParentElement, str)  == True:
                 ParentElement = _get_main_window (MainWindowName_OR_ParentElement)
                 if ParentElement == None:
                     return "failed"
@@ -206,10 +209,10 @@ def get_element(MainWindowName_OR_ParentElement, Element_Name, Element_Class,Ele
 
             
      
-    except Exception, e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
+        print(((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno)))
 
 
 
@@ -397,16 +400,16 @@ def _child_search(ParentElement, Element_Name,Element_Class,Element_AutomationID
         except:
             return None
 
-    except Exception, e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
+        print(((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno)))
         return "failed"
 
 def _get_main_window (WindowName):
     try:
         MainWindowsList = AutomationElement.RootElement.FindAll(TreeScope.Children,Condition.TrueCondition)
-        UnicodeWinName=WindowName.decode('utf-8')
+        UnicodeWinName=WindowName
         for MainWindowElement in MainWindowsList:
             try:
                 NameS =  MainWindowElement.Current.Name
@@ -418,10 +421,10 @@ def _get_main_window (WindowName):
 
 
         return None
-    except Exception, e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
+        print(((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno)))
 
 
 def Click_Element_None_Mouse(Element, Expand=None, Invoke=None, Select=None, Toggle=None):
@@ -430,7 +433,7 @@ def Click_Element_None_Mouse(Element, Expand=None, Invoke=None, Select=None, Tog
         if len(patter_list) == 0:
             # x = int (Element.Current.BoundingRectangle.X)
             # y = int (Element.Current.BoundingRectangle.Y)
-            print "no pattern found going with mouse click"
+            print("no pattern found going with mouse click")
             x = (int)(Element.Current.BoundingRectangle.Right - Element.Current.BoundingRectangle.Width / 2);
             y = (int)(Element.Current.BoundingRectangle.Bottom - Element.Current.BoundingRectangle.Height / 2);
             win32api.SetCursorPos((x, y))
@@ -449,20 +452,20 @@ def Click_Element_None_Mouse(Element, Expand=None, Invoke=None, Select=None, Tog
                         if status == 0:
                             Element.GetCurrentPattern(ExpandCollapsePattern.Pattern).Expand()
                         elif status == 1:
-                            print "Already Expanded"
+                            print("Already Expanded")
                     elif Expand == False:
                         # check to see if its Collapsed, if Collapsed, then do nothing... if not, Collapse it
                         status = Element.GetCurrentPattern(ExpandCollapsePattern.Pattern).Current.ExpandCollapseState
                         if status == 1:
                             Element.GetCurrentPattern(ExpandCollapsePattern.Pattern).Collapse()
                         elif status == 0:
-                            print "Already Collapsed"
+                            print("Already Collapsed")
 
 
 
                 elif pattern_name == "Invoke":
                     if Invoke == True:
-                        print "invoking the button: %s" % Element.Current.Name
+                        print("invoking the button: %s" % Element.Current.Name)
                         time.sleep(2)
                         Element.GetCurrentPattern(InvokePattern.Pattern).Invoke()
 
@@ -473,7 +476,7 @@ def Click_Element_None_Mouse(Element, Expand=None, Invoke=None, Select=None, Tog
                 else:
                     # x = int (Element.Current.BoundingRectangle.X)
                     # y = int (Element.Current.BoundingRectangle.Y)
-                    print "no pattern found going with mouse click"
+                    print("no pattern found going with mouse click")
                     x = (int)(Element.Current.BoundingRectangle.Right - Element.Current.BoundingRectangle.Width / 2);
                     y = (int)(Element.Current.BoundingRectangle.Bottom - Element.Current.BoundingRectangle.Height / 2);
                     win32api.SetCursorPos((x, y))
@@ -483,11 +486,11 @@ def Click_Element_None_Mouse(Element, Expand=None, Invoke=None, Select=None, Tog
 
         return "passed"
 
-    except Exception, e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
-            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
+        print(((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
+            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno)))
 
         return "failed"
 
@@ -532,8 +535,8 @@ def Drag_and_Drop_Element(data_set):
 
 def Drag_Object(Element1_source, Element2_destination):
     try:
-        print "clicking your element"
-        print Element1_source, Element2_destination
+        print("clicking your element")
+        print(Element1_source, Element2_destination)
 
         x_source = (int)(
             Element1_source.Current.BoundingRectangle.Right - Element1_source.Current.BoundingRectangle.Width / 2);
@@ -550,11 +553,11 @@ def Drag_Object(Element1_source, Element2_destination):
 
 
 
-    except Exception, e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print ((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
-            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno))
+        print(((str(exc_type).replace("type ", "Error Type: ")) + ";" + "Error Message: " + str(
+            exc_obj) + ";" + "File Name: " + fname + ";" + "Line: " + str(exc_tb.tb_lineno)))
         return 'failed'
 
 def Double_Click_Element(data_set):
