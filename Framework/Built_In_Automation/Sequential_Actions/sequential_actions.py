@@ -51,6 +51,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     130: {'module': 'common', 'screenshot':'desktop', 'name': 'get excel table', 'function': 'get_excel_table'},
     131: {'module': 'common', 'screenshot':'none', 'name': 'save text from file into variable', 'function': 'save_text_from_file_into_variable'},
     132: {'module': 'common', 'screenshot':'none', 'name': 'compare partial variable', 'function': 'Compare_Partial_Variables'},
+    133: {'module': 'common', 'screenshot':'none', 'name': 'send mail', 'function': 'send_mail'},
+    134: {'module': 'common', 'screenshot':'none', 'name': 'check latest mail', 'function': 'check_latest_mail'},
 
     200: {'module': 'appium', 'screenshot':'mobile', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'screenshot':'mobile', 'name': 'text', 'function': 'Enter_Text_Appium'},
@@ -138,6 +140,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     438: {'module': 'selenium', 'screenshot':'web', 'name': 'click and enter text', 'function': 'Click_and_Text'},
     439: {'module': 'selenium', 'screenshot':'web', 'name': 'validate url', 'function': 'Validate_Url'},
     440: {'module': 'selenium', 'screenshot':'web', 'name': 'scroll element to top', 'function': 'scroll_element_to_top'},
+    441: {'module': 'selenium', 'screenshot':'web', 'name': 'switch window', 'function': 'switch_window'},
+    442: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute', 'function': 'Save_Attribute'},
     
     500: {'module': 'utility', 'screenshot':'none', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'screenshot':'none', 'name': 'upload', 'function': 'Upload'},
