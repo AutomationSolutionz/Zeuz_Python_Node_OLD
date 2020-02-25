@@ -53,7 +53,11 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     132: {'module': 'common', 'screenshot':'none', 'name': 'compare partial variable', 'function': 'Compare_Partial_Variables'},
     133: {'module': 'common', 'screenshot':'none', 'name': 'send mail', 'function': 'send_mail'},
     134: {'module': 'common', 'screenshot':'none', 'name': 'check latest mail', 'function': 'check_latest_mail'},
+    135: {'module': 'common', 'screenshot':'none', 'name': 'save value from dictionary by key', 'function': 'save_dict_value_by_key'},
+    136: {'module': 'common', 'screenshot':'none', 'name': 'save key value from dict list', 'function': 'save_key_value_from_dict_list'},
+    137: {'module': 'common', 'screenshot':'none', 'name': 'extract date', 'function': 'extract_date'},
 
+    
     200: {'module': 'appium', 'screenshot':'mobile', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'screenshot':'mobile', 'name': 'text', 'function': 'Enter_Text_Appium'},
     202: {'module': 'appium', 'screenshot':'mobile', 'name': 'tap', 'function': 'Tap_Appium'},
@@ -142,6 +146,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     440: {'module': 'selenium', 'screenshot':'web', 'name': 'scroll element to top', 'function': 'scroll_element_to_top'},
     441: {'module': 'selenium', 'screenshot':'web', 'name': 'switch window', 'function': 'switch_window'},
     442: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute', 'function': 'Save_Attribute'},
+    443: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute values in list', 'function': 'save_attribute_values_in_list'},
+    
     
     500: {'module': 'utility', 'screenshot':'none', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'screenshot':'none', 'name': 'upload', 'function': 'Upload'},
@@ -177,7 +183,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     532: {'module': 'utility', 'screenshot':'none', 'name': 'save substring', 'function': 'save_substring'},
     533: {'module': 'utility', 'screenshot':'none', 'name': 'get attachment path', 'function': 'Get_Attachment_Path'},
     534: {'module': 'utility', 'screenshot':'none', 'name': 'extract number', 'function': 'extract_number'},
-
+    535: {'module': 'utility', 'screenshot':'none', 'name': 'convert date format', 'function': 'convert_date_format'},
+    
     600: {'module': 'xml', 'screenshot':'none', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'screenshot':'none', 'name': 'add', 'function': 'add_element'},
     602: {'module': 'xml', 'screenshot':'none', 'name': 'read', 'function': 'read_element'},
@@ -240,7 +247,8 @@ action_support = [
     'unique parameter',
     'save parameter',
     'get parameter',
-    'loop settings'
+    'loop settings',
+    'attribute constrain'
 ]
 
 # List of supported mobile platforms - must be lower case
@@ -339,7 +347,7 @@ def write_browser_logs():
         pass
 
 def Sequential_Actions(step_data, _dependency=None, _run_time_params=None, _file_attachment=None, _temp_q ='', screen_capture='Desktop',
-                       _device_info=None):
+                       _device_info=None, debug_actions=None):
     ''' Main Sequential Actions function - Performs logical decisions based on user input '''
 
     if _device_info is None:
@@ -400,7 +408,7 @@ def Sequential_Actions(step_data, _dependency=None, _run_time_params=None, _file
 
 
     sr.Set_Shared_Variables('step_data', step_data, protected=True)
-    result,skip_for_loop =  Run_Sequential_Actions([]) #empty list means run all, instead of step data we want to send the dataset no's of the step data to run
+    result,skip_for_loop =  Run_Sequential_Actions([], debug_actions) #empty list means run all, instead of step data we want to send the dataset no's of the step data to run
     write_browser_logs()
 
     global load_testing, thread_pool
@@ -535,7 +543,7 @@ def Handle_While_Loop_Action(step_data, data_set_no):
         return "failed",[]
 
 
-def Run_Sequential_Actions(data_set_list=None): #data_set_no will used in recursive conditional action call
+def Run_Sequential_Actions(data_set_list=None, debug_actions=None): #data_set_no will used in recursive conditional action call
     if data_set_list is None:
         data_set_list = []
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
@@ -554,7 +562,11 @@ def Run_Sequential_Actions(data_set_list=None): #data_set_no will used in recurs
             return 'failed',skip_for_loop
         if data_set_list == []: #run the full step data
             for i in range(len(step_data)):
-                data_set_list.append(i)
+                if debug_actions:
+                    if str(i+1) in debug_actions:
+                        data_set_list.append(i)
+                else:
+                    data_set_list.append(i)
 
         
         for dataset_cnt in data_set_list: # For each data set within step data
