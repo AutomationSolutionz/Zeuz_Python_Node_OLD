@@ -23,7 +23,7 @@ cryptography==2.8
 datefinder==0.7.0
 defusedxml==0.6.0
 dicttoxml==1.7.4
-Django==3.0
+Django==3.0.3
 django-celery==3.3.1
 dropbox==9.4.0
 Flask==1.1.1
