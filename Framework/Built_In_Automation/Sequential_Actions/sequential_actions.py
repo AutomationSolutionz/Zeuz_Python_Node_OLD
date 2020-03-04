@@ -56,6 +56,9 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     135: {'module': 'common', 'screenshot':'none', 'name': 'save value from dictionary by key', 'function': 'save_dict_value_by_key'},
     136: {'module': 'common', 'screenshot':'none', 'name': 'save key value from dict list', 'function': 'save_key_value_from_dict_list'},
     137: {'module': 'common', 'screenshot':'none', 'name': 'extract date', 'function': 'extract_date'},
+    138: {'module': 'common', 'screenshot':'none', 'name': 'voice command response', 'function': 'voice_command_response'},
+    139: {'module': 'common', 'screenshot':'none', 'name': 'compare partial variables', 'function': 'Compare_Partial_Variables'},
+
 
     
     200: {'module': 'appium', 'screenshot':'mobile', 'name': 'click', 'function': 'Click_Element_Appium'},
@@ -184,7 +187,9 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     533: {'module': 'utility', 'screenshot':'none', 'name': 'get attachment path', 'function': 'Get_Attachment_Path'},
     534: {'module': 'utility', 'screenshot':'none', 'name': 'extract number', 'function': 'extract_number'},
     535: {'module': 'utility', 'screenshot':'none', 'name': 'convert date format', 'function': 'convert_date_format'},
+
     
+        
     600: {'module': 'xml', 'screenshot':'none', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'screenshot':'none', 'name': 'add', 'function': 'add_element'},
     602: {'module': 'xml', 'screenshot':'none', 'name': 'read', 'function': 'read_element'},
@@ -635,6 +640,13 @@ def Run_Sequential_Actions(data_set_list=None, debug_actions=None): #data_set_no
                         CommonUtil.ExecLog(sModuleInfo,"Old style loop action found. This will not be supported in 2020, please replace them with new loop actions",2)
                         result, skip_for_loop = Loop_Action_Handler(data_set, row, dataset_cnt)
                         skip = skip_for_loop
+                        nested_action_skip = []  # skipping the steps that are nested  , we do not want to run them sequencially later
+                        for row in data_set:
+                            if row[0].lower() == 'nested action':
+                                a = map(int, row[2].split(","))
+                                for i in a:
+                                    nested_action_skip.append(int(i) - 1)  # converting to index format by decreasing by 1 and converting string to number
+                        skip = skip + nested_action_skip  #appending the nested actions to skip list  after the loop finish
                         if result in failed_tag_list: return 'failed', skip_for_loop
                 elif 'loop' in action_name:
                     if 'while' in action_name.lower():
