@@ -59,8 +59,24 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     138: {'module': 'common', 'screenshot':'none', 'name': 'voice command response', 'function': 'voice_command_response'},
     139: {'module': 'common', 'screenshot':'none', 'name': 'compare partial variables', 'function': 'Compare_Partial_Variables'},
 
+    # Database actions
+    140: {'module': 'common', 'screenshot': 'none', 'name': 'connect to db', 'function': 'connect_to_db'},
+    141: {'module': 'common', 'screenshot': 'none', 'name': 'db: select', 'function': 'db_select'},
+    142: {'module': 'common', 'screenshot': 'none', 'name': 'db: select single value', 'function': 'db_select_single_value'},
+    143: {'module': 'common', 'screenshot': 'none', 'name': 'db: insert/update/delete', 'function': 'db_non_query'},
 
-    
+    # Global Variable Actions
+    144: {'module': 'common', 'screenshot': 'none', 'name': 'get global list variable',
+          'function': 'get_global_list_variable'},
+    145: {'module': 'common', 'screenshot': 'none', 'name': 'append to global list variable',
+          'function': 'append_to_global_list_variable'},
+    146: {'module': 'common', 'screenshot': 'none', 'name': 'remove item from global list variable',
+          'function': 'remove_item_from_global_list_variable'},
+    147: {'module': 'common', 'screenshot': 'none', 'name': 'save variable by list difference',
+          'function': 'save_variable_by_list_difference'},
+
+
+
     200: {'module': 'appium', 'screenshot':'mobile', 'name': 'click', 'function': 'Click_Element_Appium'},
     201: {'module': 'appium', 'screenshot':'mobile', 'name': 'text', 'function': 'Enter_Text_Appium'},
     202: {'module': 'appium', 'screenshot':'mobile', 'name': 'tap', 'function': 'Tap_Appium'},
@@ -100,7 +116,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     236: {'module': 'appium', 'screenshot':'mobile', 'name': 'swipe in direction', 'function': 'swipe_in_direction'},
     237: {'module': 'appium', 'screenshot':'mobile', 'name': 'if element exists', 'function': 'if_element_exists'},
     238: {'module': 'appium', 'screenshot':'mobile', 'name': 'clear and enter text adb', 'function': 'Clear_And_Enter_Text_ADB'},
-    
+    239: {'module': 'appium', 'screenshot':'mobile', 'name': 'hide keyboard', 'function': 'Hide_Keyboard'},
+
     300: {'module': 'rest', 'screenshot':'none', 'name': 'save response', 'function': 'Get_Response_Wrapper'},
     301: {'module': 'rest', 'screenshot':'none', 'name': 'search response', 'function': 'Search_Response'},
     302: {'module': 'rest', 'screenshot':'none', 'name': 'save response into list', 'function': 'Insert_Into_List'},
@@ -150,15 +167,15 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     441: {'module': 'selenium', 'screenshot':'web', 'name': 'switch window', 'function': 'switch_window'},
     442: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute', 'function': 'Save_Attribute'},
     443: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute values in list', 'function': 'save_attribute_values_in_list'},
-    
-    
+
+
     500: {'module': 'utility', 'screenshot':'none', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'screenshot':'none', 'name': 'upload', 'function': 'Upload'},
     502: {'module': 'utility', 'screenshot':'none', 'name': 'save string', 'function': 'Save_Text'},
     503: {'module': 'utility', 'screenshot':'none', 'name': 'copy', 'function': 'Copy_File_or_Folder'},
     504: {'module': 'utility', 'screenshot':'none', 'name': 'delete', 'function': 'Delete_File_or_Folder'},
     505: {'module': 'utility', 'screenshot':'none', 'name': 'create', 'function': 'Create_File_or_Folder'},
-    506: {'module': 'utility', 'screenshot':'none', 'name': 'find', 'function': 'Find_File'},
+    506: {'module': 'utility', 'screenshot':'none', 'name': 'find', 'function': 'Find_File_Or_Folder'},
     507: {'module': 'utility', 'screenshot':'none', 'name': 'rename', 'function': 'Rename_File_or_Folder'},
     508: {'module': 'utility', 'screenshot':'none', 'name': 'move', 'function': 'Move_File_or_Folder'},
     509: {'module': 'utility', 'screenshot':'none', 'name': 'zip', 'function': 'Zip_File_or_Folder'},
@@ -188,8 +205,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     534: {'module': 'utility', 'screenshot':'none', 'name': 'extract number', 'function': 'extract_number'},
     535: {'module': 'utility', 'screenshot':'none', 'name': 'convert date format', 'function': 'convert_date_format'},
 
-    
-        
+
+
     600: {'module': 'xml', 'screenshot':'none', 'name': 'update', 'function': 'update_element'},
     601: {'module': 'xml', 'screenshot':'none', 'name': 'add', 'function': 'add_element'},
     602: {'module': 'xml', 'screenshot':'none', 'name': 'read', 'function': 'read_element'},
@@ -222,7 +239,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     810: {'module': 'windows', 'screenshot':'desktop', 'name': 'open app', 'function': 'Run_Application'},
     811: {'module': 'windows', 'screenshot':'desktop', 'name': 'close app', 'function': 'Close_Application'},
     812: {'module': 'windows', 'screenshot':'desktop', 'name': 'validate text', 'function': 'Validate_Text'},
-    813: {'module': 'windows', 'screenshot':'desktop', 'name': 'save text', 'function': 'Save_Text'}
+    813: {'module': 'windows', 'screenshot':'desktop', 'name': 'save text', 'function': 'Save_Text'},
 }
 
 # List of Sub-Field keywords, must be all lowercase, and using single spaces - no underscores
@@ -609,7 +626,7 @@ def Run_Sequential_Actions(data_set_list=None, debug_actions=None): #data_set_no
                 # If middle column = conditional action, evaluate data set
                 elif "conditional action" in action_name or "if else" in action_name:
                     if action_name.lower().strip() != 'conditional action' and action_name.lower().strip() != 'if else': #old style conditional action
-                        CommonUtil.ExecLog(sModuleInfo,"Old style conditional action found. This will not be supported in 2020, please replace them with new conditional actions", 2)
+                        CommonUtil.ExecLog(sModuleInfo,"Old style conditional action found", 1)
                         CommonUtil.ExecLog(sModuleInfo, "Checking the logical conditional action to be performed in the conditional action row: %s" % str(row), 0)
                         logic_row.append(row) # Keep track of the conditional action row, so we can access it later
                         [skip_tmp.append(int(x) - 1) for x in row[2].replace(' ', '').split(',')] # Add the processed data sets, executed by the conditional action to the skip list, so we can process the rest of the data sets (do this for both conditional actions)
@@ -1157,7 +1174,7 @@ def Conditional_Action_Handler(data_set, row, logic_row):
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
     if stored == False: # Just to be clear, we can't to log that we are using the old method
-        CommonUtil.ExecLog(sModuleInfo, "Could not find the recall result row. It's either missing or mispelled. Trying old method of Conditional Action, but suggest you update to the currently accepted method", 2)
+        CommonUtil.ExecLog(sModuleInfo, "Could not find the recall result row. It's either missing or mispelled. Trying in different method", 2)
         
     if stored == True: # Use saved result from previous data set
         if result in failed_tag_list: # Check result from previous action 

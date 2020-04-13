@@ -1,3 +1,4 @@
+pyodbc
 Appium-Python-Client
 uiautomator
 clint
@@ -20,4 +21,3 @@ speech
 SpeechRecognition
 tzlocal
 urllib3
-xlwings
