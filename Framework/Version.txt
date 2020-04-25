@@ -1,6 +1,6 @@
 [ZeuZ Python Version]
-version = 10.11
+version = 10.15
 [Release Date]
-date= 2020-04-12
+date= 2020-04-25
 [Release Note]
-Note = Hide Keyboard, few other actions
+Note = Node GUI upgrade, action updates
