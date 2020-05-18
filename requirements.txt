@@ -20,3 +20,5 @@ speech
 SpeechRecognition
 tzlocal
 urllib3
+psutil
+selenium

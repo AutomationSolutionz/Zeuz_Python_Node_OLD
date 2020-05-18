@@ -57,6 +57,33 @@ def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
                     True
                 '''
             elif driver_type == 'appium':
+
+                # If we find a '|' character in the left column, then try to check the platform
+                # and filter the appropriate data for the left column by removing '|'
+                device_platform = generic_driver.capabilities['platformName'].strip().lower()
+                cleaned_data_set = []
+                str_to_strip = "|*|"
+                for left, middle, right in step_data_set:
+                    if "element parameter" in middle:
+                        # Split the attribute field if str_to_strip is present
+                        if left.find(str_to_strip) != -1:
+                            if device_platform == "android":
+                                left = left.split(str_to_strip)[0].strip()
+                            elif device_platform == "ios":
+                                left = left.split(str_to_strip)[1].strip()
+
+                        # Split the value field if str_to_strip is present
+                        if right.find(str_to_strip) != -1:
+                            if device_platform == "android":
+                                right = right.split(str_to_strip)[0].strip()
+                            elif device_platform == "ios":
+                                right = right.split(str_to_strip)[1].strip()
+
+                    new_row = (left, middle, right,)
+                    cleaned_data_set.append(new_row)
+                
+                step_data_set = cleaned_data_set
+                        
                 new_step_data=[]
                 for row in step_data_set:
                     if row[0] == 'resource-id' and str(row[2]).startswith('*'):
@@ -289,11 +316,19 @@ def _construct_xpath_list(parameter_list,add_dot=False):
                 text_value = '[contains(text(),"%s")]' % (str(attribute_value))
                 element_main_body_list.append(text_value)
             elif attribute == "text" and driver_type == "appium":
-                text_value = '[@text="%s"]'%attribute_value
+                current_context = generic_driver.context
+                if "WEB" in current_context:
+                    text_value = '[text()="%s"]'%attribute_value
+                else:
+                    text_value = '[@text="%s"]'%attribute_value
                 element_main_body_list.append(text_value)
             elif attribute == "*text" and driver_type == "appium": #ignore case
                 #text_value = "[contains(translate(@text,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'%s')]"%str(attribute_value).lower()
-                text_value = '[contains(@%s,"%s")]' % (attribute.split('*')[1], str(attribute_value))
+                current_context = generic_driver.context
+                if "WEB" in current_context:
+                    text_value = '[contains(%s(),"%s")]' % (attribute.split('*')[1], str(attribute_value))
+                else: 
+                    text_value = '[contains(@%s,"%s")]' % (attribute.split('*')[1], str(attribute_value))
                 element_main_body_list.append(text_value)            
             elif attribute not in excluded_attribute and '*' not in attribute:
                 other_value = '[@%s="%s"]'%(attribute,attribute_value)

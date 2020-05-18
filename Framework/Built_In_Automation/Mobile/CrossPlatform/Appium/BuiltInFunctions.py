@@ -23,6 +23,7 @@ from Framework.Built_In_Automation.Shared_Resources import LocateElement
 import psutil
 
 
+
 MODULE_NAME = inspect.getmodulename(__file__)
 
 PATH_ = lambda p: os.path.abspath(os.path.join(os.path.dirname(__file__), p))
@@ -162,7 +163,7 @@ def find_correct_device_on_first_run(serial_or_name, device_info):
     
     try:
         # Get list of connected devices
-        devices = {} # Temporarily store connected device serial numbers
+        devices = {} # Temporarily store connected device serial numberspick
         all_device_info = All_Device_Info.get_all_connected_device_info()
         
         # Ensure we have at least one device connected
@@ -268,6 +269,7 @@ def find_correct_device_on_first_run(serial_or_name, device_info):
         
     except:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to read device information")
+
 
 
 def unlock_android_device(data_set):
@@ -396,9 +398,23 @@ def launch_application(data_set):
             elif str(row[1]).strip().lower() == 'action':
                 serial = row[2].lower().strip()
 
-
+        # desired capabilities for specific platforms
+        desiredcaps = dict()
         # Set the global variable for the preferred connected device
         if find_correct_device_on_first_run(serial, device_info) in failed_tag_list: return 'failed'
+
+        device_type = appium_details[device_id]['type'].lower().strip()
+        
+        for left, mid, right in data_set:
+            left, mid = left.strip().lower(), mid.strip().lower()
+
+            if 'parameter' in mid and "=" in right:
+                # key, value
+                k, v = map(lambda x: x.strip(), right.split('='))
+
+                if left in (device_type, 'multi'):
+                    desiredcaps[k] = v
+
             
         # Send wake up command to avoid issues with devices ignoring appium when they are in lower power mode (android 6.0+), and unlock if passworded
         if appium_details[device_id]['type'] == 'android':
@@ -432,7 +448,7 @@ def launch_application(data_set):
             device_name = appium_details[device_id]['device_name']
         launch_app = True
         if appium_details[device_id]['driver'] == None: # Only create a new appium instance if we haven't already (may be done by install_and_start_driver())
-            result,launch_app = start_appium_driver(package_name, activity_name,platform_version=platform_version,device_name=device_name,ios=ios,no_reset=no_reset, work_profile=work_profile)
+            result,launch_app = start_appium_driver(package_name, activity_name,platform_version=platform_version,device_name=device_name,ios=ios,no_reset=no_reset, work_profile=work_profile, desiredcaps=desiredcaps)
             if result == 'failed':
                 return 'failed'
         
@@ -477,16 +493,19 @@ def start_appium_server():
         try:
             appium_server = None
             if sys.platform  == 'win32': # We need to open appium in it's own command dos box on Windows
-                cmd = 'start "Appium Server" /wait /min cmd /c %s -p %d' % (appium_binary, appium_port) # Use start to execute and minimize, then cmd /c will remove the dos box when appium is killed
+                cmd = 'start "Appium Server" /wait /min cmd /c %s --allow-insecure chromedriver_autodownload -p %d' % (appium_binary, appium_port) # Use start to execute and minimize, then cmd /c will remove the dos box when appium is killed
                 appium_server = subprocess.Popen(cmd, shell = True) # Needs to run in a shell due to the execution command
             elif sys.platform == 'darwin':
-                appium_server = subprocess.Popen([appium_binary, '-p', str(appium_port)])
+                appium_server = subprocess.Popen('%s --allow-insecure chromedriver_autodownload -p %s'%(appium_binary, str(appium_port)), shell=True)
+            elif sys.platform == "linux" or sys.platform == "linux2":
+                appium_server = subprocess.Popen('%s --allow-insecure chromedriver_autodownload -p %s'%(appium_binary, str(appium_port)), shell=True)
             else:
                 try:
+                    
                     appium_binary_path = os.path.normpath(appium_binary)
                     appium_binary_path = os.path.abspath(os.path.join(appium_binary_path, os.pardir))
                     env = {"PATH": str(appium_binary_path)}
-                    appium_server = subprocess.Popen(['appium', '-p', str(appium_port)], env=env)
+                    appium_server = subprocess.Popen(subprocess.Popen('%s --allow-insecure chromedriver_autodownload -p %s'%(appium_binary, str(appium_port)), shell=True), env=env)
                 except:
                     CommonUtil.ExecLog(sModuleInfo,"Couldn't launch appium server, please do it manually ny typing 'appium &' in the terminal",2)
                     pass
@@ -513,7 +532,7 @@ def start_appium_server():
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error starting Appium server")
 
-def start_appium_driver(package_name = '', activity_name = '', filename = '', platform_version='', device_name='',ios='', no_reset=False, work_profile=False):
+def start_appium_driver(package_name = '', activity_name = '', filename = '', platform_version='', device_name='',ios='', no_reset=False, work_profile=False, desiredcaps=None):
     ''' Creates appium instance using discovered and provided capabilities '''
     # Does not execute application
     
@@ -529,17 +548,21 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
                 return 'failed',launch_app
 
             # Create Appium driver
-    
             # Setup capabilities
             desired_caps = {}
-            desired_caps['platformName'] = appium_details[device_id]['type'] # Set platform name
-            desired_caps['autoLaunch'] = 'false' # Do not launch application
-            desired_caps['fullReset'] = 'false' # Do not clear application cache when complete
-            desired_caps['noReset'] = 'true' # Do not clear application cache when complete
-            desired_caps['newCommandTimeout'] = 600 # Command timeout before appium destroys instance
 
-            
+            # Include the user provided desired capabilities
+            desired_caps.update(desiredcaps)
+    
+
+
             if str(appium_details[device_id]['type']).lower() == 'android':
+
+                desired_caps['platformName'] = appium_details[device_id]['type'] # Set platform name
+                desired_caps['autoLaunch'] = 'false' # Do not launch application
+                desired_caps['fullReset'] = 'false' # Do not clear application cache when complete
+                desired_caps['noReset'] = 'true' # Do not clear application cache when complete
+                desired_caps['newCommandTimeout'] = 6000 # Command timeout before appium destroys instance
                 if adbOptions.is_android_connected(device_serial) == False:
                     CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
                     return 'failed',launch_app
@@ -576,7 +599,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
                     app = os.path.join(app, ios)
                     encoding = 'utf-8'
                     bundle_id = str(subprocess.check_output(['osascript', '-e', 'id of app "%s"'%str(app)]), encoding=encoding).strip()
-                    desired_caps = {}
+                    #desired_caps = {}
                     desired_caps['app'] = app  # Use set_value() for writing to element
                     desired_caps['platformName'] = 'iOS'  # Read version #!!! Temporarily hard coded
                     desired_caps['platformVersion'] = platform_version
@@ -596,7 +619,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
             else:
                 CommonUtil.ExecLog(sModuleInfo, "Invalid device type: %s" % str(appium_details[device_id]['type']), 3)
                 return 'failed',launch_app
-            CommonUtil.ExecLog(sModuleInfo,"Capabilities: %s" % str(desired_caps), 0)
+            CommonUtil.ExecLog(sModuleInfo,"Capabilities: %s" % str(desired_caps), 1)
             
             # Create Appium instance with capabilities
             try:
@@ -756,8 +779,8 @@ def reset_application(data_set):
     except Exception:
         errMsg = "Unable to Reset the application."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    
-    
+
+
 def install_application(data_set):
     ''' Install application to device '''
     # adb does the work. Does not require appium instance. User needs to call launch action to create instance
@@ -765,6 +788,10 @@ def install_application(data_set):
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return
     
     # Parse data set
     try:
@@ -814,6 +841,11 @@ def uninstall_application(data_set):
     ''' Uninstalls/removes application from device '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Parse data set
@@ -858,6 +890,10 @@ def Swipe(x_start, y_start, x_end, y_end, duration = 1000, adb = False):
     # duration in mS - how long the gesture should take
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     try:
@@ -876,6 +912,11 @@ def Swipe(x_start, y_start, x_end, y_end, duration = 1000, adb = False):
 
 def swipe_in_direction(data_set):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     try:
         id = ''
         class_name = ''
@@ -943,6 +984,11 @@ def swipe_handler_wrapper(data_set):
 
 def swipe_handler_ios(data_set):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     try:
         direction = ''
         predicateString = ''
@@ -1001,6 +1047,11 @@ def swipe_handler_android(data_set):
     '''
      
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
  
     def Calc_Swipe(w, h, inset, direction, position, exact):
@@ -1175,6 +1226,9 @@ def read_screen_heirarchy():
     ''' Read the XML string of the device's GUI and return it '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     try:
@@ -1193,6 +1247,11 @@ def tap_location(data_set):
     # positions: list containing x,y coordinates
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
@@ -1216,6 +1275,11 @@ def get_element_location_by_id(data_set):
     ''' Find and return an element's x,y coordinates '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Parse data set
@@ -1255,6 +1319,9 @@ def get_window_size(read_type = False):
     # Returns a dictionary of width and height
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     try:
@@ -1269,44 +1336,164 @@ def get_window_size(read_type = False):
     
 
 def Click_Element_Appium(data_set):
-    ''' Click on an element '''
+    ''' Execute "click" for an element 
+    
+      if optional parameter is provided for offset, we will take it from the center of the object and % center of the bound
+      
+      Example:
+      below example will offset by 25% to the right off the center of the element.  If we select 100% it will go to the right edge of the bound.  If you want to go left prove -25.
+            
+      x_offset:y_offset             optional parameter           25:0
+    
+    '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    context_switched = False
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     try:
+
+        x_offset = False
+        y_offset = False
+        offset = False
+        
+        for row in data_set:
+            if 'option' in  str(row[1]).lower().strip() and 'x_offset:y_offset' in str(row[0]).lower().strip() :
+                offset = True
+                x_offset = ((str(row[2]).lower().strip()).split(':')[0]).strip()
+                y_offset = ((str(row[2]).lower().strip()).split(':')[1]).strip()
+
         Element = LocateElement.Get_Element(data_set,appium_driver)
+        
         if Element == "failed":
+
             CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
-            return "failed" 
-        else:
-            try:
-               
-                if Element.is_enabled():
+            CommonUtil.ExecLog(sModuleInfo, "Trying to see if there are contexts", 1)
+            
+            context_result = auto_switch_context_and_try('webview')
+            if context_result =='failed':
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                return "failed" 
+            else: 
+                context_switched = True
+            Element = LocateElement.Get_Element(data_set,appium_driver)
+            if Element == "failed":
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                if context_switched == True:
+                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                    context_result = auto_switch_context_and_try('native')
+                return "failed" 
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Found your element with different context", 1)
+
+
+        if Element.is_enabled():
+            if offset == True:
+                try:
+                    CommonUtil.ExecLog(sModuleInfo, "Clicking the element based on offset with appium TouchAction.", 1)
+                    start_loc = Element.location
+                    height_width = Element.size                        
+                    start_x = int ((start_loc)['x'])
+                    start_y = int ((start_loc)['y'])
+                    ele_width = int ((height_width)['width'])
+                    ele_height = int ((height_width)['height'])
+
+                    # calculate center of the elem 
+                    center_x  =  (start_x + (ele_width/2))
+                    center_y  =  (start_y + (ele_height/2))
+                    # we need to divide the width and height by 2 as we are offseting from the center not the full 
+                    total_x_offset = (int(x_offset)/100) * (ele_width/2)
+                    total_y_offset = (int(y_offset)/100) * (ele_height/2)
+                    
+                    x_cord_to_tap = center_x + total_x_offset
+                    y_cord_to_tap = center_y + total_y_offset                            
+                    TouchAction(appium_driver).tap(None, x_cord_to_tap, y_cord_to_tap, 1).perform()
+                    CommonUtil.ExecLog(sModuleInfo, "Tapped on element by offset successfully", 1)                   
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')
+
+                    return "passed"                        
+
+                except:
+                    CommonUtil.TakeScreenShot(sModuleInfo)
+                    CommonUtil.ExecLog(sModuleInfo, "Element is enabled. Unable to tap based on offset.", 3)
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')
+                    
+                    return "failed"        
+
+            else:
+                try:
                     Element.click()
                     CommonUtil.TakeScreenShot(sModuleInfo)
                     CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element with given parameters and values", 1)                        
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')
                     return "passed"
-                else:
-                    CommonUtil.TakeScreenShot(sModuleInfo)
-                    CommonUtil.ExecLog(sModuleInfo, "Element not enabled. Unable to click.", 3)
-                    return "failed"
-            except Exception:
-                errMsg = "Could not select/click your element."
-                return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+        
+                except Exception:
+                    errMsg = "Could not select/click your element."
+
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')                        
+                    return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+
+        else:
+            CommonUtil.TakeScreenShot(sModuleInfo)
+            CommonUtil.ExecLog(sModuleInfo, "Element not enabled. Unable to click.", 3)
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            return "failed"
 
     except Exception:
+        if context_switched == True:
+            CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+            context_result = auto_switch_context_and_try('native')
         errMsg = "Could not find/click your element."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
     
     
 def Tap_Appium(data_set):
-    ''' Execute "Tap" for an element '''
+    ''' Execute "Tap" for an element 
+      if optional parameter is provided for offset, we will take it from the center of the object and % center of the bound
+      
+      Example:
+      below example will offset by 25% to the right off the center of the element.  If we select 100% it will go to the right edge of the bound.  If you want to go left prove -25.
+            
+      x_offset:y_offset             optional parameter           25:0
+    
+    '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     try:
+
+        
+        x_offset = False
+        y_offset = False
+        offset = False
+        
+        for row in data_set:
+            if 'option' in  str(row[1]).lower().strip() and 'x_offset:y_offset' in str(row[0]).lower().strip() :
+                offset = True
+                x_offset = ((str(row[2]).lower().strip()).split(':')[0]).strip()
+                y_offset = ((str(row[2]).lower().strip()).split(':')[1]).strip()
+
         Element = LocateElement.Get_Element(data_set,appium_driver)
         if Element == "failed":
             CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
@@ -1314,10 +1501,47 @@ def Tap_Appium(data_set):
         else:
             try:
                 if Element.is_enabled():
-                    action = TouchAction(appium_driver)
-                    action.tap(Element).perform()
-                    CommonUtil.ExecLog(sModuleInfo, "Tapped on element successfully", 1)                   
-                    return "passed"
+
+                    if offset == True:
+                        try:
+                            CommonUtil.ExecLog(sModuleInfo, "Tapping the element based on offset using TouchAction", 1) 
+                            start_loc = Element.location
+                            height_width = Element.size
+                                                    
+                            start_x = int ((start_loc)['x'])
+                            start_y = int ((start_loc)['y'])
+                            
+                            ele_width = int ((height_width)['width'])
+                            ele_height = int ((height_width)['height'])
+                            
+                            
+                            # calculate center of the elem 
+                            center_x  =  (start_x + (ele_width/2))
+                            center_y  =  (start_y + (ele_height/2))
+                            # we need to divide the width and height by 2 as we are offseting from the center not the full 
+                            total_x_offset = (int(x_offset)/100) * (ele_width/2)
+                            total_y_offset = (int(y_offset)/100) * (ele_height/2)
+                                
+                            x_cord_to_tap = center_x + total_x_offset
+                            y_cord_to_tap = center_y + total_y_offset                            
+                            TouchAction(appium_driver).tap(None, x_cord_to_tap, y_cord_to_tap, 1).perform()
+                            CommonUtil.ExecLog(sModuleInfo, "Tapped on element by offset successfully", 1)                   
+                            return "passed"                        
+                                
+                            
+                            
+                            
+                            
+                        except:
+                            CommonUtil.TakeScreenShot(sModuleInfo)
+                            CommonUtil.ExecLog(sModuleInfo, "Element is enabled. Unable to tap based on offset.", 3)
+                            return "failed"
+                    else:
+                
+                        action = TouchAction(appium_driver)
+                        action.tap(Element).perform()
+                        CommonUtil.ExecLog(sModuleInfo, "Tapped on element successfully", 1)                   
+                        return "passed"
                 else:
                     CommonUtil.TakeScreenShot(sModuleInfo)
                     CommonUtil.ExecLog(sModuleInfo, "Element not enabled. Unable to click.", 3)
@@ -1333,6 +1557,11 @@ def Tap_Appium(data_set):
 def Double_Tap_Appium(data_set):
     #!!!not yet tested or used
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     try:
         Element = LocateElement.Get_Element(data_set,appium_driver)
@@ -1364,6 +1593,11 @@ def Long_Press_Appium(data_set):
     ''' Press and hold an element '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     try:
@@ -1397,6 +1631,12 @@ def Enter_Text_Appium(data_set):
     ''' Write text to an element '''
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    context_switched = False
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
     # Find text from action line
@@ -1415,51 +1655,109 @@ def Enter_Text_Appium(data_set):
     try:
         Element = LocateElement.Get_Element(data_set, appium_driver)
         if Element == "failed":
+            
             CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
-            return "failed"
-        else:
-            try:
-                # Enter text into element
-                # Element.click() # Set focus to textbox
-                # Element.clear() # Remove any text already existing
-
-                if str(appium_details[device_id]['type']).lower() == 'ios':
-                    Element.set_value(text_value)  # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
-            except Exception:
-                errMsg = "Found element, but couldn't write text to it"
-                return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
-
-            # This is wrapped in it's own try block because we sometimes get an error 
-            # from send_keys stating "Parameters were incorrect". However, most devices work only with send_keys
-            try:
-                if str(appium_details[device_id]['type']).lower() != 'ios':
-                    Element.set_value(text_value)   # Enter the user specified text
-                    
-            except Exception:
-                CommonUtil.ExecLog(sModuleInfo, "Found element, but couldn't write text to it. Trying another method",2)
-                '''try:
-                    Element.set_value(text_value) # Enter the user specified text
-                except Exception:
-                    errMsg = "Found element, but couldn't write text to it. Giving up"
-                    return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)'''
-
-            # Complete the action
-            # Do not disable this as a lot of time keyboard blocks out other fields.
-            try:
-                appium_driver.hide_keyboard() # Remove keyboard
+            CommonUtil.ExecLog(sModuleInfo, "Trying to see if there are contexts", 1)
             
-            except Exception:
-                CommonUtil.ExecLog(sModuleInfo, "Unable to hide the keyboard",2)            
-            
-            try:
-                CommonUtil.TakeScreenShot(sModuleInfo)  # Capture screen
+            context_result = auto_switch_context_and_try('webview')
+            if context_result =='failed':
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                return "failed" 
+            else: 
+                context_switched = True
+            Element = LocateElement.Get_Element(data_set,appium_driver)
+            if Element == "failed":
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                if context_switched == True:
+                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                    context_result = auto_switch_context_and_try('native')
+                return "failed" 
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Found your element with different context", 1)
+
+
+
+        try:
+            # Enter text into element
+            # Element.click() # Set focus to textbox
+            # Element.clear() # Remove any text already existing
+
+            if str(appium_details[device_id]['type']).lower() == 'ios':
+                Element.send_keys(text_value)  # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
                 CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
-                return "passed"
-            except Exception:
-                errMsg = "Found element, but couldn't write text to it"
-                return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+                
+                if context_switched == True:
+                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                    context_result = auto_switch_context_and_try('native')
+                
+                return 'passed'
+        
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo, "Found element, but couldn't write text to it using SendKeys method. Trying SetValue method",2)
+            #return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
+        # This is wrapped in it's own try block because we sometimes get an error 
+        # from send_keys stating "Parameters were incorrect". However, most devices work only with send_keys
+        try:
+            if str(appium_details[device_id]['type']).lower() != 'ios':
+                Element.set_value(text_value)   # Enter the user specified text
+                CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
+                if context_switched == True:
+                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                    context_result = auto_switch_context_and_try('native')
+                
+                return 'passed'
+            
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo, "Still could not write text to it. Both SendKeys and Set_value method did not work",3)
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            
+            return "failed"
+
+
+
+        #Enter android text
+        try:
+            if str(appium_details[device_id]['type']).lower() != 'android':
+                Element.set_value(text_value)   # Enter the user specified text
+                CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1) # dont return until hiding keyboard
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo, "Unable to SetValue to text field",3)
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            
+            return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)                         
+        
+        #try to hide keyboard for android
+        # Do not disable this as a lot of time keyboard blocks out other fields.
+        try:      
+            if str(appium_details[device_id]['type']).lower() != 'android':        
+                    appium_driver.hide_keyboard() # Remove keyboard
+                    CommonUtil.ExecLog(sModuleInfo, "Hiding keyboard", 1)
+                    CommonUtil.TakeScreenShot(sModuleInfo)  # Capture screen
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')
+                            
+                    return "passed"                
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo, "Unable to hide the keyboard",2)   
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            
+            
+            return "passed"         
     except Exception:
         errMsg = "Could not find element."
+        if context_switched == True:
+            CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+            context_result = auto_switch_context_and_try('native')
+        
+        
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
 
 
@@ -1467,6 +1765,11 @@ def Pickerwheel_Appium(data_set):
     ''' Write text to a pickerwheel '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Find text from action line
@@ -1491,7 +1794,7 @@ def Pickerwheel_Appium(data_set):
 
             # This is wrapped in it's own try block because we sometimes get an error from send_keys stating "Parameters were incorrect". However, most devices work only with send_keys
             try:
-                Element.send_keys(text_value) # Enter the user specified text
+                Element.set_value(text_value) # Enter the user specified text
             except Exception:
                 CommonUtil.ExecLog(sModuleInfo, "Found element, but couldn't write text to it. Trying another method", 2)
 
@@ -1513,6 +1816,14 @@ def Clear_And_Enter_Text_ADB(data_set, serial=''):
     ''' Enter string via adb'''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+        
+    device_platform = str(appium_driver.capabilities['platformName'].strip().lower())
+    
+    if device_platform != 'android':
+        CommonUtil.ExecLog(sModuleInfo, "Connected device is not Android.  Skipping this as pass.  This action is only for Android ", 2)
+        return "passed"
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Parse data set
@@ -1572,6 +1883,11 @@ def Clear_And_Enter_Text_Appium(data_set):
     ''' Write text to an element '''
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
     # Find text from action line
@@ -1641,6 +1957,14 @@ def Hide_Keyboard(data_set):
      '''
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+        
+    device_platform = str(appium_driver.capabilities['platformName'].strip().lower())
+    
+    if device_platform != 'android':
+        CommonUtil.ExecLog(sModuleInfo, "Connected device is not Android.  Skipping this as pass.  This action is only for Android ", 2)
+        return "passed"
+
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
     try:
@@ -1650,8 +1974,6 @@ def Hide_Keyboard(data_set):
     except Exception:
         errMsg = "Unable to hide your keyboard"
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
-    
-
 
 
 def Android_Keystroke_Key_Mapping(keystroke, hold_key = False):
@@ -1659,6 +1981,9 @@ def Android_Keystroke_Key_Mapping(keystroke, hold_key = False):
     # Keycodes: https://developer.android.com/reference/android/view/KeyEvent.html
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Sanitize input
@@ -1712,8 +2037,11 @@ def Android_Keystroke_Key_Mapping(keystroke, hold_key = False):
     except Exception as e:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+
 def iOS_Keystroke_Key_Mapping(keystroke):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     CommonUtil.ExecLog(sModuleInfo, "IOS key events not yet supported" % keystroke, 3)
@@ -1742,12 +2070,20 @@ def Keystroke_Appium(data_set):
     ''' Send physical or virtual key press or long key press event '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
     # Parse data set
     try:
-        keystroke_type = data_set[0][0].replace(' ', '').lower() # "keypress" or "long press"
-        keystroke_value = data_set[0][2]
+        keystroke_value = ''
+        for row in data_set:
+            if  row[0].strip().lower() == "keypress"  or row[0].strip().lower() == "long press": 
+                keystroke_type = row[0].strip().lower() # "keypress" or "long press"
+                keystroke_value = row[2]
         
         if keystroke_value == '':
             CommonUtil.ExecLog(sModuleInfo,"Could not find keystroke value", 3)
@@ -1792,6 +2128,11 @@ def Validate_Text_Appium(data_set):
     Should be a lot more simple design
     '''
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     data_set = [data_set]
     try:
@@ -1896,6 +2237,7 @@ def Validate_Text_Appium(data_set):
         errMsg = "Could not compare text as requested."
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
 
+
 def get_program_names(search_name):
     ''' Find Package and Activity name based on wildcard match '''
     # Android only
@@ -1904,6 +2246,9 @@ def get_program_names(search_name):
     # Alternative method to obtain activity name: Android-sdk/build-tools/aapt dumb badging program.apk| grep -i activity. This extracts it from the apk directly
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
     
 #     def find_activity(secs):
@@ -2009,12 +2354,18 @@ def get_program_names(search_name):
         result = CommonUtil.Exception_Handler(sys.exc_info())
         return result, ''
 
+
 def device_information(data_set):
     ''' Returns the requested device information '''
     # This is the sequential action interface for much of the adbOptions.py and iosOptions.py, which provides direct device access via their standard comman line tools
     # Note: This function does not require an Appium instance, so it can be called without calling launch_application() first
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
@@ -2121,11 +2472,17 @@ def device_information(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
+
 def set_device_password(data_set):
     ''' Saves the device password to shared variables for use in unlocking the phone '''
     # Caveat: Only allows one password stored at a time
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
@@ -2142,12 +2499,18 @@ def set_device_password(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error when trying to read Field and Value for action")
 
+
 def switch_device(data_set):
     ''' When multiple devices are connected, switches focus to one in particular given the serial number '''
     # Device will be set as default until this function is called again
     # Not needed when only one device is connected
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
@@ -2174,12 +2537,18 @@ def switch_device(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error when trying to read Field and Value for action")
 
+
 def package_information(data_set):
     ''' Performs serveral actions on a package '''
     # Note: Appium doens't have an API that allows us to execute anything we want, so this is the solution
     # Format is package, element parameter, PACKAGE_NAME | COMMAND, action, SHARED_VAR_NAME
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     # Parse data set
@@ -2234,10 +2603,16 @@ def package_information(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to execute mobile program")
 
+
 def minimize_appilcation(data_set):
     ''' Hides the foreground application by pressing the home key '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     try:
@@ -2246,10 +2621,16 @@ def minimize_appilcation(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to minimize application by sending home key press")
 
+
 def maximize_appilcation(data_set):
     ''' Displays the original program that was launched by appium '''
     
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
     try:
@@ -2263,6 +2644,9 @@ def serial_in_devices(serial,devices):
     ''' Displays the original program that was launched by appium '''
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+
+
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
     try:
@@ -2274,10 +2658,163 @@ def serial_in_devices(serial,devices):
         return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error trying to maximize application")
 
 
+def Handle_Mobile_Alert(data_set):
+    #accepts browser alert
+    '''
+    this works for both ios and Android
+    handle alert   appium action     get text = my_variable 
+    handle alert   appium action     send text = my text to send to alert   
+    handle alert   appium action     accept, pass, yes, ok (any of these would work)
+    handle alert   appium action     reject, fail, no, cancel (any of these would work)
+     
+      
+    '''
+    
+    
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    try:
+        choice = None
+        for row in data_set:
+            if  row[0].strip().lower() == "handle alert": 
+                choice = row[2]        
+
+        choice_lower = choice.lower()
+        if choice_lower == 'accept' or choice == 'pass' or choice == 'yes' or choice == 'ok' or  choice == 'allow':
+            try:
+                appium_driver.switch_to_alert().accept()
+                CommonUtil.ExecLog(sModuleInfo, "Mobile alert accepted", 1)
+                return "passed"
+            except Exception:
+                CommonUtil.ExecLog(sModuleInfo, "Mobile alert not found", 2)
+                return "passed"
+        
+        elif choice_lower == 'reject' or choice == 'fail' or choice == 'no' or choice == 'cancel'or  choice == 'dont allow':
+            try:
+                appium_driver.switch_to_alert().dismiss()
+                CommonUtil.ExecLog(sModuleInfo, "Mobile alert rejected", 1)
+                return "passed"
+            except Exception:
+                CommonUtil.ExecLog(sModuleInfo, "Mobile alert not found", 2)
+                return "passed"
+        
+        elif  'get text' in choice:
+            try:
+                alert_text = appium_driver.switch_to_alert().text
+                appium_driver.switch_to_alert().accept()
+                variable_name = (choice.split("="))[1]
+                result = Shared_Resources.Set_Shared_Variables(variable_name, alert_text)
+                if result in failed_tag_list:
+                    CommonUtil.ExecLog(sModuleInfo, "Value of Variable '%s' could not be saved!!!"%variable_name, 3)
+                    return "failed"
+                else:
+                    Shared_Resources.Show_All_Shared_Variables()
+                    return "passed"
+
+            except Exception:
+                CommonUtil.ExecLog(sModuleInfo, "Mobile alert not found.  Unable to collect text", 3)
+                return "failed"
+        
+        elif  'send text' in choice:
+            try:
+                text_to_send = (choice.split("="))[1]
+                appium_driver.switch_to_alert().send_keys(text_to_send)
+                appium_driver.switch_to_alert().accept()
+                return "passed"
+
+            except Exception:
+                CommonUtil.ExecLog(sModuleInfo, "Unable to send text to alert pop up", 3)
+                return "failed"           
+
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Wrong Step Data.  Please review the action help document", 3)
+            return "failed"
+
+    except Exception:
+        ErrorMessage =  "Failed to handle alert"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
+
+
+
+def Switch_Context(data_set):
+    #switches context between native and webview
+    '''
+    this works for both ios and Android
+    switch context   appium action     native
+    or 
+    switch context   appium action     webview  (it will get the first webview)
+    or 
+    switch context    appium action    name_of_context
+
+     
+    '''
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    try:
+        choice = None
+        for row in data_set:
+            if  row[0].strip().lower() == "switch context": 
+                choice = row[2]        
+
+        choice = choice.strip() #dont lower this
+        
+        try:
+            all_contexts = appium_driver.contexts
+            CommonUtil.ExecLog(sModuleInfo, "All available contexts are: %s"%all_contexts, 1)
+            for each in all_contexts:
+                
+                if 'NATIVE_APP' in each and choice =='native':
+                    appium_driver.switch_to.context(each)
+                    current_context = appium_driver.context
+                    CommonUtil.ExecLog(sModuleInfo, "Successfully switched context to: %s"%current_context, 1)
+                    return "passed"
+
+                elif choice =='webview' and 'WEBVIEW' in each:
+                    appium_driver.switch_to.context(each)
+                    current_context = appium_driver.context
+                    CommonUtil.ExecLog(sModuleInfo, "Successfully switched context to: %s"%current_context, 1)
+                    return "passed"
+                    
+                else:
+                    appium_driver.switch_to.context(choice)
+                    current_context = appium_driver.context
+                    CommonUtil.ExecLog(sModuleInfo, "Successfully switched context to: %s"%current_context, 1)
+                    return "passed"
+            CommonUtil.ExecLog(sModuleInfo, "Could not switch to any other context", 3)
+            return "failed" 
+    
+        except Exception:
+            CommonUtil.ExecLog(sModuleInfo, "Unable to switch context requested: %s.  Please view log to see what are all the available contexts"%choice, 3)
+            return "failed"
+  
+
+    except Exception:
+        ErrorMessage =  "Failed to handle alert"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, ErrorMessage)
+
+
+
+
 def if_element_exists(data_set):
     ''' Click on an element '''
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
     CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
 
     try:
@@ -2307,4 +2844,56 @@ def if_element_exists(data_set):
         errMsg = "Could not find your element."
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
 
+def filter_optional_action_and_step_data(data_set, sModuleInfo):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    try:
+        CommonUtil.ExecLog(sModuleInfo, "Checking to see if we need to skip this action based on OS", 1)
+        device_platform = str(appium_driver.capabilities['platformName'].strip().lower())
+        CommonUtil.ExecLog(sModuleInfo, "Currently running with %s"%device_platform, 1)
+        
+        for row in data_set:
+            if  row[0].strip().lower() == "platform": 
+                os_to_run_on = row[2].strip().lower()
+                if device_platform != os_to_run_on:
+                    CommonUtil.ExecLog(sModuleInfo,"[SKIP] This action has been marked as optional and only intended for the platform '%s'" % os_to_run_on,1)
+                    return False
+                else:
+                    return True
+    
+        return True
+    except Exception:
+        CommonUtil.ExecLog(sModuleInfo, "Unable to skip optional action based on OS", 2)
+        return True
 
+def auto_switch_context_and_try(native_web):
+    
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME    
+    try:
+        choice = native_web
+        all_contexts = appium_driver.contexts
+        CommonUtil.ExecLog(sModuleInfo, "All available contexts are: %s"%all_contexts, 1)
+        if len(all_contexts) == 1:
+            CommonUtil.ExecLog(sModuleInfo, "There is only one context", 2)
+            return 'failed'
+            
+        for each in all_contexts:
+            
+            if 'NATIVE_APP' in each and choice =='native':
+                appium_driver.switch_to.context(each)
+                current_context = appium_driver.context
+                CommonUtil.ExecLog(sModuleInfo, "Successfully switched context to: %s"%current_context, 1)
+                return "passed"
+
+            elif choice =='webview' and 'WEBVIEW' in each:
+                appium_driver.switch_to.context(each)
+                current_context = appium_driver.context
+                CommonUtil.ExecLog(sModuleInfo, "Successfully switched context to: %s"%current_context, 1)
+                return "passed"
+
+        CommonUtil.ExecLog(sModuleInfo, "Could not switch to any other context", 2)
+        return "failed"              
+
+
+    except Exception:
+        CommonUtil.ExecLog(sModuleInfo, "Unable to switch context requested: %s.  Please view log to see what are all the available contexts"%choice, 3)
+        return "failed"
