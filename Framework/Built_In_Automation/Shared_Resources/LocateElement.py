@@ -147,13 +147,32 @@ def Get_Element(step_data_set,driver,query_debug=False, wait_enable = True):
                 result = "failed"
             elif query_type == "xpath" and element_query != False:
                 result = _get_xpath_or_css_element(element_query,"xpath",index_number)
-
             elif query_type == "css" and element_query != False:
                 result = _get_xpath_or_css_element(element_query,"css",index_number)
             elif query_type == "unique" and element_query != False:
                 result = _get_xpath_or_css_element(element_query,"unique",index_number)
             else:
                 result = "failed"
+            
+            # if user sends optional option check if element is displayed or not.    We may need to add more
+            # items here such as enabled, visible and such.
+
+            try:
+                if driver_type == 'appium' or driver_type == 'selenium':
+                    is_displayed_value = ''
+                    for row in step_data_set:
+                        if 'option' in  str(row[1]).lower().strip() and 'is_displayed' in str(row[0]).lower().strip() :
+                            is_displayed_value=row[2].strip().lower()
+                            if is_displayed_value == 'true':
+                                display_status = result.is_displayed()
+                                if display_status == False:
+                                    CommonUtil.ExecLog(sModuleInfo, "Element was found, however, it was not displayed or enabled. Returning failed", 2)
+                                    result = "failed"  
+                                    break
+                                else:
+                                    break 
+            except:
+                True
             
             if result not in failed_tag_list:
                 if save_parameter !='': #save element to a variable

@@ -11,6 +11,7 @@ from Framework.Utilities import FileUtilities as FL
 import uuid
 from Framework.Utilities import RequestFormatter
 import subprocess
+from pathlib import Path
 
 
 # For TakeScreenShot()
@@ -36,10 +37,13 @@ colorama_init(autoreset=True)
 MODULE_NAME = inspect.getmodulename(__file__)
 
 # Get file path for temporary config file
-temp_config = os.path.join(os.path.join(FL.get_home_folder(), os.path.join('Desktop', os.path.join('AutomationLog',
-                                                                                                   ConfigModule.get_config_value(
-                                                                                                       'Advanced Options',
-                                                                                                       '_file')))))
+#temp_config = os.path.join(os.path.join(FL.get_home_folder(), os.path.join('Desktop', os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options','_file')))))
+
+
+# temp_config = os.path.join(os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
+temp_config = Path(os.path.join (os.path.realpath(__file__).split("Framework")[0]) / Path('AutomationLog') / Path(ConfigModule.get_config_value('Advanced Options', '_file', Path(os.path.realpath(__file__)).parent.parent / Path('settings.conf'))))
+
+
 
 passed_tag_list = ['Pass', 'pass', 'PASS', 'PASSED', 'Passed', 'passed', 'true', 'TRUE', 'True', '1', 'Success',
                    'success', 'SUCCESS', True]
@@ -247,11 +251,24 @@ def ExecLog(sModuleInfo, sDetails, iLogLevel=1, _local_run="", sStatus="", force
             now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             all_logs[all_logs_count] = {'logid': log_id, 'modulename': sModuleInfo, 'details': sDetails,
                                         'status': status, 'loglevel': iLogLevel, 'tstamp': str(now)}
-            all_logs_count += 1
-            if all_logs_count >= 500:
-                all_logs_list.append(all_logs)
-                all_logs_count = 0
-                all_logs = {}
+            if len(all_logs_list) >= 1:
+                # start logging to the log file instead of logging to the server
+                try:
+                    # filepath = Path(ConfigModule.get_config_value('sectionOne', 'log_folder', temp_config)) / 'execution.log'
+                    filepath = Path(ConfigModule.get_config_value('sectionOne', 'temp_run_file_path', temp_config)) / 'execution.log'
+                    with open(filepath, 'a+') as f:
+                        print("[%s] %s" % (now, current_log_line), file=f)
+                except FileNotFoundError:
+                    pass
+
+            # log warnings and errors
+            if iLogLevel in (2, 3) or len(all_logs_list) < 1:
+                # log to server in case of logs less than 2k
+                all_logs_count += 1
+                if all_logs_count > 2000:
+                    all_logs_list.append(all_logs)
+                    all_logs_count = 0
+                    all_logs = {}
 
 
 def FormatSeconds(sec):
@@ -466,7 +483,12 @@ class MachineInfo():
         :return: returns the local pc name
         """
         try:
-            node_id_file_path = os.path.join(FL.get_home_folder(), os.path.join('Desktop', 'node_id.conf'))
+            #node_id_file_path = os.path.join(FL.get_home_folder(), os.path.join('Desktop', 'node_id.conf'))
+            
+            # node_id_file_path = os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('node_id.conf'))
+            node_id_file_path = Path(os.path.realpath(__file__).split("Framework")[0]) / Path('node_id.conf')
+
+            
             if os.path.isfile(node_id_file_path):
                 unique_id = ConfigModule.get_config_value('UniqueID', 'id', node_id_file_path)
                 if unique_id == '':
@@ -499,7 +521,10 @@ class MachineInfo():
         :return: returns the local pc unique ID
         """
         try:
-            node_id_file_path = os.path.join(FL.get_home_folder(), os.path.join('Desktop', 'node_id.conf'))
+            #node_id_file_path = os.path.join(FL.get_home_folder(), os.path.join('Desktop', 'node_id.conf'))
+            # node_id_file_path = os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('node_id.conf'))
+            node_id_file_path = Path(os.path.realpath(__file__).split("Framework")[0]) / Path('node_id.conf')
+
             if os.path.isfile(node_id_file_path):
                 unique_id = ConfigModule.get_config_value('UniqueID', 'id', node_id_file_path)
                 if unique_id == '':

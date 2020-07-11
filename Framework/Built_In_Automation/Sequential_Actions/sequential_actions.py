@@ -119,6 +119,11 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     239: {'module': 'appium', 'screenshot':'mobile', 'name': 'hide keyboard', 'function': 'Hide_Keyboard'},
     240: {'module': 'appium', 'screenshot':'mobile', 'name': 'handle alert', 'function': 'Handle_Mobile_Alert'},
     241: {'module': 'appium', 'screenshot':'mobile', 'name': 'switch context', 'function': 'Switch_Context'},
+    242: {'module': 'appium', 'screenshot':'mobile', 'name': 'clear media', 'function': 'clear_existing_media_ios'},
+    243: {'module': 'appium', 'screenshot':'mobile', 'name': 'add media', 'function': 'add_media_ios'},
+    244: {'module': 'appium', 'screenshot':'mobile', 'name': 'take screenshot mobile', 'function': 'take_screenshot_appium'},
+    245: {'module': 'appium', 'screenshot':'mobile', 'name': 'save attribute', 'function': 'Save_Attribute'},
+    246: {'module': 'appium', 'screenshot':'mobile', 'name': 'go to webpage', 'function': 'go_to_webpage'},
 
     300: {'module': 'rest', 'screenshot':'none', 'name': 'save response', 'function': 'Get_Response_Wrapper'},
     301: {'module': 'rest', 'screenshot':'none', 'name': 'search response', 'function': 'Search_Response'},
@@ -169,7 +174,8 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     441: {'module': 'selenium', 'screenshot':'web', 'name': 'switch window', 'function': 'switch_window'},
     442: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute', 'function': 'Save_Attribute'},
     443: {'module': 'selenium', 'screenshot':'web', 'name': 'save attribute values in list', 'function': 'save_attribute_values_in_list'},
-
+    444: {'module': 'selenium', 'screenshot':'web', 'name': 'take screenshot web', 'function': 'take_screenshot_selenium'},
+    445: {'module': 'selenium', 'screenshot':'web', 'name': 'mouse click', 'function': 'Mouse_Click_Element'},
 
     500: {'module': 'utility', 'screenshot':'none', 'name': 'math', 'function': 'Calculate'},
     501: {'module': 'utility', 'screenshot':'none', 'name': 'upload', 'function': 'Upload'},
@@ -206,6 +212,7 @@ actions = { # Numbers are arbitrary, and are not used anywhere
     533: {'module': 'utility', 'screenshot':'none', 'name': 'get attachment path', 'function': 'Get_Attachment_Path'},
     534: {'module': 'utility', 'screenshot':'none', 'name': 'extract number', 'function': 'extract_number'},
     535: {'module': 'utility', 'screenshot':'none', 'name': 'convert date format', 'function': 'convert_date_format'},
+    536: {'module': 'utility', 'screenshot':'none', 'name': 'compare images', 'function': 'compare_images'},
 
 
 
@@ -474,13 +481,22 @@ def Handle_Conditional_Action(step_data, data_set_no):
         if data_set in failed_tag_list:
             return 'failed'
 
-        for row in data_set:
-            condition = str(row[0]).strip().lower()
-            if condition.count("true") == 2 or condition.count("false") == 2: #Will be positive for the satisfying condition true == true or false == false
-                next_level_step_data = get_data_set_nums(str(row[2]).strip())
-                skip+=next_level_step_data
-            else:
-                skip+=get_data_set_nums(str(row[2]).strip())
+        for left, _, right in data_set:
+            # Verify that the row we're executing contains the 'if' and '==' tokens.
+            if 'if' in left.lower() and '==' in left:
+                # if left_value == right_value
+                condition = left.strip().split("==")
+                # lvalue = left_value
+                lvalue = condition[0].strip().split()[1]
+                # rvalue = right_value
+                rvalue = condition[1].strip()
+
+                # If both side matches
+                if lvalue == rvalue:
+                    next_level_step_data = get_data_set_nums(str(right).strip())
+                    skip += next_level_step_data
+                else:
+                    skip += get_data_set_nums(str(right).strip())
 
         if next_level_step_data == []:
             CommonUtil.ExecLog(sModuleInfo, "Conditional action step data is invalid, please see action help for more info", 3)
@@ -629,7 +645,7 @@ def Run_Sequential_Actions(data_set_list=None, debug_actions=None): #data_set_no
                 # If middle column = conditional action, evaluate data set
                 elif "conditional action" in action_name or "if else" in action_name:
                     if action_name.lower().strip() != 'conditional action' and action_name.lower().strip() != 'if else': #old style conditional action
-                        CommonUtil.ExecLog(sModuleInfo,"Old style conditional action found", 1)
+                        # CommonUtil.ExecLog(sModuleInfo,"Old style conditional action found", 1)
                         CommonUtil.ExecLog(sModuleInfo, "Checking the logical conditional action to be performed in the conditional action row: %s" % str(row), 0)
                         logic_row.append(row) # Keep track of the conditional action row, so we can access it later
                         [skip_tmp.append(int(x) - 1) for x in row[2].replace(' ', '').split(',')] # Add the processed data sets, executed by the conditional action to the skip list, so we can process the rest of the data sets (do this for both conditional actions)
@@ -657,7 +673,7 @@ def Run_Sequential_Actions(data_set_list=None, debug_actions=None): #data_set_no
                 # Simulate a while/for loop with the specified data sets
                 elif 'loop action' in action_name:
                     if action_name.lower().strip() not in ('while loop action','for loop action'): #old style loop action
-                        CommonUtil.ExecLog(sModuleInfo,"Old style loop action found. This will not be supported in 2020, please replace them with new loop actions",2)
+                        # CommonUtil.ExecLog(sModuleInfo,"Old style loop action found. This will not be supported in 2020, please replace them with new loop actions",2)
                         result, skip_for_loop = Loop_Action_Handler(data_set, row, dataset_cnt)
                         skip = skip_for_loop
                         
@@ -1303,7 +1319,7 @@ def Action_Handler(_data_set, action_row):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
 
-    skip_conversion_of_shared_variable_for_actions = ['if element exists','run actions','loop settings']
+    skip_conversion_of_shared_variable_for_actions = ['run actions','loop settings']
 
     # Split data set row into the usable parts
     action_name = action_row[0]

@@ -42,6 +42,8 @@ from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, ski
 
 MODULE_NAME = inspect.getmodulename(__file__)
 
+temp_config = os.path.join(os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
+
 global WebDriver_Wait
 WebDriver_Wait = 20
 global WebDriver_Wait_Short
@@ -272,16 +274,16 @@ def Handle_Browser_Alert(step_data):
                 CommonUtil.ExecLog(sModuleInfo, "Browser alert accepted", 1)
                 return "passed"
             except NoAlertPresentException as e:
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 2)
-                return "passed"
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 3)
+                return "failed"
         elif choice_lower == 'reject' or choice == 'fail' or choice == 'no' or choice == 'cancel':
             try:
                 selenium_driver.switch_to_alert().dismiss()
                 CommonUtil.ExecLog(sModuleInfo, "Browser alert rejected", 1)
                 return "passed"
             except NoAlertPresentException as e:
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 2)
-                return "passed"
+                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 3)
+                return "failed"
         
         elif  'get text' in choice:
             try:
@@ -324,6 +326,61 @@ def Handle_Browser_Alert(step_data):
 def Initialize_List(data_set):
     ''' Temporary wrapper until we can convert everything to use just data_set and not need the extra [] '''
     return Shared_Resources.Initialize_List([data_set])
+
+
+def save_screenshot(driver, path):
+    """
+    Take the screenshot of the whole web page
+    :param driver: selenium driver
+    :param path: where to save the screenshot
+    :return: None
+    """
+    # Ref: https://stackoverflow.com/a/52572919
+    import time
+    original_size = driver.get_window_size()
+    required_width = driver.execute_script('return document.body.parentNode.scrollWidth')
+    required_height = driver.execute_script('return document.body.parentNode.scrollHeight')
+    driver.set_window_size(required_width, required_height)
+    time.sleep(2)
+    # driver.save_screenshot(path)  # has scrollbar
+    driver.find_element_by_tag_name('body').screenshot(path)  # avoids scrollbar
+    time.sleep(2)
+    driver.set_window_size(original_size['width'], original_size['height'])
+
+
+def take_screenshot_selenium(data_set):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
+
+    from pathlib import Path
+    import time
+
+    try:
+        filename_format = "%Y_%m_%d_%H-%M-%S"
+        fullscreen = False
+
+        for left, mid, right in data_set:
+            if 'take screenshot web' in left:
+                if "default" not in right:
+                    filename_format = right.strip()
+            if 'fullscreen' in left:
+                fullscreen = right.lower().strip() == 'true'
+
+        screenshot_folder = ConfigModule.get_config_value('sectionOne', 'screen_capture_folder', temp_config)
+        filename = time.strftime(filename_format) + ".png"
+        screenshot_path = str(Path(screenshot_folder) / Path(filename))
+
+        if fullscreen:
+            save_screenshot(selenium_driver, screenshot_path)
+        else:
+            selenium_driver.save_screenshot(screenshot_path)
+
+        # Save the screenshot's name into a variable
+        Shared_Resources.Set_Shared_Variables("zeuz_screenshot", filename)
+    except Exception:
+        errMsg = "Failed to take screenshot"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
 
 #Method to enter texts in a text box; step data passed on by the user
 def Enter_Text_In_Text_Box(step_data):
@@ -500,6 +557,55 @@ def Click_Element(data_set):
             return 'passed'
         except Exception:
             return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error clicking location")
+
+
+
+def Mouse_Click_Element(data_set):
+    ''' 
+    This funciton will move the mouse to the element and then perform a physical mouse click 
+    
+    element_prop        element parameter          element_value
+    mouse click        selenium action            click
+    
+    
+    
+    '''
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo, "Function start", 0)
+    global selenium_driver
+    # Click using elemen
+    CommonUtil.ExecLog(sModuleInfo, "Looking for element", 0)
+    # Get element object
+    Element = LocateElement.Get_Element(data_set,selenium_driver)
+    if Element in failed_tag_list:
+        CommonUtil.ExecLog(sModuleInfo, "Could not find element", 3)
+        return 'failed'
+    # Get element location
+
+    # Get element size
+    try:
+        size_ele = Element.size # Retreive the dictionary containing the x,y location coordinates
+        if size_ele in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Could not get element location", 3)
+            return 'failed'
+        #Find center of the element. We will use offset 
+        width = (size_ele['width'])/2
+        height = (size_ele['height'])/2
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, "Error retrieving element location")
+    try:
+        actions = ActionChains(selenium_driver)
+        actions.move_to_element_with_offset(Element, width, height).click().perform() 
+        CommonUtil.TakeScreenShot(sModuleInfo) # Capture screenshot, if settings allow for it\        
+        CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element", 1)
+        return "passed"
+    except Exception:
+
+        errMsg = "Could not select/click your element."
+        return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
+    
+      
+
         
 
 
@@ -1861,31 +1967,21 @@ def if_element_exists(data_set):
     global selenium_driver
     try:
         variable_name = ''
-        boolean = 'true'
-        for row in data_set:
-            if str(row[1]) == 'action':
-                splitted = str(row[2]).split("=")
-                if len(splitted) < 2:
-                    CommonUtil.ExecLog(sModuleInfo,
-                                       "Data should be like variable_name=boolean (for example: abc=True, Here abc is the variable name and True is the boolean value)",
-                                       3)
-                    return "failed"
-                variable_name = str(splitted[0]).strip()
-                variable_name = variable_name.split('%|')[1].split('|%')[0]
-                boolean = str(splitted[1]).strip().lower()
+        value = ''
 
-        if variable_name == '':
-            CommonUtil.ExecLog(sModuleInfo,
-                               "Data should be like variable_name=boolean (for example: abc=True, Here abc is the variable name and True is the boolean value)",
-                               3)
-            return "failed"
+        for left, mid, right in data_set:
+            if 'action' in mid:
+                value, variable_name = right.split('=')
+                value = value.strip()
+                variable_name = variable_name.strip()
 
         Element = LocateElement.Get_Element(data_set, selenium_driver)
         if Element in failed_tag_list:
-            Shared_Resources.Set_Shared_Variables(variable_name, str(not boolean))
+            Shared_Resources.Set_Shared_Variables(variable_name, "false")
         else:
-            Shared_Resources.Set_Shared_Variables(variable_name, str(boolean))
+            Shared_Resources.Set_Shared_Variables(variable_name, value)
         return "passed"
     except Exception:
-        errMsg = "Could not find your element."
+        errMsg = "Failed to parse data/locate element. Data format: variableName = value"
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+

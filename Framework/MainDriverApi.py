@@ -1365,10 +1365,12 @@ def main(device_dict):
     CommonUtil.ExecLog(sModuleInfo, "MainDriver is starting", 4, False)
 
     # get temp file
-    temp_ini_file = os.path.join(os.path.join(FL.get_home_folder(), os.path.join('Desktop',
-                                                                                 os.path.join('AutomationLog',
-                                                                                              ConfigModule.get_config_value(
-                                                                                                  'Advanced Options', '_file')))))
+    #temp_ini_file = os.path.join(os.path.join(FL.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file')))))
+    
+
+    temp_ini_file = os.path.join(os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
+
+
 
     # add temp file to config values
     ConfigModule.add_config_value(
@@ -1376,20 +1378,6 @@ def main(device_dict):
 
     # get local machine user id
     Userid = (CommonUtil.MachineInfo().getLocalUser()).lower()
-
-    # get run definition config value
-    send_log_file_only_for_fail = ConfigModule.get_config_value(
-        'RunDefinition', 'upload_log_file_only_for_fail')
-
-    # check whether to send log file only for fail
-    if send_log_file_only_for_fail == "" or send_log_file_only_for_fail == None:
-        send_log_file_only_for_fail = True
-    elif send_log_file_only_for_fail.lower() == 'true':
-        send_log_file_only_for_fail = True
-    elif send_log_file_only_for_fail.lower() == 'false':
-        send_log_file_only_for_fail = False
-    else:
-        send_log_file_only_for_fail = True
 
     # check user permission to run test
     user_permission = check_user_permission_to_run_test(sModuleInfo, Userid)
@@ -1456,6 +1444,20 @@ def main(device_dict):
         # get all remote config
         rem_config = get_all_remote_config(run_id)
         ConfigModule.remote_config = rem_config
+
+        # get run definition config value
+        send_log_file_only_for_fail = ConfigModule.get_config_value(
+            'RunDefinition', 'upload_log_file_only_for_fail')
+
+        # check whether to send log file only for fail
+        if send_log_file_only_for_fail == "" or send_log_file_only_for_fail == None:
+            send_log_file_only_for_fail = True
+        elif send_log_file_only_for_fail.lower() == 'true':
+            send_log_file_only_for_fail = True
+        elif send_log_file_only_for_fail.lower() == 'false':
+            send_log_file_only_for_fail = False
+        else:
+            send_log_file_only_for_fail = True
 
         # add log
         if len(TestCaseLists) > 0:

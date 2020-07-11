@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # -*- coding: cp1252 -*-
 
-import os, sys, time, os.path, base64, signal, subprocess
+import os, sys, time, os.path, base64, signal
 from getpass import getpass
-from base64 import b64encode, b64decode
 
+from Framework.module_installer import install_missing_modules
 from utils import input_with_timeout, TimeoutExpired
 
 # Append correct paths so that it can find the configuration files and other modules
@@ -14,40 +14,9 @@ os.chdir(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Framework'))
 
 from Framework.Utilities import ConfigModule, RequestFormatter, CommonUtil, FileUtilities, All_Device_Info
 from Framework import MainDriverApi
-from concurrent.futures import ThreadPoolExecutor
+
 sys.path.append("..")
-def install_missing_modules(req_file_path=True):
-    '''
-    Purpose: This function will check all the installed modules, compare with what is in requirements.txt file 
-    If anything is missing from requirements.txt file, it will install them only
-    '''
-    try:
-        #get all the pip modules that are installed
-        #getting all pip from requirements.txt file
-        if req_file_path == True:
-            req_file_path = os.path.dirname(os.path.realpath(__file__)).replace(os.sep + 'Framework', '')+os.sep + 'requirements.txt'
-        with open(req_file_path) as fd:
-            req_list = fd.read().splitlines()
-        #get all the modules installed from freeze
-        try:
-            from pip._internal.operations import freeze
-        except ImportError:  # pip < 10.0
-            from pip.operations import freeze
-        freeze_list = freeze.freeze()
-        alredy_installed_list = []
-        for p in freeze_list:
-            alredy_installed_list.append(str (p.split("==")[0]))
-        #installing any missing modules
-        for each in req_list:
-            if each not in alredy_installed_list:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", each])        
-        return True
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
-        print (Error_Detail)
-        return True
+
 
 def signal_handler(sig, frame):
     print("Disconnecting from server...")
@@ -127,8 +96,15 @@ device_dict = {}
 
 processing_test_case = False # Used by Zeuz Node GUI to check if we are in the middle of a run
 exit_script = False # Used by Zeuz Node GUI to exit script
-if not os.path.exists(os.path.join(FileUtilities.get_home_folder(), 'Desktop',os.path.join('AutomationLog'))): os.mkdir(os.path.join(FileUtilities.get_home_folder(), 'Desktop',os.path.join('AutomationLog')))
-temp_ini_file = os.path.join(os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file')))))
+
+if not os.path.exists(os.path.join (os.path.realpath(__file__).split("node_cli.py")[0] , os.path.join ('AutomationLog'))): os.mkdir(os.path.join (os.path.realpath(__file__).split("node_cli.py")[0] , os.path.join ('AutomationLog')))
+
+
+
+#temp_ini_file = os.path.join(os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file')))))
+
+temp_ini_file =os.path.join(os.path.join (os.path.realpath(__file__).split("node_cli.py")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
+
 
 
 def zeuz_authentication_prompts_for_cli():
@@ -148,7 +124,7 @@ def zeuz_authentication_prompts_for_cli():
 
 
 def Login(cli=False):
-    # install_missing_modules(req_file_path=True)
+    install_missing_modules()
     username=ConfigModule.get_config_value(AUTHENTICATION_TAG,USERNAME_TAG)
     password = ConfigModule.get_config_value(AUTHENTICATION_TAG,PASSWORD_TAG)
     server_name = ConfigModule.get_config_value(AUTHENTICATION_TAG,"server_address")
@@ -261,8 +237,8 @@ def RunProcess(sTesterid):
             if exit_script: return False
             if time.time() > etime: return True # Timeout reached, re-login. We do this because after about 3-4 hours this function will hang, and thus not be available for deployment
 
-            r=RequestFormatter.Get('is_run_submitted_api',{'machine_name':sTesterid})
-            if 'run_submit' in r and r['run_submit']:
+            r = RequestFormatter.Get('is_run_submitted_api',{'machine_name':sTesterid})
+            if r and 'run_submit' in r and r['run_submit']:
                 processing_test_case = True
                 CommonUtil.ExecLog('', "**************************\n* STARTING NEW TEST CASE *\n**************************", 4, False)
                 PreProcess()
@@ -274,7 +250,7 @@ def RunProcess(sTesterid):
                 CommonUtil.ExecLog('', "Successfully updated db with parameter", 4, False)
             else:
                 time.sleep(3)
-                if 'update' in r and r['update']:
+                if r and 'update' in r and r['update']:
                     _r=RequestFormatter.Get('update_machine_with_time_api',{'machine_name':sTesterid})
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -283,8 +259,12 @@ def RunProcess(sTesterid):
             CommonUtil.ExecLog('', Error_Detail, 4, False)
             break # Exit back to login() - In some circumstances, this while loop will get into a state when certain errors occur, where nothing runs, but loops forever. This stops that from happening 
     return True
+
+
 def PreProcess():
-    current_path = os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop', 'AutomationLog'))
+    #current_path = os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop', 'AutomationLog'))
+    current_path = os.path.join (os.path.realpath(__file__).split("node_cli.py")[0] , os.path.join ('AutomationLog'))
+    
     retVal = FileUtilities.CreateFolder(current_path, forced=False)
     if retVal:
         # now save it in the global_config.ini
@@ -430,7 +410,7 @@ def get_project_names(team):
     ''' Retrieve projects for given team '''
     
     try:
-        username=ConfigModule.get_config_value(AUTHENTICATION_TAG,USERNAME_TAG)
+        username = ConfigModule.get_config_value(AUTHENTICATION_TAG,USERNAME_TAG)
         password = ConfigModule.get_config_value(AUTHENTICATION_TAG, PASSWORD_TAG)
 
 

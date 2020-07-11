@@ -8,12 +8,14 @@ import webbrowser
 # Import colorama for console color support
 from colorama import init as colorama_init
 from colorama import Fore
+from pathlib import Path
+
+from Framework.module_installer import install_missing_modules
 
 # Initialize colorama for the current platform
 from utils import MyDialogBox
 
 colorama_init(autoreset=True)
-
 
 
 def detect_admin():
@@ -35,39 +37,7 @@ def pass_encode(key, clear):
         enc.append(enc_c)
     return base64.urlsafe_b64encode(bytes(enc))
 
-def install_missing_modules(req_file_path=True):
-    '''
-    Purpose: This function will check all the installed modules, compare with what is in requirements.txt file 
-    If anything is missing from requirements.txt file, it will install them only
-    '''
-    try:
-        #get all the pip modules that are installed
-        #getting all pip from requirements.txt file
-        if req_file_path == True:
-            req_file_path = os.path.dirname(os.path.abspath(__file__))+os.sep + 'requirements.txt'
-        with open(req_file_path) as fd:
-            req_list = fd.read().splitlines()
-        #get all the modules installed from freeze
-        try:
-            from pip._internal.operations import freeze
-        except ImportError:  # pip < 10.0
-            from pip.operations import freeze
-        freeze_list = freeze.freeze()
-        alredy_installed_list = []
-        for p in freeze_list:
-            alredy_installed_list.append(str (p.split("==")[0]))
-        #installing any missing modules
-        for each in req_list:
-            if each not in alredy_installed_list:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", each])        
-        return True
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Error_Detail = ((str(exc_type).replace("type ", "Error Type: ")) + ";" +  "Error Message: " + str(exc_obj) +";" + "File Name: " + fname + ";" + "Line: "+ str(exc_tb.tb_lineno))
-        print (Error_Detail)
-        return True
-        
+
 # Have user install Tk if this fails - we try to do it for them first
 try:
     import tkinter as tk # http://infohost.nmt.edu/tcc/help/pubs/tkinter/tkinter.pdf
@@ -106,15 +76,12 @@ except:
 
 import tkinter.messagebox
 os.chdir(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Framework')) # Move to Framework directory, so all modules can be seen
-# install_missing_modules(req_file_path=True)
+install_missing_modules()
 from Framework.Utilities import ConfigModule, FileUtilities, self_updater # Modifing settings files
 from node_cli import Login, disconnect_from_server, get_team_names, get_project_names, check_server_online, processing_test_case # Controlling node status and logging in
 
 # Find node id file
-if sys.platform  == 'win32':
-    node_id_filename = os.path.join(os.getenv('USERPROFILE'), 'Desktop', 'node_id.conf')
-else:
-    node_id_filename = os.path.join(os.getenv('HOME'), 'Desktop', 'node_id.conf')
+node_id_filename = Path(os.getcwd()).parent / Path('node_id.conf')
 
 # Set title with version
 version_path = os.path.join(os.getcwd(), 'Version.txt')
@@ -345,7 +312,7 @@ class Application(tk.Frame):
             if check:
                 print('Checking last update time')
                 # Read from temp config last time we checked for updates. If over maximum time, check again
-                temp_ini_file = os.path.join(os.path.join(FileUtilities.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file')))))
+                temp_ini_file = os.path.join(os.path.join (os.path.realpath(__file__).split("node_gui.py")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
                 try:
                     last_update = ConfigModule.get_config_value('sectionOne', 'last_update', temp_ini_file)
                     update_interval = self.update_interval * 3600 # Convert interval into seconds for easy comparison

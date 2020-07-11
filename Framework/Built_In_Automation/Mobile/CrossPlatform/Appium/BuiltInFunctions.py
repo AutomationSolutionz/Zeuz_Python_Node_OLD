@@ -12,17 +12,20 @@
 #########################
 
 from appium import webdriver
-import os, sys, time, inspect, subprocess, re, signal, _thread, requests
+import traceback
+import os, sys, datetime, time, inspect, subprocess, re, signal, _thread, requests
 from Framework.Utilities import CommonUtil
+from Framework.Built_In_Automation.Built_In_Utility.CrossPlatform import BuiltInUtilityFunction as Utility_Functions
 from Framework.Built_In_Automation.Mobile.Android.adb_calls import adbOptions
 from Framework.Built_In_Automation.Mobile.iOS import iosOptions
 from appium.webdriver.common.touch_action import TouchAction
+from Framework.Utilities import ConfigModule
 from Framework.Built_In_Automation.Shared_Resources import BuiltInFunctionSharedResources as Shared_Resources
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list, skipped_tag_list
 from Framework.Built_In_Automation.Shared_Resources import LocateElement
 import psutil
 
-
+temp_config = os.path.join(os.path.join (os.path.realpath(__file__).split("Framework")[0] , os.path.join ('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file'))))
 
 MODULE_NAME = inspect.getmodulename(__file__)
 
@@ -507,7 +510,7 @@ def start_appium_server():
                     env = {"PATH": str(appium_binary_path)}
                     appium_server = subprocess.Popen(subprocess.Popen('%s --allow-insecure chromedriver_autodownload -p %s'%(appium_binary, str(appium_port)), shell=True), env=env)
                 except:
-                    CommonUtil.ExecLog(sModuleInfo,"Couldn't launch appium server, please do it manually ny typing 'appium &' in the terminal",2)
+                    CommonUtil.ExecLog(sModuleInfo,"Couldn't launch appium server, please do it manually by typing 'appium &' in the terminal",2)
                     pass
             appium_details[device_id]['server'] = appium_server # Save the server object for teardown
         except Exception as returncode: # Couldn't run server
@@ -563,6 +566,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
                 desired_caps['fullReset'] = 'false' # Do not clear application cache when complete
                 desired_caps['noReset'] = 'true' # Do not clear application cache when complete
                 desired_caps['newCommandTimeout'] = 6000 # Command timeout before appium destroys instance
+                desired_caps['automationName'] = 'UiAutomator2'
                 if adbOptions.is_android_connected(device_serial) == False:
                     CommonUtil.ExecLog(sModuleInfo, "Could not detect any connected Android devices", 3)
                     return 'failed',launch_app
@@ -588,23 +592,35 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
                 CommonUtil.ExecLog(sModuleInfo,"Setting up with IOS",1)
                 if appium_details[device_id]['imei'] == 'Simulated': #ios simulator
                     launch_app = False #ios simulator so need to launch app again
-                    if Shared_Resources.Test_Shared_Variables('ios_simulator_folder_path'): #if simulator path already exists
-                        app = Shared_Resources.Get_Shared_Variables('ios_simulator_folder_path')
-                        app = os.path.normpath(app)
+                    
+                    if 'browserName' in desired_caps:
+                        # We're trying to launch the Safari browser
+                        # NOTE: Other browsers are not supported by appium on iOS
+                        if 'safariAllowPopups' not in desired_caps:
+                            # Allow popups by default, unless specified by the user
+                            desired_caps['safariAllowPopups'] = True
                     else:
-                        app = os.path.normpath(os.getcwd()+os.sep + os.pardir)
-                        app = os.path.join(app,"iosSimulator")
-                        #saving simulator path for future use
-                        Shared_Resources.Set_Shared_Variables('ios_simulator_folder_path',str(app))
-                    app = os.path.join(app, ios)
-                    encoding = 'utf-8'
-                    bundle_id = str(subprocess.check_output(['osascript', '-e', 'id of app "%s"'%str(app)]), encoding=encoding).strip()
-                    #desired_caps = {}
-                    desired_caps['app'] = app  # Use set_value() for writing to element
+                        # We're trying to launch an application using .app file
+                        if Shared_Resources.Test_Shared_Variables('ios_simulator_folder_path'): #if simulator path already exists
+                            app = Shared_Resources.Get_Shared_Variables('ios_simulator_folder_path')
+                            app = os.path.normpath(app)
+                        else:
+                            app = os.path.normpath(os.getcwd()+os.sep + os.pardir)
+                            app = os.path.join(app,"iosSimulator")
+                            #saving simulator path for future use
+                            Shared_Resources.Set_Shared_Variables('ios_simulator_folder_path',str(app))
+                        
+                        app = os.path.join(app, ios)
+                        encoding = 'utf-8'
+                        bundle_id = str(subprocess.check_output(['osascript', '-e', 'id of app "%s"'%str(app)]), encoding=encoding).strip()
+
+                        desired_caps['app'] = app  # Use set_value() for writing to element
+                        desired_caps['bundleId'] = bundle_id.replace('\\n','')
+
                     desired_caps['platformName'] = 'iOS'  # Read version #!!! Temporarily hard coded
                     desired_caps['platformVersion'] = platform_version
                     desired_caps['deviceName'] = device_name
-                    desired_caps['bundleId'] = bundle_id.replace('\\n','')
+                    desired_caps['automationName'] = 'XCUITest'
                     desired_caps['wdaLocalPort'] = wdaLocalPort
                     desired_caps['udid'] = appium_details[device_id]['serial']
                     desired_caps['newCommandTimeout'] = 6000
@@ -612,7 +628,7 @@ def start_appium_driver(package_name = '', activity_name = '', filename = '', pl
                         desired_caps['noReset'] = 'true'  # Do not clear application cache when complete
                 else: #for real ios device, not developed yet
                     desired_caps['sendKeyStrategy'] = 'setValue' # Use set_value() for writing to element
-                    desired_caps['platformVersion'] = '10.3' # Read version #!!! Temporarily hard coded
+                    desired_caps['platformVersion'] = '13.5' # Read version #!!! Temporarily hard coded
                     desired_caps['deviceName'] = 'iPhone' # Read model (only needs to be unique if using more than one)
                     desired_caps['bundleId'] = ios
                     desired_caps['udid'] = appium_details[device_id]['serial'] # Device unique identifier - use auto if using only one phone
@@ -1242,6 +1258,110 @@ def read_screen_heirarchy():
         CommonUtil.ExecLog(sModuleInfo,"Read screen heirarchy unsuccessfully",3)
         return False
 
+def clear_existing_media_ios(data_set):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+    #Clears all media (photos and videos) from a booted device
+    
+    try:
+        CommonUtil.ExecLog(sModuleInfo,"Trying to clear media.", 0)
+
+        #get booted device id if not already available
+        deviceid = subprocess.getoutput("xcrun simctl list | grep 'Booted' | awk 'match($0, /\(([-0-9A-F]+)\)/) { print substr( $0, RSTART + 1, RLENGTH - 2 )}'")
+    
+        #clear all media from the selected simulator
+        os.system('rm -rf ~/Library/Developer/CoreSimulator/Devices/%s/data/Media/DCIM/'%deviceid)
+        os.system('rm -rf ~/Library/Developer/CoreSimulator/Devices/%s/data/Media/PhotoData/'%deviceid)
+        
+        #Reboot simulator - Required if any new media is to be added afterwards
+        os.system("xcrun simctl shutdown %s" % deviceid)
+        os.system("xcrun simctl boot %s" % deviceid)
+        
+        CommonUtil.ExecLog(sModuleInfo,"Closed the media successfully from simulator.",1)
+        return "passed"
+        
+    except:
+        errMsg = "No device, please ensure a device is booted to clear its media."
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
+def add_media_ios(data_set):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+
+
+    try:
+        media_name = str(data_set[0][2]).strip()
+        #Add image or video to a booted ios simulator
+        os.system("xcrun simctl addmedia booted ~/Desktop/Attachments/%s" %media_name)
+        CommonUtil.ExecLog(sModuleInfo,"Successfully added media to device.", 0)
+        return 'passed'
+    except:
+        errMsg = "Unable to add media to device. Either no device is booted or media name is wrong."
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
+
+def take_screenshot_appium(data_set):
+    """
+    Data set:
+    take screenshot     appium action           filename_format
+
+    The filename of the saved screenshot will be stored in the "zeuz_screenshot"
+    """
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
+    from pathlib import Path
+    import time
+
+    # Parse data set
+    try:
+        # There's only one row
+        left, mid, right = data_set[0]
+
+        filename_format = right
+        if "default" in filename_format:
+            filename_format = "%Y_%m_%d_%H-%M-%S"
+
+        screenshot_folder = ConfigModule.get_config_value('sectionOne', 'screen_capture_folder', temp_config)
+        filename = time.strftime(filename_format) + ".png"
+        screenshot_path = str(Path(screenshot_folder) / Path(filename))
+        appium_driver.save_screenshot(screenshot_path)
+
+        # Save the screenshot's name into a variable
+        Shared_Resources.Set_Shared_Variables("zeuz_screenshot", filename)
+
+        return "passed"
+    except:
+        traceback.print_exc()
+        errMsg = "Unable to parse data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
+
+def go_to_webpage(data_set):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    skip_or_not = filter_optional_action_and_step_data(data_set, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
+    CommonUtil.ExecLog(sModuleInfo, "Function Start", 0)
+
+    # Parse data set
+    try:
+        url = data_set[0][2]
+
+        for _ in range(3):
+            try:
+                appium_driver.get(url)
+                return 'passed'
+            except:
+                CommonUtil.ExecLog(sModuleInfo, "Failed executing go_to_webpage. Retrying...", 2)
+    except Exception:
+        errMsg = "Unable to parse data set"
+        return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
+
 def tap_location(data_set):
     ''' Tap the provided position using x,y cooridnates '''
     # positions: list containing x,y coordinates
@@ -1270,7 +1390,7 @@ def tap_location(data_set):
     except Exception:
         errMsg = "Tapped on location unsuccessfully"
         return CommonUtil.Exception_Handler(sys.exc_info(),None,errMsg)
-    
+
 def get_element_location_by_id(data_set):
     ''' Find and return an element's x,y coordinates '''
     
@@ -1343,7 +1463,7 @@ def Click_Element_Appium(data_set):
       Example:
       below example will offset by 25% to the right off the center of the element.  If we select 100% it will go to the right edge of the bound.  If you want to go left prove -25.
             
-      x_offset:y_offset             optional parameter           25:0
+      x_offset:y_offset             optional option           25:0
     
     '''
     
@@ -1671,26 +1791,53 @@ def Enter_Text_Appium(data_set):
                 if context_switched == True:
                     CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
                     context_result = auto_switch_context_and_try('native')
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
                 return "failed" 
             else:
                 CommonUtil.ExecLog(sModuleInfo, "Found your element with different context", 1)
 
-
+        # Click and clear the text box for both iOS and Android
+        # We found found the element 
+        # sometimes when we click on the element, the element properties may stay same but the 
+        #actual reference may change. So in this case, we will need to search for element again once w
+        # click on the element.
+        try:
+            CommonUtil.ExecLog(sModuleInfo, "Clicking and clearing the text field",1)
+            Element.click() # Set focus to textbox
+            Element = LocateElement.Get_Element(data_set, appium_driver)
+            if Element == "failed":
+                CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
+                CommonUtil.ExecLog(sModuleInfo, "Trying to see if there are contexts", 1)
+                context_result = auto_switch_context_and_try('webview')
+                if context_result =='failed':
+                    CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                    return "failed" 
+                else: 
+                    context_switched = True
+                Element = LocateElement.Get_Element(data_set,appium_driver)
+                if Element == "failed":
+                    CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                    if context_switched == True:
+                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                        context_result = auto_switch_context_and_try('native')
+                    CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with different contexts.", 3)
+                    return "failed" 
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "Found your element with different context", 1)
+            Element.clear() # Remove any text already existing
+        except:
+            #just in case we run into any error, we will still try to proceed
+            CommonUtil.ExecLog(sModuleInfo, "Unable to click and clear the text field",2)
+            True
 
         try:
-            # Enter text into element
-            # Element.click() # Set focus to textbox
-            # Element.clear() # Remove any text already existing
-
-            if str(appium_details[device_id]['type']).lower() == 'ios':
-                Element.send_keys(text_value)  # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
-                CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
-                
-                if context_switched == True:
-                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
-                    context_result = auto_switch_context_and_try('native')
-                
-                return 'passed'
+            #Trying to send text using send keys method
+            Element.send_keys(text_value)  # Work around for IOS issue in Appium v1.6.4 where send_keys() doesn't work
+            CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            return 'passed'
         
         except Exception:
             CommonUtil.ExecLog(sModuleInfo, "Found element, but couldn't write text to it using SendKeys method. Trying SetValue method",2)
@@ -1699,65 +1846,25 @@ def Enter_Text_Appium(data_set):
         # This is wrapped in it's own try block because we sometimes get an error 
         # from send_keys stating "Parameters were incorrect". However, most devices work only with send_keys
         try:
-            if str(appium_details[device_id]['type']).lower() != 'ios':
-                Element.set_value(text_value)   # Enter the user specified text
-                CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
-                if context_switched == True:
-                    CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
-                    context_result = auto_switch_context_and_try('native')
-                
-                return 'passed'
+            Element.set_value(text_value)   # Enter the user specified text
+            CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1)
+            if context_switched == True:
+                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
+                context_result = auto_switch_context_and_try('native')
+            return 'passed'
             
         except Exception:
             CommonUtil.ExecLog(sModuleInfo, "Still could not write text to it. Both SendKeys and Set_value method did not work",3)
             if context_switched == True:
                 CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
                 context_result = auto_switch_context_and_try('native')
-            
-            return "failed"
-
-
-
-        #Enter android text
-        try:
-            if str(appium_details[device_id]['type']).lower() != 'android':
-                Element.set_value(text_value)   # Enter the user specified text
-                CommonUtil.ExecLog(sModuleInfo, "Successfully set the value of to text to: %s" % text_value, 1) # dont return until hiding keyboard
-        except Exception:
-            CommonUtil.ExecLog(sModuleInfo, "Unable to SetValue to text field",3)
-            if context_switched == True:
-                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
-                context_result = auto_switch_context_and_try('native')
-            
-            return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)                         
-        
-        #try to hide keyboard for android
-        # Do not disable this as a lot of time keyboard blocks out other fields.
-        try:      
-            if str(appium_details[device_id]['type']).lower() != 'android':        
-                    appium_driver.hide_keyboard() # Remove keyboard
-                    CommonUtil.ExecLog(sModuleInfo, "Hiding keyboard", 1)
-                    CommonUtil.TakeScreenShot(sModuleInfo)  # Capture screen
-                    if context_switched == True:
-                        CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
-                        context_result = auto_switch_context_and_try('native')
-                            
-                    return "passed"                
-        except Exception:
-            CommonUtil.ExecLog(sModuleInfo, "Unable to hide the keyboard",2)   
-            if context_switched == True:
-                CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
-                context_result = auto_switch_context_and_try('native')
-            
-            
-            return "passed"         
+            return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)   
+     
     except Exception:
         errMsg = "Could not find element."
         if context_switched == True:
             CommonUtil.ExecLog(sModuleInfo, "Context was switched during this action.  Switching back to default Native Context", 1) 
             context_result = auto_switch_context_and_try('native')
-        
-        
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
 
 
@@ -2805,6 +2912,59 @@ def Switch_Context(data_set):
 
 
 
+def Save_Attribute(step_data):
+    #switches context between native and webview
+    '''
+    this works for both ios and Android
+    *** Enter attribute of element that you are trying to locate.  Example, class, ID ****    element parameter     *** Enter the value of the attribute that you are trying to locate. ***
+     *** Attribute name that you are trying to save.  Example "value"***                      save parameter    *** Your variable.  please do not use spaces.  To recall your variable in other action use   %|your_variable|%   ****
+    save attribute                                                                            appium action    save attribute   
+    '''
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    skip_or_not = filter_optional_action_and_step_data(step_data, sModuleInfo)
+    if skip_or_not == False:
+        return 'passed'
+
+    CommonUtil.ExecLog(sModuleInfo,"Function Start", 0)
+    
+
+    try:
+        Element = LocateElement.Get_Element(step_data,appium_driver)
+        if Element == "failed":
+            CommonUtil.ExecLog(sModuleInfo, "Unable to locate your element with given data.", 3)
+            return "failed" 
+        else: 
+            CommonUtil.ExecLog(sModuleInfo, "Target element was found. We will attempt to extract the attribute value that you provided", 1)
+            
+        for each_step_data_item in step_data:
+            if 'save parameter' in each_step_data_item[1]:
+                variable_name = each_step_data_item[2]
+                attribute_name = each_step_data_item[0]  
+                break
+        try:
+            attribute_value = Element.get_attribute(attribute_name)
+        except Exception as supported_attribute:
+            CommonUtil.ExecLog(sModuleInfo, str(supported_attribute) , 3)
+            return CommonUtil.Exception_Handler(sys.exc_info())     
+              
+        CommonUtil.ExecLog(sModuleInfo,"Your attribute %s was found and value is %s"%(attribute_name, attribute_value) , 1)
+        if attribute_value == '':
+            CommonUtil.ExecLog(sModuleInfo, "Unable to save attribute value as it is empty", 3)
+            return "failed"   
+        
+        result = Shared_Resources.Set_Shared_Variables(variable_name, attribute_value)
+        
+        if result in failed_tag_list:
+            CommonUtil.ExecLog(sModuleInfo, "Value of Variable '%s' could not be saved!!!"%variable_name, 3)
+            return "failed"
+        else:
+            Shared_Resources.Show_All_Shared_Variables()
+            CommonUtil.ExecLog(sModuleInfo, "Value of Variable '%s' was saved"%variable_name, 1)
+            return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
 
 def if_element_exists(data_set):
     ''' Click on an element '''
@@ -2819,30 +2979,24 @@ def if_element_exists(data_set):
 
     try:
         variable_name = ''
-        boolean = 'true'
-        for row in data_set:
-            if str(row[1]) == 'action':
-                splitted = str(row[2]).split("=")
-                if len(splitted)<2:
-                    CommonUtil.ExecLog(sModuleInfo,"Data should be like variable_name=boolean (for example: abc=True, Here abc is the variable name and True is the boolean value)",3)
-                    return "failed"
-                variable_name = str(splitted[0]).strip()
-                variable_name = variable_name.split('%|')[1].split('|%')[0]
-                boolean = str(splitted[1]).strip().lower()
+        boolean = ''
 
-        if variable_name == '':
-            CommonUtil.ExecLog(sModuleInfo, "Data should be like variable_name=boolean (for example: abc=True, Here abc is the variable name and True is the boolean value)", 3)
-            return "failed"
+        for left, mid, right in data_set:
+            if 'action' in mid:
+                value, variable_name = right.split('=')
+                value = value.strip()
+                variable_name = variable_name.strip()
 
         Element = LocateElement.Get_Element(data_set, appium_driver)
         if Element in failed_tag_list:
-            Shared_Resources.Set_Shared_Variables(variable_name, str(not boolean))
+            Shared_Resources.Set_Shared_Variables(variable_name, "false")
         else:
-            Shared_Resources.Set_Shared_Variables(variable_name, str(boolean))
+            Shared_Resources.Set_Shared_Variables(variable_name, value)
         return "passed"
     except Exception:
-        errMsg = "Could not find your element."
+        errMsg = "Failed to parse data/locate element. Data format: variableName = value"
         return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
 
 def filter_optional_action_and_step_data(data_set, sModuleInfo):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
