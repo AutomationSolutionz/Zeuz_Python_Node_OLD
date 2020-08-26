@@ -12,32 +12,37 @@ def install_missing_modules():
     If anything is missing from requirements-win.txt file, it will install them only
     """
     try:
-        CommonUtil.ExecLog("module_installer : install_missing_modules",
-                           "Checking for missing modules...", 1, False)
+        print("\nmodule_installer: Checking for missing modules...")
 
         import platform
+
         plt = platform.system().lower()
 
         if "windows" in plt:
-            req_file_name = 'requirements-win.txt'
+            req_file_name = "requirements-win.txt"
         elif "linux" in plt:
-            req_file_name = 'requirements-linux.txt'
+            req_file_name = "requirements-linux.txt"
         elif "darwin" in plt:
-            req_file_name = 'requirements-mac.txt'
+            req_file_name = "requirements-mac.txt"
         else:
             print("Unidentified system")
             return
 
         req_file_path = True
         if req_file_path:
-            req_file_path = os.path.dirname(os.path.realpath(__file__)).replace(os.sep + 'Framework', '')\
-                            + os.sep + req_file_name
+            req_file_path = (
+                os.path.dirname(os.path.realpath(__file__)).replace(
+                    os.sep + "Framework", ""
+                )
+                + os.sep
+                + req_file_name
+            )
 
         req_list = list()
         with open(req_file_path) as fd:
             for i in fd.read().splitlines():
-                if not i.startswith('http'):
-                    req_list.append(i.split('==')[0])
+                if not i.startswith("http"):
+                    req_list.append(i.split("==")[0])
 
         # get all the modules installed from freeze
         try:
@@ -50,7 +55,7 @@ def install_missing_modules():
         alredy_installed_list = []
         for p in freeze_list:
             name = p.split("==")[0]
-            if '@' not in name:
+            if "@" not in name:
                 # '@' symbol appears in some python modules in Windows
                 alredy_installed_list.append(str(name).lower())
 
@@ -59,16 +64,15 @@ def install_missing_modules():
         for each in req_list:
             if each.lower() not in alredy_installed_list:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", each])
-                CommonUtil.ExecLog("module_installer : install_missing_modules",
-                                   "Installed missing module: %s" % each, 1, False)
+                print("module_installer: Installed missing module: %s" % each)
                 installed = True
 
         if installed:
-            CommonUtil.ExecLog("module_installer : install_missing_modules",
-                               "NEW CORE MODULES INSTALLED. YOU'LL NEED TO RESTART ZEUZ NODE...", 3, False)
+            print("module_installer: New modules installed.")
         else:
-            CommonUtil.ExecLog("module_installer : install_missing_modules",
-                               "All required modules are already installed. Continuing...", 1, False)
+            print(
+                "module_installer: All required modules are already installed. Continuing..."
+            )
     except:
         print("Failed to install missing modules...")
         traceback.print_exc()
