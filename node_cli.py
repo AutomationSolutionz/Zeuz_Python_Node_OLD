@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- coding: cp1252 -*-
 
-import os, sys, time, os.path, base64, signal
+import os, sys, time, os.path, base64, signal, argparse
 from pathlib import Path
 from getpass import getpass
 
@@ -38,6 +38,7 @@ from Framework.Utilities import (
     CommonUtil,
     FileUtilities,
     All_Device_Info,
+    self_updater
 )
 from Framework import MainDriverApi
 
@@ -48,6 +49,7 @@ temp_ini_file = (
     / ConfigModule.get_config_value("Advanced Options", "_file")
 )
 
+import subprocess
 
 def signal_handler(sig, frame):
     print("Disconnecting from server...")
@@ -161,6 +163,9 @@ def zeuz_authentication_prompts_for_cli():
         else:
             display_text = prompt.replace("_", " ").capitalize()
             value = input(f"{display_text} : ")
+            if prompt == "server_address":
+                if value[-1] == "/":
+                    value = value[:-1]
             ConfigModule.add_config_value(AUTHENTICATION_TAG, prompt, str(value))
 
 
@@ -169,6 +174,30 @@ def Login(cli=False):
     username = ConfigModule.get_config_value(AUTHENTICATION_TAG, USERNAME_TAG)
     password = ConfigModule.get_config_value(AUTHENTICATION_TAG, PASSWORD_TAG)
     server_name = ConfigModule.get_config_value(AUTHENTICATION_TAG, "server_address")
+    api = ConfigModule.get_config_value(AUTHENTICATION_TAG, "api-key")
+    api_flag = True
+
+    if api:
+        if not server_name:
+            print("Please provide server url with --server")
+            return
+
+        url = '/api/auth/token/verify?api_key=%s' % (api)
+        r = RequestFormatter.Get(url)
+        if r:
+            try:
+                token = r['token']
+                res = RequestFormatter.Get("/api/user", headers={'Authorization': "Bearer %s" % token})
+                info = res[0]
+                username=info['username']
+                api_flag=False
+                ConfigModule.add_config_value(AUTHENTICATION_TAG, "username", username)
+            except:
+                print("Incorrect API key...")
+                return
+        else:
+            print("Failed to get authentication token from server.")
+            return
 
     if password == "YourUserNameGoesHere":
         password = password
@@ -222,8 +251,10 @@ def Login(cli=False):
                     "", f"Authenticating user: {username}", 4, False,
                 )
 
-                r = RequestFormatter.Get("login_api", user_info_object)
-                if r:
+                if api_flag:
+                    r = RequestFormatter.Get("login_api", user_info_object)
+
+                if (isinstance(r,dict) and r['status']==200) or r:
                     CommonUtil.ExecLog(
                         "",
                         f"Authentication successful: USER='{username}', "
@@ -350,7 +381,7 @@ def RunProcess(sTesterid):
                 processing_test_case = True
                 CommonUtil.ExecLog(
                     "",
-                    "**************************\n* STARTING NEW TEST CASE *\n**************************",
+                    "**************************\n*    STARTING SESSION    *\n**************************",
                     4,
                     False,
                 )
@@ -637,14 +668,172 @@ def pass_decode(key, enc):
         dec.append(dec_c)
     return "".join(dec)
 
+def check_for_updates():
+    """Checks for update. If any update is not found the code will continue to login prompts, otherwise it will
+    download the newest version of Zeuz Node, install it and restart/quit the terminal.
+    """
+    try:
+        # Just check for updates, and schedule testing to see if updates checking is complete
+
+        print("Checking for software updates")
+        self_updater.check_for_updates()
+
+        # No update, do nothing, and thus stop checking
+        if self_updater.check_complete in ("check", "noupdate"):
+            print("No software updates available")
+
+        # Update check complete, we have an update, start install
+        elif self_updater.check_complete[0:6] == "update":
+            # Print update notes
+            try:
+                print("\nUpdate notes:")
+                for note in str(self_updater.check_complete[7:]).split(";"):
+                    print(note)
+                print("*** A new update is available. Automatically installing.")
+
+                update_path = os.path.dirname(
+                    os.path.realpath(__file__)
+                ).replace(os.sep + "Framework", "")
+                self_updater.main(update_path)
+            except:
+                print("Couldn't install updates")
+
+            try:
+                print("*** Update installed. Automatically restarting. ***")
+                time.sleep(2)  # Wait a bit, so they can see the message
+                subprocess.Popen(
+                    'python "%s"'
+                    % os.path.realpath(sys.argv[0]).replace(os.sep + "Framework", ""),
+                    shell=True,
+                )  # Restart zeuz node
+                quit()  # Exit this process
+            except:
+                print("Exception in Restart. Please restart manually")
+                time.sleep(2)
+                quit()
+
+        # Some error occurred during updating
+        elif "error" in self_updater.check_complete:
+            print("An error occurred during update")
+
+    except Exception as e:
+        print("Exception in CheckUpdates")
+
+def command_line_args():
+    """
+    This function handles command line scripts with given arguments
+
+    Example 1:
+    1. python node_cli.py
+    2. node_cli.py
+    These 2 scripts will skip all kind of actions in this function because they dont have any arguments and will execute
+    Login(CLI=true) from __main__
+
+    Example 2:
+    1. python node_cli.py --logout
+    2. node_cli.py --logout
+    3. node_cli.py -l
+
+    These 3 scripts will will execute logout from server and then will execute Login(CLI=true) from __main__ then
+    you have to provide server, username, password one by one in the terminal to login
+
+    Example 3:
+    1. python node_cli.py --username USER_NAME --password PASS_XYZ --server https://zeuz.zeuz.ai
+    2. node_cli.py --logout --username USER_NAME --password PASS_XYZ --server https://zeuz.zeuz.ai
+    3. node_cli.py -u USER_NAME -p PASS_XYZ -s https://zeuz.zeuz.ai
+    4. python node_cli.py -k YOUR_API_KEY --server https://zeuz.zeuz.ai
+
+    These 3 scripts will will execute logout from server and then will execute Login(CLI=true) from __main__ but you
+    don't need to provide server, username, password again. It will execute the login process automatically for you
+
+    Example 3:
+    1. python node_cli.py --help
+    2. node_cli.py --help
+    3. node_cli.py -h
+
+    These 3 scripts will show the documentation for every arguments and will execute sys.exit()
+
+    Example 4:
+    1. python node_cli.py --ussssername USER_NAME --password PASS_XYZ --server https://zeuz.zeuz.ai
+    2. node_cli.py --u USER_NAME -p PASS_XYZ -s
+    3. node_cli.py --logout https://zeuz.zeuz.ai
+
+    Above are some invalid arguments which will show some log/documentation and will execute sys.exit()
+    """
+    # try:
+    parser_object = argparse.ArgumentParser("node_cli parser")
+    parser_object.add_argument(
+        "-u", "--username", action="store", help="Enter your username", metavar=""
+    )
+    parser_object.add_argument(
+        "-p", "--password", action="store", help="Enter your password", metavar=""
+    )
+    parser_object.add_argument(
+        "-s", "--server", action="store", help="Enter server address", metavar=""
+    )
+    parser_object.add_argument(
+        "-k", "--api_key", action="store", help="Enter api key", metavar=""
+    )
+    parser_object.add_argument(
+        "-l", "--logout", action="store_true", help="Logout from the server"
+    )
+    parser_object.add_argument(
+        "-a", "--auto_update", action="store_true", help="Updates your Zeuz Node"
+    )
+
+    all_arguments = parser_object.parse_args()
+
+    username = all_arguments.username
+    password = all_arguments.password
+    server = all_arguments.server
+    api=all_arguments.api_key
+    logout = all_arguments.logout
+    auto_update = all_arguments.auto_update
+
+    if server and server[-1] == "/":
+        server = server[:-1]
+
+    if auto_update:
+        check_for_updates()
+    if username or password or server or logout or api:
+        if api and server:
+            ConfigModule.remove_config_value(AUTHENTICATION_TAG, "api-key")
+            ConfigModule.add_config_value(AUTHENTICATION_TAG, "api-key", api)
+            ConfigModule.remove_config_value(AUTHENTICATION_TAG, "server_address")
+            ConfigModule.add_config_value(AUTHENTICATION_TAG, "server_address", server)
+
+
+        elif username and password and server:
+            ConfigModule.remove_config_value(AUTHENTICATION_TAG, "server_address")
+            ConfigModule.add_config_value(AUTHENTICATION_TAG, "username", username)
+            ConfigModule.add_config_value(
+                AUTHENTICATION_TAG, "password", password_hash(False, "zeuz", password)
+            )
+            ConfigModule.add_config_value(AUTHENTICATION_TAG, "server_address", server)
+        elif logout:
+            ConfigModule.remove_config_value(AUTHENTICATION_TAG, "server_address")
+        else:
+            CommonUtil.ExecLog(
+                "AUTHENTICATION FAILED",
+                "Enter the command line arguments in correct format",
+                3,
+            )
+            sys.exit()  # exit and let the user try again from command line
+
+    """argparse module automatically shows exceptions of corresponding wrong arguments
+     and executes sys.exit(). So we don't need to use try except"""
+    # except:
+    #     CommonUtil.ExecLog("\ncommand_line_args : node_cli.py","Did not parse anything from given arguments",4)
+    #     sys.exit()
+
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     print("Press Ctrl-C to disconnect and quit.")
 
-    arg_options = [arg for arg in sys.argv[1:] if arg.startswith("--")]
-
-    if "--logout" in arg_options:
-        ConfigModule.remove_config_value(AUTHENTICATION_TAG, "server_address")
+    """We can use this condition to skip command_line_args() when "python node_cli.py" or "node_cli.py" is executed"""
+    # if (len(sys.argv)) > 1:
+    command_line_args()
 
     Login(cli=True)
+

@@ -14,1394 +14,18 @@
 """
 
 # Dictionary of supported actions and their respective modules
-# Rules: Action NAME must be lower case, no underscores, single spaces, no trailing whitespace. Module names must match those used in load_sa_modules()
-# Common module: These are functions that are common to multiple Built In Functions, which have special handling. See common_functions.py where they are stored for more information
-# Caveat: Modules that are common to more than one built in function are listed here as with the module set to "common". If there is a "common" function, and another module with the same name created here, there may be a conflict, and the wrong function may execute
-actions = {  # Numbers are arbitrary, and are not used anywhere
-    100: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "step result",
-        "function": "step_result",
-    },
-    101: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "sleep",
-        "function": "Sleep",
-    },
-    102: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "wait",
-        "function": "Wait_For_Element",
-    },
-    103: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "wait disable",
-        "function": "Wait_For_Element",
-    },
-    104: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save text",
-        "function": "Save_Text",
-    },
-    105: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "compare variable",
-        "function": "Compare_Variables",
-    },
-    106: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "compare list",
-        "function": "Compare_Lists_or_Dicts",
-    },
-    107: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "compare dictionary",
-        "function": "Compare_Lists_or_Dicts",
-    },
-    108: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save variable",
-        "function": "Save_Variable",
-    },
-    109: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "delete shared variables",
-        "function": "delete_all_shared_variables",
-    },
-    110: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "settings",
-        "function": "sequential_actions_settings",
-    },
-    111: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "step exit",
-        "function": "step_exit",
-    },
-    112: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save time",
-        "function": "Save_Current_Time",
-    },
-    113: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create or append list into list",
-        "function": "insert_list_into_another_list",
-    },
-    114: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create or append dictionary into dictionary",
-        "function": "insert_dict_into_another_dict",
-    },
-    115: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create list",
-        "function": "Initialize_List",
-    },
-    116: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create dictionary",
-        "function": "Initialize_Dict",
-    },
-    117: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create or append list",
-        "function": "append_list_shared_variable",
-    },
-    118: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create or append dictionary",
-        "function": "append_dict_shared_variable",
-    },
-    119: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "set server variable",
-        "function": "set_server_variable",
-    },
-    120: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "get server variable",
-        "function": "get_server_variable",
-    },
-    121: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "get all server variable",
-        "function": "get_all_server_variable",
-    },
-    122: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "start timer",
-        "function": "start_timer",
-    },
-    123: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "wait for timer",
-        "function": "wait_for_timer",
-    },
-    124: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "get server variable and wait",
-        "function": "get_server_variable_and_wait",
-    },
-    125: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "randomize list",
-        "function": "Randomize_List",
-    },
-    126: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "create 3d list",
-        "function": "create_3d_list",
-    },
-    127: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "download ftp file",
-        "function": "download_ftp_file",
-    },
-    128: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "write into single cell in excel",
-        "function": "write_into_single_cell_in_excel",
-    },
-    129: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "run macro in excel",
-        "function": "run_macro_in_excel",
-    },
-    130: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "get excel table",
-        "function": "get_excel_table",
-    },
-    131: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save text from file into variable",
-        "function": "save_text_from_file_into_variable",
-    },
-    132: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "compare partial variable",
-        "function": "Compare_Partial_Variables",
-    },
-    133: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "send mail",
-        "function": "send_mail",
-    },
-    134: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "check latest mail",
-        "function": "check_latest_mail",
-    },
-    135: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save value from dictionary by key",
-        "function": "save_dict_value_by_key",
-    },
-    136: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save key value from dict list",
-        "function": "save_key_value_from_dict_list",
-    },
-    137: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "extract date",
-        "function": "extract_date",
-    },
-    138: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "voice command response",
-        "function": "voice_command_response",
-    },
-    139: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "compare partial variables",
-        "function": "Compare_Partial_Variables",
-    },
-    # Database actions
-    140: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "connect to db",
-        "function": "connect_to_db",
-    },
-    141: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "db: select",
-        "function": "db_select",
-    },
-    142: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "db: select single value",
-        "function": "db_select_single_value",
-    },
-    143: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "db: insert/update/delete",
-        "function": "db_non_query",
-    },
-    # Global Variable Actions
-    144: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "get global list variable",
-        "function": "get_global_list_variable",
-    },
-    145: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "append to global list variable",
-        "function": "append_to_global_list_variable",
-    },
-    146: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "remove item from global list variable",
-        "function": "remove_item_from_global_list_variable",
-    },
-    147: {
-        "module": "common",
-        "screenshot": "none",
-        "name": "save variable by list difference",
-        "function": "save_variable_by_list_difference",
-    },
-    148: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "read from excel",
-        "function": "excel_read",
-    },
-    149: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "split string",
-        "function": "split_string",
-    },
-    150: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "excel comparison",
-        "function": "excel_comparison",
-    },
-    151: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "create/append to list or dictionary",
-        "function": "save_into_variable",
-    },
-    152: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "save into variable",
-        "function": "save_into_variable",
-    },
-    153: {
-        "module": "common",
-        "screenshot": "desktop",
-        "name": "save length",
-        "function": "save_length",
-    },
-    200: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "click",
-        "function": "Click_Element_Appium",
-    },
-    201: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "text",
-        "function": "Enter_Text_Appium",
-    },
-    202: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "tap",
-        "function": "Tap_Appium",
-    },
-    203: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "validate full text",
-        "function": "Validate_Text_Appium",
-    },
-    204: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "validate partial text",
-        "function": "Validate_Text_Appium",
-    },
-    205: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "install",
-        "function": "install_application",
-    },
-    206: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "launch",
-        "function": "launch_application",
-    },
-    207: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "get location",
-        "function": "get_element_location_by_id",
-    },
-    208: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "swipe",
-        "function": "swipe_handler_wrapper",
-    },
-    209: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "close",
-        "function": "close_application",
-    },
-    210: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "uninstall",
-        "function": "uninstall_application",
-    },
-    211: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "teardown",
-        "function": "teardown_appium",
-    },
-    212: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "keypress",
-        "function": "Keystroke_Appium",
-    },
-    213: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "long keypress",
-        "function": "Keystroke_Appium",
-    },
-    214: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "reset",
-        "function": "reset_application",
-    },
-    215: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "imei",
-        "function": "device_information",
-    },
-    216: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "validate screen text",
-        "function": "Validate_Text_Appium",
-    },
-    217: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "model name",
-        "function": "device_information",
-    },
-    218: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "version",
-        "function": "device_information",
-    },
-    219: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "serial no",
-        "function": "device_information",
-    },
-    220: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "storage",
-        "function": "device_information",
-    },
-    221: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "reboot",
-        "function": "device_information",
-    },
-    222: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "phone name",
-        "function": "device_information",
-    },
-    223: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "device password",
-        "function": "set_device_password",
-    },
-    224: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "switch device",
-        "function": "switch_device",
-    },
-    225: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "long press",
-        "function": "Long_Press_Appium",
-    },
-    226: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "tap location",
-        "function": "tap_location",
-    },
-    227: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "wake",
-        "function": "device_information",
-    },
-    228: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "maximize",
-        "function": "maximize_appilcation",
-    },
-    229: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "minimize",
-        "function": "minimize_appilcation",
-    },
-    230: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "package version",
-        "function": "package_information",
-    },
-    231: {
-        "module": "appium",
-        "screenshot": "none",
-        "name": "package installed",
-        "function": "package_information",
-    },
-    232: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "clear and enter text",
-        "function": "Clear_And_Enter_Text_Appium",
-    },
-    233: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "pickerwheel",
-        "function": "Pickerwheel_Appium",
-    },
-    234: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "unlock android device",
-        "function": "unlock_android_device",
-    },
-    235: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "unlock android app",
-        "function": "unlock_android_app",
-    },
-    236: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "swipe in direction",
-        "function": "swipe_in_direction",
-    },
-    237: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "if element exists",
-        "function": "if_element_exists",
-    },
-    238: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "clear and enter text adb",
-        "function": "Clear_And_Enter_Text_ADB",
-    },
-    239: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "hide keyboard",
-        "function": "Hide_Keyboard",
-    },
-    240: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "handle alert",
-        "function": "Handle_Mobile_Alert",
-    },
-    241: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "switch context",
-        "function": "Switch_Context",
-    },
-    242: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "clear media",
-        "function": "clear_existing_media_ios",
-    },
-    243: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "add media",
-        "function": "add_media_ios",
-    },
-    244: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "take screenshot mobile",
-        "function": "take_screenshot_appium",
-    },
-    245: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "save attribute",
-        "function": "Save_Attribute",
-    },
-    246: {
-        "module": "appium",
-        "screenshot": "mobile",
-        "name": "go to webpage",
-        "function": "go_to_webpage",
-    },
-    300: {
-        "module": "rest",
-        "screenshot": "none",
-        "name": "save response",
-        "function": "Get_Response_Wrapper",
-    },
-    301: {
-        "module": "rest",
-        "screenshot": "none",
-        "name": "search response",
-        "function": "Search_Response",
-    },
-    302: {
-        "module": "rest",
-        "screenshot": "none",
-        "name": "save response into list",
-        "function": "Insert_Into_List",
-    },
-    303: {
-        "module": "rest",
-        "screenshot": "none",
-        "name": "save response and cookie",
-        "function": "Get_Response_Wrapper_With_Cookie",
-    },
-    304: {
-        "module": "rest",
-        "screenshot": "none",
-        "name": "save response tuple into list",
-        "function": "Insert_Tuple_Into_List",
-    },
-    401: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "click",
-        "function": "Click_Element",
-    },
-    402: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "click and hold",
-        "function": "Click_and_Hold_Element",
-    },
-    403: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "context click",
-        "function": "Context_Click_Element",
-    },
-    404: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "double click",
-        "function": "Double_Click_Element",
-    },
-    405: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "move to element",
-        "function": "Move_To_Element",
-    },
-    406: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "hover",
-        "function": "Hover_Over_Element",
-    },
-    407: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "keystroke keys",
-        "function": "Keystroke_For_Element",
-    },
-    408: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "keystroke chars",
-        "function": "Keystroke_For_Element",
-    },
-    409: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "text",
-        "function": "Enter_Text_In_Text_Box",
-    },
-    410: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "initialize list",
-        "function": "Initialize_List",
-    },
-    411: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate full text",
-        "function": "Validate_Text",
-    },
-    412: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate partial text",
-        "function": "Validate_Text",
-    },
-    413: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "scroll",
-        "function": "Scroll",
-    },
-    414: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "deselect all",
-        "function": "Select_Deselect",
-    },
-    415: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "select by visible text",
-        "function": "Select_Deselect",
-    },
-    416: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "deselect by visible text",
-        "function": "Select_Deselect",
-    },
-    417: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "select by value",
-        "function": "Select_Deselect",
-    },
-    418: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "deselect by value",
-        "function": "Select_Deselect",
-    },
-    419: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "select by index",
-        "function": "Select_Deselect",
-    },
-    420: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "deselect by index",
-        "function": "Select_Deselect",
-    },
-    421: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "open browser",
-        "function": "Open_Browser_Wrapper",
-    },
-    422: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "go to link",
-        "function": "Go_To_Link",
-    },
-    423: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "tear down browser",
-        "function": "Tear_Down_Selenium",
-    },
-    424: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "navigate",
-        "function": "Navigate",
-    },
-    425: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "get location",
-        "function": "get_location_of_element",
-    },
-    426: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate table",
-        "function": "validate_table",
-    },
-    427: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "handle alert",
-        "function": "Handle_Browser_Alert",
-    },
-    428: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "browser",
-        "function": "Open_Browser_Wrapper",
-    },
-    429: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "teardown",
-        "function": "Tear_Down_Selenium",
-    },
-    430: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "open new tab",
-        "function": "open_new_tab",
-    },
-    431: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "switch tab",
-        "function": "switch_tab",
-    },
-    432: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate table row size",
-        "function": "validate_table_row_size",
-    },
-    433: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate table column size",
-        "function": "validate_table_column_size",
-    },
-    434: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "upload file",
-        "function": "upload_file",
-    },
-    435: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "drag and drop",
-        "function": "drag_and_drop",
-    },
-    436: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "scroll to element",
-        "function": "scroll_to_element",
-    },
-    437: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "if element exists",
-        "function": "if_element_exists",
-    },
-    438: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "click and enter text",
-        "function": "Click_and_Text",
-    },
-    439: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "validate url",
-        "function": "Validate_Url",
-    },
-    440: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "scroll element to top",
-        "function": "scroll_element_to_top",
-    },
-    441: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "switch window",
-        "function": "switch_window",
-    },
-    442: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "save attribute",
-        "function": "Save_Attribute",
-    },
-    443: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "save attribute values in list",
-        "function": "save_attribute_values_in_list",
-    },
-    444: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "take screenshot web",
-        "function": "take_screenshot_selenium",
-    },
-    445: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "mouse click",
-        "function": "Mouse_Click_Element",
-    },
-    446: {
-        "module": "selenium",
-        "screenshot": "web",
-        "name": "execute javascript",
-        "function": "execute_javascript",
-    },
-    500: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "math",
-        "function": "Calculate",
-    },
-    501: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "upload",
-        "function": "Upload",
-    },
-    502: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "save string",
-        "function": "Save_Text",
-    },
-    503: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "copy",
-        "function": "Copy_File_or_Folder",
-    },
-    504: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "delete",
-        "function": "Delete_File_or_Folder",
-    },
-    505: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "create",
-        "function": "Create_File_or_Folder",
-    },
-    506: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "find",
-        "function": "Find_File_Or_Folder",
-    },
-    507: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "rename",
-        "function": "Rename_File_or_Folder",
-    },
-    508: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "move",
-        "function": "Move_File_or_Folder",
-    },
-    509: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "zip",
-        "function": "Zip_File_or_Folder",
-    },
-    510: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "unzip",
-        "function": "Unzip_File_or_Folder",
-    },
-    511: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "compare",
-        "function": "Compare_File",
-    },
-    512: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "empty",
-        "function": "Empty_Trash",
-    },
-    513: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "user name",
-        "function": "Get_User_Name",
-    },
-    514: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "current documents",
-        "function": "Get_Current_Documents",
-    },
-    515: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "current desktop",
-        "function": "Get_Current_Desktop",
-    },
-    516: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "home directory",
-        "function": "Get_Home_Directory",
-    },
-    518: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "run command",
-        "function": "Run_Command",
-    },
-    519: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "download",
-        "function": "Download_file",
-    },
-    520: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "log 2",
-        "function": "Add_Log",
-    },
-    521: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "log 3",
-        "function": "Add_Log",
-    },
-    522: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "log 1",
-        "function": "Add_Log",
-    },
-    523: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "download and unzip",
-        "function": "Download_File_and_Unzip",
-    },
-    524: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "take screen shot",
-        "function": "TakeScreenShot",
-    },
-    525: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "change ini value",
-        "function": "Change_Value_ini",
-    },
-    526: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "add ini line",
-        "function": "Add_line_ini",
-    },
-    527: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "delete ini line",
-        "function": "Delete_line_ini",
-    },
-    528: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "read name_value",
-        "function": "Read_line_name_and_value",
-    },
-    529: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "text replace",
-        "function": "replace_Substring",
-    },
-    530: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "count files in folder",
-        "function": "count_no_of_files_in_folder",
-    },
-    531: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "search string",
-        "function": "pattern_matching",
-    },
-    532: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "save substring",
-        "function": "save_substring",
-    },
-    533: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "get attachment path",
-        "function": "Get_Attachment_Path",
-    },
-    534: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "extract number",
-        "function": "extract_number",
-    },
-    535: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "convert date format",
-        "function": "convert_date_format",
-    },
-    536: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "compare images",
-        "function": "compare_images",
-    },
-    537: {
-        "module": "utility",
-        "screenshot": "none",
-        "name": "datatype conversion",
-        "function": "datatype_conversion",
-    },
-    600: {
-        "module": "xml",
-        "screenshot": "none",
-        "name": "update",
-        "function": "update_element",
-    },
-    601: {
-        "module": "xml",
-        "screenshot": "none",
-        "name": "add",
-        "function": "add_element",
-    },
-    602: {
-        "module": "xml",
-        "screenshot": "none",
-        "name": "read",
-        "function": "read_element",
-    },
-    603: {
-        "module": "xml",
-        "screenshot": "none",
-        "name": "delete",
-        "function": "delete_element",
-    },
-    700: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "click",
-        "function": "Click_Element",
-    },
-    701: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "double click",
-        "function": "Click_Element",
-    },
-    702: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "hover",
-        "function": "move_mouse",
-    },
-    703: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "keystroke keys",
-        "function": "Keystroke_For_Element",
-    },
-    704: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "keystroke chars",
-        "function": "Keystroke_For_Element",
-    },
-    705: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "text",
-        "function": "Enter_Text",
-    },
-    706: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "close program",
-        "function": "close_program",
-    },
-    707: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "launch program",
-        "function": "launch_program",
-    },
-    708: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "check",
-        "function": "check_for_element",
-    },
-    709: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "move",
-        "function": "move_mouse",
-    },
-    710: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "teardown",
-        "function": "teardown",
-    },
-    711: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "drag",
-        "function": "Drag_Element",
-    },
-    712: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "listbox",
-        "function": "navigate_listbox",
-    },
-    713: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "hotkey",
-        "function": "execute_hotkey",
-    },
-    714: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "click on coordinates",
-        "function": "click_on_coordinates",
-    },
-    715: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "move mouse cursor",
-        "function": "move_mouse_cursor",
-    },
-    716: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "wait gui",
-        "function": "Wait_For_Element_Pyautogui",
-    },
-    717: {
-        "module": "desktop",
-        "screenshot": "desktop",
-        "name": "wait disable gui",
-        "function": "Wait_For_Element_Pyautogui",
-    },
-    801: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "click",
-        "function": "Click_Element",
-    },
-    802: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "right click",
-        "function": "Right_Click_Element",
-    },
-    803: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "drag and drop",
-        "function": "Drag_and_Drop_Element",
-    },
-    804: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "double click",
-        "function": "Double_Click_Element",
-    },
-    805: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "hover",
-        "function": "Hover_Over_Element",
-    },
-    806: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "keystroke keys",
-        "function": "Keystroke_For_Element",
-    },
-    807: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "keystroke chars",
-        "function": "Keystroke_For_Element",
-    },
-    808: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "text",
-        "function": "Enter_Text_In_Text_Box",
-    },
-    809: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "Desktop",
-        "function": "go_to_desktop",
-    },
-    810: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "open app",
-        "function": "Run_Application",
-    },
-    811: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "close app",
-        "function": "Close_Application",
-    },
-    812: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "validate text",
-        "function": "Validate_Text",
-    },
-    813: {
-        "module": "windows",
-        "screenshot": "desktop",
-        "name": "save text",
-        "function": "Save_Text",
-    },
-}
+# Rules: Action NAME must be lower case, no underscores, single
+# spaces, no trailing whitespace. Module names must match those used
+# in load_sa_modules()
+# Common module: These are functions that are common to multiple Built
+# In Functions, which have special handling. See common_functions.py
+# where they are stored for more information.
+# Caveat: Modules that are common to more than one built in function
+# are listed here as with the module set to "common". If there is a
+# "common" function, and another module with the same name created
+# here, there may be a conflict, and the wrong function may execute
 
-# List of Sub-Field keywords, must be all lowercase, and using single spaces - no underscores
-action_support = (
-    "action",
-    "optional action",
-    "loop action",
-    "element parameter",
-    "child parameter",
-    "sibling parameter",
-    "parent parameter",
-    "target parameter",
-    "optional parameter",
-    "method",
-    "url",
-    "body",
-    "header",
-    "headers",
-    "compare",
-    "path",
-    "value",
-    "result",
-    "table parameter",
-    "source parameter",
-    "input parameter",
-    "custom action",
-    "unique parameter",
-    "save parameter",
-    "get parameter",
-    "loop settings",
-    "attribute constrain",
-    "optional option",
-    "graphql",
-)
-
-# List of supported mobile platforms - must be lower case
-supported_platforms = ("android", "ios")
-
+from .action_declarations.info import actions, action_support, supported_platforms
 
 # Import modules
 import inspect, subprocess
@@ -1464,6 +88,11 @@ def load_sa_modules(
 
         if module == "common":
             pass  # Already imported at top of this file
+        elif module == "database":
+            global database
+            from Framework.Built_In_Automation.Database import (
+                BuiltInFunctions as database
+            )
         elif module == "appium":
             global appium
             from Framework.Built_In_Automation.Mobile.CrossPlatform.Appium import (
@@ -1630,21 +259,52 @@ def Sequential_Actions(
 
     return result
 
-
+deprecateLog = True
 def get_data_set_nums(action_value):
     try:
         data_set_nums = []
-        splitted = str(action_value).split(",")
-        for each in splitted:
-            try:
-                string = str(each).split("#")[1].strip()
-                if string.endswith(")"):
-                    string = string[:-1]
-                elif " " in string:
-                    string = string.split(" ")[0]
-                data_set_nums.append(int(string) - 1)
-            except:
-                pass
+        global deprecateLog
+        if "run" in action_value or "#" in action_value.lower() and deprecateLog:
+            deprecateLog = False
+            CommonUtil.ExecLog(
+                "",
+                "remove 'action#', 'run'. This one is older syntax and will be removed on a later period. Try the simple syntax format writen in document",
+                2,
+            )
+            splitted = str(action_value).split(",")
+            for each in splitted:
+                try:
+                    string = str(each).split("#")[1].strip()
+                    if string.endswith(")"):
+                        string = string[:-1]
+                    elif " " in string:
+                        string = string.split(" ")[0]
+                    data_set_nums.append(int(string) - 1)
+                except:
+                    pass
+        elif "if" in action_value.lower():
+            data = action_value.lower().replace("if", "").replace("pass", "").replace("fail", "").replace("ed", "").replace(" ", "")
+            data_set_nums.append(int(data)-1)
+        else:
+            splitted = str(action_value).strip().split(",")
+            for each in splitted:
+                try:
+                    if "-" in each:
+                        start, end = each.replace(" ","").split("-")
+                        for i in range(int(start), int(end)+1):
+                            data_set_nums.append(i-1)
+                    elif each.strip().lower() in ("pass", "passed"):
+                        data_set_nums.append("p")
+                        break
+                    elif each.strip().lower() in ("fail", "failed"):
+                        data_set_nums.append("f")
+                        break
+                    else:
+                        string = each.strip()
+                        data_set_nums.append(int(string)-1)
+                except:
+                    pass
+
         return data_set_nums
     except:
         return []
@@ -1655,49 +315,187 @@ def Handle_Conditional_Action(step_data, data_set_no):
     try:
         data_set = step_data[data_set_no]
         next_level_step_data = []
-        skip = []
+        inner_skip, outer_skip = [], []
+        condition_matched = False
+        if_exists = False
         data_set = common.shared_variable_to_value(data_set)
+        global deprecateLog
+        deprecateLog = True
         if data_set in failed_tag_list:
             return "failed"
 
         for left, _, right in data_set:
-            # Verify that the row we're executing contains the 'if' and '==' tokens.
-            if "if" in left.lower() and "==" in left:
-                # if left_value == right_value
-                condition = left.strip().split("==")
-                # lvalue = left_value
-                lvalue = condition[0].strip().split()[1]
-                # rvalue = right_value
-                rvalue = condition[1].strip()
+            statement = ""
+            operator = ""
+            operators = {"==": 0, "!=": 0, "<=": 0, ">=": 0, ">": 0, "<": 0}
+            statements = ("else if", "else", "if")
+            for i in statements:
+                if left.lower().find(i) == 0:
+                    statement = i
+                    break
+            for i in operators:
+                if i in left:
+                    operators[i] += 1
+            operators["<"] -= operators["<="]
+            operators[">"] -= operators[">="]
 
-                # If both side matches
-                if lvalue == rvalue:
-                    next_level_step_data = get_data_set_nums(str(right).strip())
-                    skip += next_level_step_data
-                else:
-                    skip += get_data_set_nums(str(right).strip())
+            if statement not in statements:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "Specify a statement among (if, else if, else) and add a <single space> after that",
+                    3,
+                )
+                return "failed"
+            if sum(operators.values()) == 0 and statement != "else":
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "Specify an operator among (==, !=, <, >, <=, >=) and add a <single space> before and after the operator",
+                    3,
+                )
+                return "failed"
+            elif sum(operators.values()) == 1:
+                for i in operators:
+                    if operators[i] == 1:
+                        operator = i
+                        break
+            else:
+                # need regex to handle more than one operators to separate operator and right/left values
+                pass
 
+            try:
+                """Actual format: Statement <single space> Lvalue <single space> operator <single space> Rvalue
+                Lvalue and Rvalue can have spaces at starting or ending so don't try stripping them. it can manipulate
+                their actual values. Suppose, %|XY|% = "Hello " stripping will remove the last space"""
+
+                if statement != "else":
+                    Lvalue, Rvalue = left[len(statement + " "):].split(operator)  # remove "if "
+                    Lvalue = Lvalue[:-1] if Lvalue[-1] == " " else Lvalue  # remove 1 space before the operator
+                    Rvalue = Rvalue[1:] if Rvalue[0] == " " else Rvalue  # remove 1 space after the operator
+                    Lvalue, Rvalue = CommonUtil.parse_value_into_object(Lvalue), CommonUtil.parse_value_into_object(Rvalue)
+            except:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "Couldn't parse Left and Right values",
+                    3,
+                )
+                return "failed"
+
+            def check_operators():
+                nonlocal outer_skip, next_level_step_data, condition_matched
+                if statement == "else":
+                    if not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+
+                elif operator == "==":
+                    if Lvalue == Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+                elif operator == "!=":
+                    if Lvalue != Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+                elif operator == "<=":
+                    if Lvalue <= Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+                elif operator == ">=":
+                    if Lvalue >= Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+                elif operator == "<":
+                    if Lvalue < Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+                elif operator == ">":
+                    if Lvalue > Rvalue and not condition_matched:
+                        condition_matched = True
+                        for i in get_data_set_nums(str(right).strip()):
+                            next_level_step_data.append(i)
+                        outer_skip += next_level_step_data
+                    else:
+                        outer_skip += get_data_set_nums(str(right).strip())
+
+            if statement == "if":
+                if_exists = True
+                condition_matched = False
+                check_operators()
+            elif statement == "else if":
+                if not if_exists:
+                    CommonUtil.ExecLog(sModuleInfo, "No 'if' statement found. Please define a 'if' statement first", 3)
+                    return "failed", []
+                check_operators()
+            elif statement == "else":
+                if not if_exists:
+                    CommonUtil.ExecLog(sModuleInfo, "No 'if' statement found. Please define a 'if' statement first", 3)
+                    return "failed", []
+                check_operators()
+
+        while "f" in outer_skip: outer_skip.remove("f")
+        while "p" in outer_skip: outer_skip.remove("p")
         if next_level_step_data == []:
             CommonUtil.ExecLog(
                 sModuleInfo,
-                "Conditional action step data is invalid, please see action help for more info",
-                3,
+                "No conditions matched. Skipping action %s" % [i+1 for i in outer_skip],
+                2,
             )
-            return "failed", []
 
         for data_set_index in next_level_step_data:
-            result, skip_for_loop = Run_Sequential_Actions(
-                [data_set_index]
-            )  # new edit: full step data is passed. [step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
-            if result in failed_tag_list:
-                return result, list(set(skip + skip_for_loop))
-            skip = list(set(skip + skip_for_loop))
+            if data_set_index in ("p", "f"):
+                outer_skip = [i for i in range(len(step_data))]
+                CommonUtil.ExecLog(sModuleInfo, "Step Exit called. Stopping Test Step.", 1)
+                return "passed" if data_set_index == "p" else "failed", outer_skip
+            elif data_set_index >= len(step_data):
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "You did not define action %s. So skipping this action index" % str(data_set_index+1),
+                    2
+                )
+                continue
+            elif data_set_index == data_set_no:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "You are running an if else action within another if else action. It may create infinite recursion in some cases",
+                    2
+                )
+            if data_set_index not in inner_skip:
+                result, skip = Run_Sequential_Actions(
+                    [data_set_index]
+                ) # Running
+                inner_skip = list(set(inner_skip+skip))
+                outer_skip = list(set(outer_skip + inner_skip))
+                if result in failed_tag_list:
+                    return result, outer_skip
 
         CommonUtil.ExecLog(sModuleInfo, "Conditional action handled successfully", 1)
-        return "passed", skip
+        return "passed", outer_skip
     except:
         CommonUtil.ExecLog(sModuleInfo, "Error while handling conditional action", 3)
-        return "failed", []
+        return CommonUtil.Exception_Handler(sys.exc_info()), []
 
 
 def Handle_While_Loop_Action(step_data, data_set_no):
@@ -1707,31 +505,42 @@ def Handle_While_Loop_Action(step_data, data_set_no):
         loop_this_data_sets = []
         passing_data_sets = []
         failing_data_sets = []
-        skip = []
+        outer_skip, inner_skip = [], []
         max_no_of_loop = 1
-        var_name = ""
-        var_value = ""
+        operand_matching = ""
+        var_name, var_value = "", ""
+        deprecate_log = True
+        global deprecateLog
+        deprecateLog = True
         data_set = common.shared_variable_to_value(data_set)
         if data_set in failed_tag_list:
             return "failed", []
 
         for row in data_set:
-            if str(row[0]).strip().lower() == "run actions":
-                loop_this_data_sets = get_data_set_nums(str(row[2]).strip())
-                skip += get_data_set_nums(str(row[2]).strip())
-            elif str(row[0]).strip().lower() == "repeat":
-                max_no_of_loop = int(str(row[2]).strip())
-            elif str(row[0]).strip().lower() == "exit loop":
-                value = str(row[2]).strip()
-                if "pass" in value:
+            if row[0].strip().lower() == "run actions":
+                loop_this_data_sets = get_data_set_nums(row[2].strip())
+                outer_skip += loop_this_data_sets
+            elif row[0].strip().lower() == "repeat":
+                max_no_of_loop = int(row[2].strip())
+            elif row[0].strip().lower() == "exit loop":
+                value = row[2].strip()
+                if "pass" in value.lower():
                     passing_data_sets += get_data_set_nums(value)
-                elif "fail" in value:
+                elif "fail" in value.lower():
                     failing_data_sets += get_data_set_nums(value)
+                elif "==" in value and "optional loop settings" in row[1].strip().lower():
+                    operand_matching = row
                 elif "==" in value:
                     boolean_data_list = value.split("==")
                     var_name = boolean_data_list[0].split("%|")[1].split("|%")[0]
                     var_value = boolean_data_list[1].strip().lower()
-
+                if "loop settings" == row[1].strip().lower() and deprecate_log:
+                    deprecate_log = False
+                    CommonUtil.ExecLog(
+                        sModuleInfo,
+                        "Use 'optional loop setting' instead of 'loop settings' to get our updated feature. Try the simple syntax format writen in document",
+                        2,
+                    )
         if loop_this_data_sets == []:
             CommonUtil.ExecLog(
                 sModuleInfo,
@@ -1744,41 +553,78 @@ def Handle_While_Loop_Action(step_data, data_set_no):
         while i < max_no_of_loop:
             die = False
             for data_set_index in loop_this_data_sets:
-                result, skip_for_loop = Run_Sequential_Actions(
-                    [data_set_index]
-                )  # new edit: full step data is passed. [step_data[data_set_index]]) # Recursively call this function until all called data sets are complete
-                skip = list(set(skip + skip_for_loop))
+                if data_set_index not in inner_skip:
+                    if data_set_index >= len(step_data):
+                        CommonUtil.ExecLog(
+                            sModuleInfo,
+                            "You did not define action %s. So skipping this action index" % str(data_set_index + 1),
+                            2
+                        )
+                        while data_set_index in loop_this_data_sets: loop_this_data_sets.remove(data_set_index)
+                        outer_skip = list(set(outer_skip + [data_set_index]))
+                        continue
+                    elif data_set_index == data_set_no:
+                        CommonUtil.ExecLog(
+                            sModuleInfo,
+                            "You are running an Loop action within the same Loop action. It may create infinite recursion in some cases",
+                            2
+                        )
+                    result, skip = Run_Sequential_Actions(
+                        [data_set_index]
+                    )  # new edit: full step data is passed. [step_data[data_set_index]])
+                    # Recursively call this function until all called data sets are complete
+                    inner_skip = list(set(inner_skip + skip))
+                    outer_skip = list(set(outer_skip + inner_skip))
+                else:
+                    continue
                 if result in passed_tag_list and data_set_index in passing_data_sets:
                     CommonUtil.ExecLog(
-                        sModuleInfo, "Loop exit condition satisfied. Exiting loop", 1
+                        sModuleInfo,
+                        "Loop exit condition satisfied. Action %s passed. Exiting loop" % str(data_set_index+1),
+                        1
                     )
                     die = True
                     break
                 elif result in failed_tag_list and data_set_index in failing_data_sets:
                     CommonUtil.ExecLog(
-                        sModuleInfo, "Loop exit condition satisfied. Exiting loop", 1
+                        sModuleInfo,
+                        "Loop exit condition satisfied. Action %s failed. Exiting loop" % str(data_set_index+1),
+                        1
                     )
                     die = True
                     break
-                elif var_name != "" and sr.Test_Shared_Variables(var_name):
-                    shared_variable_value = sr.Get_Shared_Variables(var_name).lower()
-                    if ("true" in shared_variable_value and "true" in var_value) or (
-                        "false" in shared_variable_value and "false" in var_value
-                    ):
+                elif operand_matching != "":
+                    operand_matching_2 = operand_matching[2][3:] if operand_matching[2][2] == " " else operand_matching[2][2:]
+                    data = [(operand_matching[0], "optional parameter", operand_matching_2)]
+                    RandL = common.shared_variable_to_value(data)[0][2]
+                    Lvalue, Rvalue = RandL.split("==")
+                    Lvalue = Lvalue[:-1] if Lvalue[-1] == " " else Lvalue  # remove 1 space before the operator
+                    Rvalue = Rvalue[1:] if Rvalue[0] == " " else Rvalue  # remove 1 space after the operator
+                    Lvalue, Rvalue = CommonUtil.parse_value_into_object(Lvalue), CommonUtil.parse_value_into_object(Rvalue)
+                    if Lvalue == Rvalue:
                         CommonUtil.ExecLog(
                             sModuleInfo,
-                            "Loop exit condition satisfied. Exiting loop",
+                            "Loop exit condition satisfied. Left and Right operands matched. Exiting loop",
                             1,
                         )
                         die = True
                         break
-
+                elif var_name != "" and sr.Test_Shared_Variables(var_name):
+                    shared_variable_value = str(sr.Get_Shared_Variables(var_name)).strip().lower()
+                    if (shared_variable_value == var_value):
+                        CommonUtil.ExecLog(
+                            sModuleInfo,
+                            "Loop exit condition satisfied. Left and Right operands matched. Exiting loop",
+                            1,
+                        )
+                        die = True
+                        break
             if die:
                 break
             i += 1
 
         CommonUtil.ExecLog(sModuleInfo, "Loop action handled successfully", 1)
-        return "passed", skip
+        return "passed", outer_skip
     except:
         CommonUtil.ExecLog(sModuleInfo, "Error while handling loop action", 3)
         return "failed", []
@@ -1817,8 +663,8 @@ def Run_Sequential_Actions(
         for dataset_cnt in data_set_list:  # For each data set within step data
             CommonUtil.ExecLog(
                 sModuleInfo,
-                "********** Starting Data Set #%d **********" % (dataset_cnt + 1),
-                1,
+                "\n********** Starting Action #%d **********\n" % (dataset_cnt + 1),
+                4,
             )  # Offset by one to make it look proper
             data_set = step_data[dataset_cnt]  # Save data set to variable
             if dataset_cnt in skip:
@@ -1828,7 +674,7 @@ def Run_Sequential_Actions(
                 CommonUtil.check_offline()
             ):  # Check if user initiated offline command from GUI
                 CommonUtil.ExecLog(
-                    sModuleInfo, "User requested Zeuz Node to go Offline", 2
+                    sModuleInfo, "User requested Zeuz Node to go offline.", 2
                 )
                 return "failed", skip_for_loop
 
@@ -1927,6 +773,7 @@ def Run_Sequential_Actions(
                             step_data, dataset_cnt
                         )
                         skip += to_skip
+                        skip_for_loop += to_skip
                         if result in failed_tag_list:
                             CommonUtil.ExecLog(
                                 sModuleInfo,
@@ -2132,7 +979,8 @@ def Run_Sequential_Actions(
                         CommonUtil.ExecLog(
                             sModuleInfo, "Step Exit called. Stopping Test Step.", 1
                         )
-                        return result, skip_for_loop
+                        skip_all = [i for i in range(len(step_data))]
+                        return result, skip_all
 
                     # Check if user wants to store the result for later use
                     stored = False
@@ -2237,6 +1085,7 @@ def Loop_Action_Handler(data, row, dataset_cnt):
         nested_loop = False
         nested_double = False
         max_retry = 50  # wil search for any elemnt this amount of time in while loop
+        loop_method = None
         ### Create sub-set of step data that we will send to SA for processing
         try:
             if str(row[2]).strip().startswith("nested"):
@@ -2328,12 +1177,10 @@ def Loop_Action_Handler(data, row, dataset_cnt):
                         else:
                             loop_method = "list"
 
-                        if (
-                            type(loop_type) != list
-                        ):  # Make sure shared variable is a list
+                        if type(loop_type) not in (list, str):
                             CommonUtil.ExecLog(
                                 sModuleInfo,
-                                "Shared Variable found for Loop action, but is not in list format, which is required.",
+                                "Shared Variable found for Loop action, but is not in list/str format, which is required.",
                                 3,
                             )
                             return "failed"
@@ -2764,9 +1611,21 @@ def Conditional_Action_Handler(data_set, row, logic_row):
 
     elif module == "appium" or module == "selenium":
         try:
-            Element = LocateElement.Get_Element(
-                data_set, eval(module).get_driver()
-            )  # Get the element object or 'failed'
+            wait = 0
+            for left, mid, right in data_set:
+                mid = mid.lower()
+                left = left.lower()
+                if "optional parameter" in mid and "wait" in left:
+                    wait = float(right.strip())
+            start_time = time.time()
+            end_time = start_time + wait
+            while True:
+                Element = LocateElement.Get_Element(
+                    data_set, eval(module).get_driver()
+                )  # Get the element object or 'failed'
+                if (Element not in failed_tag_list) or (time.time() >= end_time):
+                    break
+                # time.sleep(0.5)
             if Element in failed_tag_list:
                 CommonUtil.ExecLog(
                     sModuleInfo, "Conditional Actions could not find the element", 3
@@ -2781,9 +1640,14 @@ def Conditional_Action_Handler(data_set, row, logic_row):
             logic_decision = "false"
 
     elif (
-        module == "common"
+        module == "common" or module == "database"
     ):  # compare variable or list, and based on the result conditional actions will work
         try:
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                "The function has been deprecated and will be removed at a later period.\n" +
+                " Use our other action 'if else'",
+                2)
             result = common.Compare_Variables(
                 data_set
             )  # Get the element object or 'failed'
@@ -3028,9 +1892,6 @@ def Action_Handler(_data_set, action_row):
             CommonUtil.ExecLog(sModuleInfo, "Can't find module for %s" % module, 3)
             return "failed"
 
-        CommonUtil.ExecLog(
-            sModuleInfo, "Executing %s with data set %s" % (function, str(data_set)), 1
-        )
         run_function = getattr(
             eval(module), function
         )  # create a reference to the function

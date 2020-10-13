@@ -540,11 +540,11 @@ def upload_zip(server_id, port_id, temp_folder, run_id, file_name, base_path=Fal
                 "file_name": file_name,
                 "base_path": base_path,
             }
-            r = requests.post(url_link, files=file_list, data=data_list)
+            r = requests.post(url_link, files=file_list, data=data_list, verify=False)
             if r.status_code == 200:
                 CommonUtil.ExecLog(
                     sModuleInfo,
-                    "Zip File is uploaded to production successfully",
+                    "Uploaded logs and screenshots as zip file to server.",
                     4,
                     False,
                 )
@@ -552,7 +552,7 @@ def upload_zip(server_id, port_id, temp_folder, run_id, file_name, base_path=Fal
             else:
                 CommonUtil.ExecLog(
                     sModuleInfo,
-                    "Zip File is not uploaded to production successfully. Trying again",
+                    "Failed to upload zip file to server... retrying %d." % i+1,
                     4,
                     False,
                 )
@@ -561,7 +561,7 @@ def upload_zip(server_id, port_id, temp_folder, run_id, file_name, base_path=Fal
         except:
             CommonUtil.ExecLog(
                 sModuleInfo,
-                "Zip File is not uploaded to production successfully. Trying again",
+                "Failed to upload zip file to server... retrying %d." % i+1,
                 4,
                 False,
             )
@@ -587,10 +587,6 @@ def get_final_dependency_list(dependency_list, run_description):
 
 # downloads attachments for a test step
 def download_attachments_for_test_case(sModuleInfo, run_id, test_case, temp_ini_file):
-    CommonUtil.ExecLog(sModuleInfo, "-------------*************--------------", 1)
-    CommonUtil.ExecLog(
-        sModuleInfo, "Creating Built_In_Automation Log for test case: %s" % test_case, 1
-    )
     try:
         log_file_path = ConfigModule.get_config_value(
             "sectionOne", "temp_run_file_path", temp_ini_file
@@ -675,7 +671,7 @@ def download_attachments_for_test_case(sModuleInfo, run_id, test_case, temp_ini_
         download_url += "/static" + each[0]
 
         # Use request streaming to efficiently download files
-        with requests.get(download_url, stream=True) as r:
+        with requests.get(download_url, stream=True, verify=False) as r:
             shutil.copyfileobj(r.raw, f)
 
         # f.write(urllib.request.urlopen(download_url).read())
@@ -744,12 +740,12 @@ def call_driver_function_of_test_step(
         else:
             current_driver = TestStepsList[StepSeq - 1][3]
 
-        print("@@@@@@@@@@ CURRENT DRIVER: {}".format(current_driver))
+        print("DRIVER: {}".format(current_driver))
 
         if current_driver in driver_list:
             try:
                 module_name = importlib.import_module(current_driver)  # get module
-                print("FOUND")
+                print("STEP DATA and VARIABLES")
                 # get step name
                 if TestStepsList[StepSeq - 1][8] != None:
                     step_name = (TestStepsList[StepSeq - 1][7]).strip()
@@ -974,9 +970,10 @@ def run_all_test_steps_in_a_test_case(
         current_step_sequence = TestStepsList[StepSeq - 1][2]
 
         # add log
-        CommonUtil.ExecLog(sModuleInfo, "Step : %s" % current_step_name, 1)
-
-        # get step meta data
+        log_line = "STEP #%d: %s" % (StepSeq, current_step_name)
+        print("-"*len(log_line))
+        CommonUtil.ExecLog(sModuleInfo, log_line, 4)
+        print("-"*len(log_line))
 
         step_meta_data = get_step_meta_data_of_a_step(
             run_id, test_case, StepSeq
@@ -1030,14 +1027,6 @@ def run_all_test_steps_in_a_test_case(
         # get test step data
         test_steps_data = get_test_step_data(
             run_id, test_case, current_step_sequence, sModuleInfo
-        )
-
-        # add log
-        CommonUtil.ExecLog(
-            sModuleInfo,
-            "********** steps data for Step #%d: %s **********"
-            % (StepSeq, str(test_steps_data)),
-            1,
         )
 
         # take screen-shot
@@ -1467,11 +1456,6 @@ def run_test_case(
         "sectionOne", "sTestStepExecLogId", "MainDriver", temp_ini_file
     )
 
-    # add log
-    CommonUtil.ExecLog(
-        sModuleInfo, "Gathering data for test case %s" % (test_case), 4, False
-    )
-
     retry = 1
     while not copy_status:
         if retry > 100:
@@ -1483,11 +1467,6 @@ def run_test_case(
         # check if test case is copied
         copy_status = check_if_test_case_is_copied(run_id, test_case)
         if copy_status:
-            CommonUtil.ExecLog(
-                sModuleInfo,
-                "Gathering data for test case %s is completed" % test_case,
-                1,
-            )
             break
 
         time.sleep(3)
@@ -1503,10 +1482,15 @@ def run_test_case(
     TestCaseName = test_case_detail[0][1]
 
     # add log
-    CommonUtil.ExecLog(sModuleInfo, "-------------*************--------------", 1)
+    log_line = "# EXECUTING TEST CASE : %s :: %s #" % (test_case, TestCaseName)
+    print("#"*(len(log_line)))
     CommonUtil.ExecLog(
-        sModuleInfo, "Running Test case id : %s :: %s" % (test_case, TestCaseName), 1
+        "",
+        log_line,
+        4,
+        False,
     )
+    print("#"*(len(log_line)))
 
     # get test case start time
     sTestCaseStartTime = datetime.fromtimestamp(time.time()).strftime(
@@ -1633,9 +1617,13 @@ def run_test_case(
         shared.Clean_Up_Shared_Variables()  # clean up shared variables
 
     if debug:
-        if cleanup_drivers_during_debug:
-            cleanup_driver_instances()  # clean up drivers
-            shared.Clean_Up_Shared_Variables()  # clean up shared variables
+        """
+        Drivers shouldn't be teared down and variables shouldn't be cleared after debugging all steps though
+        "Cleanup Drivers and Variables" is set to YES in server
+        """
+        # if cleanup_drivers_during_debug:
+        #     cleanup_driver_instances()  # clean up drivers
+        #     shared.Clean_Up_Shared_Variables()  # clean up shared variables
 
         # start sending logs/results to server
         start_sending_log_to_server(run_id, temp_ini_file)  # send logs
@@ -1770,9 +1758,6 @@ def main(device_dict):
     # get module info
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
 
-    # add log
-    CommonUtil.ExecLog(sModuleInfo, "MainDriver is starting", 4, False)
-
     # get temp file
     # temp_ini_file = os.path.join(os.path.join(FL.get_home_folder(), os.path.join('Desktop',os.path.join('AutomationLog',ConfigModule.get_config_value('Advanced Options', '_file')))))
 
@@ -1811,15 +1796,7 @@ def main(device_dict):
     # set device info according to user order
     set_device_info_according_to_user_order(device_order, device_dict)
 
-    # add log
-    if len(TestRunLists) > 0:
-        CommonUtil.ExecLog(
-            sModuleInfo,
-            "Running Test cases from Test Set : %s"
-            % TestRunLists[0 : len(TestRunLists)],
-            1,
-        )
-    else:
+    if len(TestRunLists) == 0:
         CommonUtil.ExecLog(
             sModuleInfo,
             "No Test Run Schedule found for the current user : %s" % Userid,
@@ -1888,12 +1865,6 @@ def main(device_dict):
 
         # add log
         if len(TestCaseLists) > 0:
-            CommonUtil.ExecLog(
-                sModuleInfo,
-                "Running Test cases from list : %s"
-                % TestCaseLists[0 : len(TestCaseLists)],
-                1,
-            )
             CommonUtil.ExecLog(
                 sModuleInfo,
                 "Total number of test cases %s" % len(TestCaseLists),

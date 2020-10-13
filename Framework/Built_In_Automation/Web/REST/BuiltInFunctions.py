@@ -45,7 +45,6 @@ MODULE_NAME = inspect.getmodulename(__file__)
 
 
 # Method to get the element step data from the original step_data
-@logger
 def Get_Element_Step_Data(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -64,7 +63,6 @@ def Get_Element_Step_Data(step_data):
 
 
 # Handles actions for the sequential logic, based on the input from the mentioned function
-@logger
 def Action_Handler(action_step_data, action_row):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -150,17 +148,6 @@ def Compare_Variables(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-# Method to return dictonaries from string
-@logger
-def get_value_as_list(data):
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-    try:
-        return json.loads(data)
-    except Exception:
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-@logger
 def get_all_val(x, target):
     global all_val
     for key, value in list(x.items()):
@@ -180,7 +167,6 @@ def get_all_val(x, target):
                 continue
 
 
-@logger
 def get_val(x, target):
     global count, index
     for key, value in list(x.items()):
@@ -228,7 +214,7 @@ def get_val(x, target):
 
 
 @logger
-def search_val(x, target, target_val):
+def search_val(x, target, target_val, key=""):
     if isinstance(x, list):
         for each in x:
             if isinstance(each, str):
@@ -237,7 +223,7 @@ def search_val(x, target, target_val):
                 else:
                     continue
             elif isinstance(each, list) or isinstance(each, dict):
-                result = search_val(each, target, target_val)
+                result = search_val(each, target, target_val, key)
                 if result:
                     return True
 
@@ -295,7 +281,6 @@ def search_val_wrapper(x, target, target_val, equal=True):
 
 
 # Method to save rest call parameters
-@logger
 def save_fields_from_rest_call(result_dict, fields_to_be_saved):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -351,7 +336,7 @@ def save_fields_from_rest_call(result_dict, fields_to_be_saved):
                 1,
             )
 
-        Shared_Resources.Show_All_Shared_Variables()
+        # Shared_Resources.Show_All_Shared_Variables()
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -489,7 +474,7 @@ def Insert_Into_List(step_data):
                 )
                 return "failed"
             else:
-                Shared_Resources.Show_All_Shared_Variables()
+                # Shared_Resources.Show_All_Shared_Variables()
                 return "passed"
 
         else:
@@ -662,7 +647,6 @@ def search_condition_wrapper(data, condition_string):
 
 
 # Method to handle rest calls
-@logger
 def handle_rest_call(
     data,
     fields_to_be_saved,
@@ -681,7 +665,7 @@ def handle_rest_call(
     try:
         global index, count
         Shared_Resources.Set_Shared_Variables(
-            "status_code", 0
+            "status_code", 0, print_variable=False
         )  # Reset this shared variable, so we do not get confused with any previous run
         url = data[0]
         method = data[1]
@@ -690,26 +674,24 @@ def handle_rest_call(
         payload = data[4]
 
         # Parse header into proper object.
-        headers = get_value_as_list(headers)
+        headers = CommonUtil.parse_value_into_object(headers)
 
         # Parse body into proper object unless it is not GraphQL.
-        temp = get_value_as_list(body)
+        temp = CommonUtil.parse_value_into_object(body)
         if temp not in failed_tag_list:
             body = temp
 
-        CommonUtil.ExecLog(sModuleInfo, "Calling %s method" % method, 5)
-        CommonUtil.ExecLog(sModuleInfo, "URL: %s" % url, 5)
-        CommonUtil.ExecLog(sModuleInfo, "body: %s" % body, 5)
-        CommonUtil.ExecLog(sModuleInfo, "headers %s" % headers, 5)
-        if payload != "":
-            CommonUtil.ExecLog(sModuleInfo, "payload %s" % payload, 1)
+        CommonUtil.ExecLog(sModuleInfo, "HTTP method: %s\nURL: %s\nBODY: %s\nHEADERS: %s" % (method, url, body, headers), 5)
+        if payload:
+            CommonUtil.ExecLog(sModuleInfo, "PAYLOAD: %s" % payload, 1)
 
         request_count = 1
         if wait_for_response_code != 0:
-            request_count = 60
+            request_count = 3
 
         count = 0
 
+        result = None
         status_code = 1  # dummy value
         while count < request_count:
             method = method.lower().strip()
@@ -772,15 +754,12 @@ def handle_rest_call(
             else:
                 return "failed"
             status_code = int(result.status_code)
-            CommonUtil.ExecLog(
-                sModuleInfo, "Post Call returned status code: %d" % status_code, 1
-            )
 
             if request_count > 1:
                 if status_code != wait_for_response_code:
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "Post Call Status Code %d did not match with Expected Status Code %d, Retrying again"
+                        "HTTP Status Code %d did not match with Expected Status Code %d, retrying again."
                         % (status_code, wait_for_response_code),
                         1,
                     )
@@ -788,7 +767,7 @@ def handle_rest_call(
                 else:
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "Post Call Status Code %d matched with Expected Status Code %d"
+                        "HTTP Status Code %d matched with Expected Status Code %d"
                         % (status_code, wait_for_response_code),
                         1,
                     )
@@ -798,12 +777,10 @@ def handle_rest_call(
         Shared_Resources.Set_Shared_Variables("status_code", result.status_code)
         try:
             if result.json():
-                Shared_Resources.Set_Shared_Variables("rest_response", result.json())
+                Shared_Resources.Set_Shared_Variables("rest_response", result.json(), print_variable=False)
+                Shared_Resources.Set_Shared_Variables("http_response", result.json())
                 CommonUtil.ExecLog(
-                    sModuleInfo, "Post Call Returned Response Successfully", 1
-                )
-                CommonUtil.ExecLog(
-                    sModuleInfo, "Received Response: %s" % result.json(), 1
+                    sModuleInfo, "HTTP Request successful.", 1
                 )
 
                 # if save cookie option enabled then push cookie into shared variables, if cookie var name is 'id' then you can reference it later with %|id|%
@@ -882,26 +859,29 @@ def handle_rest_call(
                 return "passed"
             else:
                 CommonUtil.ExecLog(
-                    sModuleInfo, "REST Call did not respond in json format", 1
+                    sModuleInfo, "HTTP Request did not respond in json format", 1
                 )
                 response_text = result.json()
                 CommonUtil.ExecLog(
-                    sModuleInfo, "REST Call response is: %s" % str(response_text), 1
+                    sModuleInfo, "Received Response", 1
                 )
                 try:
                     # try to save as dict
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "Trying to convert REST Call Response Text to json",
+                        "Trying to convert HTTP Request response text to json",
                         1,
                     )
                     json_of_response = ast.literal_eval(response_text)
                     Shared_Resources.Set_Shared_Variables(
-                        "rest_response", json_of_response
+                        "rest_response", json_of_response, print_variable=False
+                    )
+                    Shared_Resources.Set_Shared_Variables(
+                        "http_response", json_of_response
                     )
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "REST Call Response Text converted to json and saved in 'rest_response' shared variable",
+                        "REST Call Response Text converted to json and saved in 'http_response' shared variable",
                         1,
                     )
                 except:
@@ -913,11 +893,14 @@ def handle_rest_call(
                         2,
                     )
                     Shared_Resources.Set_Shared_Variables(
-                        "rest_response", response_text
+                        "rest_response", response_text, print_variable=False
+                    )
+                    Shared_Resources.Set_Shared_Variables(
+                        "http_response", CommonUtil.parse_value_into_object(response_text)
                     )
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "REST Call Response Text saved in 'rest_response' shared variable",
+                        "REST Call Response Text saved in 'http_response' shared variable",
                         1,
                     )
                 return "passed"
@@ -935,10 +918,11 @@ def handle_rest_call(
                     sModuleInfo, "Trying to convert REST Call Response Text to json", 1
                 )
                 json_of_response = ast.literal_eval(response_text)
-                Shared_Resources.Set_Shared_Variables("rest_response", json_of_response)
+                Shared_Resources.Set_Shared_Variables("rest_response", json_of_response, print_variable=False)
+                Shared_Resources.Set_Shared_Variables("http_response", json_of_response)
                 CommonUtil.ExecLog(
                     sModuleInfo,
-                    "REST Call Response Text converted to json and saved in 'rest_response' shared variable",
+                    "REST Call Response Text converted to json and saved in 'http_response' shared variable",
                     1,
                 )
             except:
@@ -948,10 +932,11 @@ def handle_rest_call(
                     "REST Call Response Text couldn't be converted to json",
                     2,
                 )
-                Shared_Resources.Set_Shared_Variables("rest_response", response_text)
+                Shared_Resources.Set_Shared_Variables("rest_response", response_text, print_variable=False)
+                Shared_Resources.Set_Shared_Variables("http_response", response_text)
                 CommonUtil.ExecLog(
                     sModuleInfo,
-                    "REST Call Response Text saved in 'rest_response' shared variable",
+                    "REST Call Response Text saved in 'http_response' shared variable",
                     1,
                 )
             return "passed"
@@ -960,7 +945,6 @@ def handle_rest_call(
 
 
 # Get Response Wrapper Normal
-@logger
 def Get_Response_Wrapper(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -970,7 +954,6 @@ def Get_Response_Wrapper(step_data):
 
 
 # Get Response Wrapper With Cookie
-@logger
 def Get_Response_Wrapper_With_Cookie(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -982,7 +965,6 @@ def Get_Response_Wrapper_With_Cookie(step_data):
 # Method to get responses
 @logger
 def Get_Response(step_data, save_cookie=False):
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
         wait_for_response_code = 0
         fields_to_be_saved = ""
@@ -1267,7 +1249,6 @@ def Sequential_Actions(step_data):
 
 
 # Validation of step data passed on by the user
-@logger
 def Validate_Step_Data(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:

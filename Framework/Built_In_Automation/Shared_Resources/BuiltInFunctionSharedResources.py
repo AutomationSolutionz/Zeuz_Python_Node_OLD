@@ -7,11 +7,13 @@ import inspect, sys, time, collections
 import string
 import random
 import re
+import json
 from Framework.Utilities import CommonUtil
 from Framework.Utilities.CommonUtil import passed_tag_list, failed_tag_list
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from Framework.Utilities.decorators import logger, deprecated
+from .data_collector import DataCollector
 
 
 global shared_variables
@@ -22,9 +24,10 @@ protected_variables = (
 
 
 MODULE_NAME = inspect.getmodulename(__file__)
+data_collector = DataCollector()
 
 
-def Set_Shared_Variables(key, value, protected=False, allowEmpty=False):
+def Set_Shared_Variables(key, value, protected=False, allowEmpty=False, print_variable=True):
     try:
         sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
         global shared_variables, protected_variables
@@ -47,9 +50,19 @@ def Set_Shared_Variables(key, value, protected=False, allowEmpty=False):
 
             # Good to proceed
             shared_variables[key] = value
-            CommonUtil.ExecLog(
-                sModuleInfo, "Variable value of '%s' is set as: %s" % (key, value), 0
-            )
+
+            if print_variable:
+                CommonUtil.ExecLog(
+                    sModuleInfo, "Saved variable: %s" % key, 1,
+                    variable={
+                        "key": key,
+                        "val": CommonUtil.parse_value_into_object(value)
+                    }
+                )
+
+            # Try to get a pretty print.
+            CommonUtil.prettify(key, value)
+
             return "passed"
     except:
         CommonUtil.Exception_Handler(sys.exc_info())
@@ -84,21 +97,23 @@ def Set_List_Shared_Variables(list_name, key, value, protected=False):
             # Good to proceed
             if list_name in shared_variables:
                 shared_variables[list_name][key] = value
+
+                # Try to get a pretty print.
+                CommonUtil.prettify(key, value)
+
                 CommonUtil.ExecLog(
-                    sModuleInfo,
-                    "In List '%s' Variable value of '%s' is set as: %s"
-                    % (list_name, key, value),
-                    0,
+                    sModuleInfo, "Saved variable:\n%s = %s" % (key, value), 0
                 )
                 return "passed"
             else:  # create dict if now available
                 shared_variables[list_name] = collections.OrderedDict()
                 shared_variables[list_name][key] = value
+
+                # Try to get a pretty print.
+                CommonUtil.prettify(key, value)
+
                 CommonUtil.ExecLog(
-                    sModuleInfo,
-                    "In List '%s' Variable value of '%s' is set as: %s"
-                    % (list_name, key, value),
-                    0,
+                    sModuleInfo, "Saved variable:\n%s = %s" % (key, value), 0
                 )
                 return "passed"
     except:
@@ -156,6 +171,7 @@ def Append_List_Shared_Variables(key, value, protected=False, value_as_list=Fals
         CommonUtil.Exception_Handler(sys.exc_info())
 
 
+@deprecated
 def Append_Dict_Shared_Variables(key, value, protected=False, parent_dict=""):
     """ Creates and appends a python list variable """
 
@@ -211,11 +227,12 @@ def Get_Shared_Variables(key, log=True):
         else:
             if key in shared_variables:
                 value = shared_variables[key]
+                # Try to get a pretty print.
+                # CommonUtil.prettify(key, value)
+
                 if log:
                     CommonUtil.ExecLog(
-                        sModuleInfo,
-                        "Variable value of '%s' is: %s" % (str(key), value),
-                        0,
+                        sModuleInfo, "Accessed variable:\n%s = %s" % (key, value), 0
                     )
                 return value
             else:
@@ -238,11 +255,15 @@ def Get_List_from_Shared_Variables(list_name):
             return "failed"
         else:
             if list_name in shared_variables:
-                list = shared_variables[list_name]
+                value = shared_variables[list_name]
+
+                # Try to get a pretty print.
+                # CommonUtil.prettify(list_name, value)
+
                 CommonUtil.ExecLog(
-                    sModuleInfo, "List: " + list_name + " is: " + str(list), 1
+                    sModuleInfo, "Accessed variable:\n%s = %s" % (list_name, value), 0
                 )
-                return list
+                return value
             else:
                 CommonUtil.ExecLog(
                     sModuleInfo,
@@ -367,61 +388,192 @@ def handle_nested_rest_json(result, string):
         return "failed"
 
 
-@logger
+class VariableParser:
+    """Helper class for parsing the values of different indices as
+          specified in [ ] square brackets of a variable.
+    """
+
+    @staticmethod
+    def get_number(idx):
+        try: return int(idx)
+        except: return None
+    
+
+    @staticmethod
+    def get_string(idx):
+        if isinstance(idx, str):
+            if idx[0] in ("'", '"'):
+                return idx[1:len(idx)-1]
+
+            return None
+        return None
+
+    
+    @staticmethod
+    def get_slice(idx):
+        try:
+            sp = idx.split(":")
+            if len(sp) > 1:
+                left, right = sp[0], sp[1]
+
+                try: left = int(left)
+                except: left = Get_Shared_Variables(left, log=False)
+
+                try: right = int(right)
+                except: right = Get_Shared_Variables(right, log=False)
+
+                if "failed" in (left, right):
+                    return None
+                else:
+                    left = int(left)
+                    right = int(right)
+
+                return (left, right)
+
+        except: pass
+        return None
+
+
+    @staticmethod
+    def get_variable(idx):
+        val = Get_Shared_Variables(idx, log=False)
+        return val if val != "failed" else None
+
+
 def parse_variable(name):
-    """Parse a given variable (probalby indexed
-      like var["hello"][0]["test"]) and return its value."""
+    """Parses a given variable and returns its value.
+
+    The variable can be indexed, similar to how Python's variables are
+    indexed - lists and dictionaries with [ ] square brackets.
+
+    If a tilde ~ character is specified in front of the variable name,
+    then data collector is run, which collects data from a given
+    pattern.
+
+    Patterns:
+    
+        "_" (underscore) - match all list items.
+        "*" (asterisk)   - match all values of dictionaries.
+        "*xyz"           - partial match for dictionary keys ending with "xyz"
+        "xyz*"           - partial match for dictionary keys starting with "xyz"
+
+    Args:
+
+        name: Variable name with indices specified if necessary.
+
+    Examples:
+        
+        var
+        var["hello"]
+        var[hello] - Fetch hello from shared variables.
+        var[3]
+        var[2:5]
+        var[left:right] - Fetch left and right from shared variables.
+        var["hello"][3][2:5]
+
+        var{_, *, occurrence, _, line}
+        var{_, error*, occurrence, _, line}
+        var{_, *error, occurrence, _, line}
+        var{_, *, occurrence, _, message}
+        var{0, error2, occurrence, 0, message}
+        var{_, error1, type}{_, *, type} - Two patterns.
+        var{pattern_1}{pattern_2}{pattern_3} - Three patterns.
+
+        var(key1, key2) - Find 'key1' and 'key2' in the data and store their result.
+        var(key1, key2)(key3, key4) - Two key patterns.
+
+
+    Returns:
+
+        Value of the variable at the given index (if specified).
+    """
 
     try:
-        pattern = r"\[(.*?)\]"
+        # Pattern to match [] {} () brackets.
+        pattern = r"[\[\{\(](.*?)[\)\}\]]"
         indices = re.findall(pattern, name)
+
+        # For printing log.
+        copy_of_name = name
 
         if len(indices) == 0:
             # If there are no [ ] style indexing.
             return Get_Shared_Variables(name)
 
-        name = name[: name.find("[")]
+        if "{" in name:
+            # Data collector with pattern.
+            # Match with the following pattern.
+            # var_name{pattern1}{pattern2}{...}
 
-        val = Get_Shared_Variables(name)
-        for idx in indices:
-            # Check to see if it's a quoted string.
-            if idx[0] == '"' or idx[0] == "'":
-                # Remove quotations.
-                idx = idx[1 : len(idx) - 1]
-            else:
-                # Otherwise check to see if its an integer or another variable
-                try:
-                    # Try converting to int.
-                    idx = int(idx)
-                except:
-                    # Since it's not an int, try getting the value from the shared variables.
-                    idx = Get_Shared_Variables(idx)
+            name = name[: name.find("{")]
+            val = Get_Shared_Variables(name, log=False)
+            result = []
 
-                    if idx == "failed":
-                        return "failed"
+            for idx in indices:
+                result.append(data_collector.collect(idx, val, "pattern"))
 
-                    try:
-                        # Try converting to int.
-                        idx = int(idx)
-                    except:
-                        # Not an int? Check to see if it's a quoted string.
-                        if idx[0] == '"' or idx[0] == "'":
-                            # Remove quotations.
-                            idx = idx[1 : len(idx) - 1]
+            if len(indices) > 1:
+                result = list(zip(*result))
+            elif len(indices) == 1:
+                result = result[0]
 
-            try:
-                val = val[idx]
-            except:
-                # Edge case. Try converting the idx into str and see if it can be accessed.
-                val = val[str(idx)]
+            # Print to console.
+            CommonUtil.prettify(copy_of_name, result)
+            return result
+        elif "(" in name:
+            # Data collector with keys.
+            # Match with the following pattern.
+            # var_name(pattern1)(pattern2)(...)
 
-        return val
+            name = name[: name.find("(")]
+            val = Get_Shared_Variables(name, log=False)
+            result = []
+
+            for idx in indices:
+                result.append(data_collector.collect(idx, val, "key"))
+
+            if len(indices) == 1:
+                result = result[0]
+
+            CommonUtil.prettify(copy_of_name, result)
+            return result
+        elif "[" in name:
+            # Otherwise, perform variable indexing.
+            # var_name["abc"][xyz][3][2:5]
+            
+            # Get the variable name part, not the indices with [ ]
+            name = name[: name.find("[")]
+
+            # Get the root of the variable.
+            val = Get_Shared_Variables(name, log=False)
+
+            if isinstance(val, str):
+                val = CommonUtil.parse_value_into_object(val)
+
+            for idx in indices:
+                _number     = VariableParser.get_number(idx)
+                _string     = VariableParser.get_string(idx)
+                _variable   = VariableParser.get_variable(idx)
+                _slice      = VariableParser.get_slice(idx)
+
+                if _number is not None:
+                    val = val[_number]
+                elif _string is not None:
+                    val = val[_string]
+                elif _variable is not None:
+                    val = val[_variable]
+                elif _slice is not None:
+                    left, right = _slice
+                    val = val[left:right]
+
+            # Print to console.
+            CommonUtil.prettify(copy_of_name, val)
+            return val
     except:
-        print("Failed to parse variable.")
+        print("Failed to parse variable")
         return "failed"
 
 
-@logger
 def get_previous_response_variables_in_strings(step_data_string_input):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     try:
@@ -685,9 +837,9 @@ def Compare_Variables(step_data):
                 result.append(False)
                 fail_count += 1
 
-        CommonUtil.ExecLog(sModuleInfo, "###Variable Comparison Results###", 1)
+        CommonUtil.ExecLog(sModuleInfo, "### Variable Comparison Results ###", 1)
         CommonUtil.ExecLog(sModuleInfo, "Matched Variables: %d" % pass_count, 1)
-        CommonUtil.ExecLog(sModuleInfo, "Not Matched Variables: %d" % fail_count, 3)
+        CommonUtil.ExecLog(sModuleInfo, "Not Matched Variables: %d" % fail_count, 2)
 
         for i in range(0, len(variable_list1)):
             if result[i] == True:

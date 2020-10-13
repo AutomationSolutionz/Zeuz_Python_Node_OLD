@@ -4,6 +4,8 @@
 import sys
 import inspect
 import os, psutil, os.path, threading
+import ast
+import json
 import logging
 from Framework.Utilities import ConfigModule
 import datetime
@@ -99,6 +101,40 @@ def to_unicode(obj, encoding="utf-8"):
         if not isinstance(obj, str):
             obj = str(obj, encoding)
         return obj
+
+
+def parse_value_into_object(val):
+    """Parses the given value into a Python object: int, str, list, dict."""
+
+    if not isinstance(val, str):
+        return val
+
+    try:
+        val = ast.literal_eval(val)
+    except:
+        try:
+            val = json.loads(val)
+        except:
+            try:
+                val = ast.literal_eval(f'"{val}"')
+            except:
+                pass
+
+    return val
+
+
+def prettify(key, val):
+    """Tries to pretty print the given value."""
+
+    color = Fore.MAGENTA
+
+    try:
+        if type(val) == str:
+            val = parse_value_into_object(val)
+
+        print(color + "%s = %s" % (key, json.dumps(val, indent=2, sort_keys=True)))
+    except:
+        return print(color + "%s = %s" % (key, val))
 
 
 def Add_Folder_To_Current_Test_Case_Log(src):
@@ -223,7 +259,7 @@ def Result_Analyzer(sTestStepReturnStatus, temp_q):
 
 
 def ExecLog(
-    sModuleInfo, sDetails, iLogLevel=1, _local_run="", sStatus="", force_write=False
+    sModuleInfo, sDetails, iLogLevel=1, _local_run="", sStatus="", force_write=False, variable=None
 ):
     # Do not log anything if load testing is going on and we're not forced to write logs
     if load_testing and not force_write:
@@ -264,8 +300,10 @@ def ExecLog(
     elif iLogLevel == 6:
         status = "BrowserConsole"
     else:
-        print("*** Unknown log level- Set to Warning ***")
-        status = "Warning"
+        print("*** Unknown log level - Set to Info ***")
+        status = "Info"
+        iLogLevel = 5
+        line_color = Fore.CYAN
 
     if not sModuleInfo:
         sModuleInfo = ""
@@ -275,11 +313,12 @@ def ExecLog(
 
     # Display on console
     # Change the format for console, mainly leave out the status level
-    if status == "Console":
-        msg = f"{info}{sDetails}" if sModuleInfo else sDetails
-        print(line_color + msg)
-    else:
-        print(line_color + f"{status.upper()} - {info}{sDetails}")
+    if "saved variable" not in sDetails.lower():
+        if status == "Console":
+            msg = f"{info}{sDetails}" if sModuleInfo else sDetails
+            print(line_color + msg)
+        else:
+            print(line_color + f"{status.upper()} - {info}{sDetails}")
 
     current_log_line = f"{status.upper()} - {sModuleInfo} - {sDetails}"
 
@@ -339,6 +378,9 @@ def ExecLog(
 
             if not log_id:
                 return
+
+            if variable:
+                sDetails = "%s\nVariable value: %s" % (sDetails, variable["val"])
 
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             all_logs[all_logs_count] = {

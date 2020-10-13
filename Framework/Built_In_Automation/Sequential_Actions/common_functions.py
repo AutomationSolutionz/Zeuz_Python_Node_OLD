@@ -147,12 +147,10 @@ def sanitize(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-@logger
 def verify_step_data(step_data):
     """ Verify step data is valid """
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-    CommonUtil.ExecLog(sModuleInfo, "Verifying Step Data", 1)
 
     try:
         data_set_index = 0
@@ -301,7 +299,6 @@ def verify_step_data(step_data):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-@logger
 def check_action_types(module, step_data):
     """ Check for a specific module in the step data type and return true/false """
     # To be used when we don't have a dependency, and need to know the type of actions the user have specified
@@ -316,7 +313,6 @@ def check_action_types(module, step_data):
     return False
 
 
-@logger
 def adjust_element_parameters(step_data, platforms):
     """ Strip out element parameters that do not match the dependency """
 
@@ -415,7 +411,6 @@ def adjust_element_parameters(step_data, platforms):
     return new_step_data  # Return cleaned step_data that contains only the element paramters we are interested in
 
 
-@logger
 def get_module_and_function(action_name, action_sub_field):
     """ Function to split module from the action name, and with the action name tries to find the corrosponding function name """
 
@@ -488,7 +483,6 @@ def get_module_and_function(action_name, action_sub_field):
         return CommonUtil.Exception_Handler(sys.exc_info())
 
 
-@logger
 def shared_variable_to_value(data_set):
     """ Look for any Shared Variable strings in step data, convert them into their values, and return """
 
@@ -500,7 +494,8 @@ def shared_variable_to_value(data_set):
     skip_conversion_of_shared_variable_for_actions = [
         "if element exists",
         "run actions",
-        "loop settings",
+        "optional loop settings",
+        "loop settings"
     ]
 
     try:
@@ -549,7 +544,6 @@ def shared_variable_to_value(data_set):
 # it will remove the module the user specified, replace it with the "common" module, and continue as normal.
 
 
-@logger
 def step_result(data_set):
     """ Returns passed/failed in the standard format, when the user specifies it in the step data """
 
@@ -576,7 +570,6 @@ def step_result(data_set):
         return "failed"
 
 
-@logger
 def step_exit(data_set):
     """ Exits a Test Step wtih passed/failed in the standard format, when the user specifies it in the step data """
 
@@ -774,11 +767,11 @@ def Save_Text(data_set):
         )
 
 
+@deprecated
 @logger
 def Compare_Variables(data_set):
-    """ Compare shared variables / strings to eachother """
+    """ Compare shared variables / strings to each other """
     # Compares two variables from Field and Value on any line that is not the action line
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     return sr.Compare_Variables([data_set])
 
 
@@ -793,16 +786,17 @@ def Compare_Partial_Variables(data_set):
 @logger
 def save_into_variable(data_set):
     """Save variable with native python type.
-    
+
     Can also create/append/update a str, list or dictionary from the given data.
-    
+
     Accepts any valid Python representation or JSON data.
 
     Args:
         data_set:
-          data               | element parameter | valid JSON string
-          operation          | element parameter | save/update
-          save into variable | common action     | variable_name
+          data               | element parameter  | valid JSON string
+          operation          | element parameter  | save/update
+          extra operation    | optional parameter | length/no duplicate/ascending sort/descending sort
+          save into variable | common action      | variable_name
 
     Returns:
         "passed" if success.
@@ -814,17 +808,20 @@ def save_into_variable(data_set):
     try:
 
         operation = "save"
+        extra_operation = None
         variable_value = None
         variable_name = None
 
         try:
             for left, mid, right in data_set:
                 left = left.strip().lower()
-                if "operation" in left:
+                if "extra operation" in left:
+                    extra_operation = right.strip().lower()
+                elif "operation" in left:
                     operation = right.strip().lower()
-                if "data" in left:
-                    variable_value = parse_value_into_object(right)
-                if "action" in mid:
+                elif "data" in left:
+                    variable_value = CommonUtil.parse_value_into_object(right)
+                elif "action" in mid:
                     variable_name = right.strip()
         except:
             CommonUtil.ExecLog(sModuleInfo, "Failed to parse data.", 1)
@@ -855,13 +852,65 @@ def save_into_variable(data_set):
             )
             return "failed"
 
+        try:
+            if extra_operation:
+                if "length" in extra_operation:
+                    variable_value = len(variable_value)
+                elif "no duplicate" in extra_operation:
+                    variable_value = list(set(variable_value))
+                elif "sort" in extra_operation:
+                    variable_value = sort_list(variable_value, extra_operation)
+        except:
+            CommonUtil.ExecLog(
+                    sModuleInfo, f"Failed to perform extra action.", 3,
+            )
+            return "failed"
+
         sr.Set_Shared_Variables(variable_name, variable_value)
 
         return "passed"
     except:
-        CommonUtil.ExecLog(sModuleInfo, "Failed to save variable.", 1)
+        CommonUtil.ExecLog(sModuleInfo, "Failed to save variable.", 3)
         return "failed"
 
+
+def sort_list(variable_value, extra_operation):
+    dictionary = True if isinstance(variable_value, dict) else False
+    index = 0
+    for i in variable_value:
+        if isinstance(i, list):
+            variable_value[index] = sort_list(i, extra_operation)
+        elif isinstance(i, dict):
+            variable_value[index] = sort_list(i, extra_operation)
+        else:
+            try:
+                return_when_error = variable_value
+                if dictionary and (isinstance(variable_value[i], list) or isinstance(variable_value[i], dict)):
+                    variable_value[i] = sort_list(variable_value[i], extra_operation)
+                elif dictionary:
+                    pass
+                else:
+                    if "descending" in extra_operation:
+                        variable_value = sorted(variable_value, reverse=True)
+                    else:
+                        variable_value = sorted(variable_value)
+                    break
+            except TypeError:
+                CommonUtil.ExecLog(
+                    "",
+                    "Skipping the list %s\n" %str(variable_value)+
+                    "Items inside your list should be of same datatype. Example:\n" +
+                    "<list of numbers> [1,2,4,3.5]\n" +
+                    "<list of strings> ['apple','cat','20.5']\n" +
+                    "<list of lists> [ [1,2,4,3.5], ['apple','cat','20.5'] ]\n" +
+                    "Above is a 2 Dimensional list but you can provide any n Dimensional list but the unit lists should have items of same datatype\n" +
+                    "<list of dicts> [ {'name':'John', 'id':20}, {'name':'Mike', 'id':10} ]",
+                    2
+                )
+                return return_when_error
+
+        index += 1
+    return variable_value
 
 @logger
 @deprecated
@@ -909,23 +958,6 @@ def Save_Variable(data_set):
         return "failed"
 
 
-def parse_value_into_object(val):
-    """Parses the given value into a Python object: int, str, list, dict."""
-
-    try:
-        val = ast.literal_eval(val)
-    except:
-        try:
-            val = json.loads(val)
-        except:
-            try:
-                val = ast.literal_eval(f'"{val}"')
-            except:
-                pass
-
-    return val
-
-
 @logger
 def save_length(data_set):
     """Save the length/size of a given value into a variable."""
@@ -937,7 +969,7 @@ def save_length(data_set):
             variable_name = each[0]
             value = each[2]
 
-    value = parse_value_into_object(value)
+    value = CommonUtil.parse_value_into_object(value)
 
     try:
         value_length = len(value)
@@ -1065,13 +1097,17 @@ def append_dict_shared_variable(data_set):
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
-
+@deprecated
 @logger
 def save_dict_value_by_key(data_set):
     """ Gets the value of a key in a dictionary and saves it in a shared variable """
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
+    CommonUtil.ExecLog(
+        sModuleInfo,
+        "You can access any index of list or dictionary using python syntax.\n" +
+        " Use our other action 'Save variable - number string list dictionary'",
+        2)
     try:
         # Split the data into left and right side (just like variable assignment x = y)
         left_side, right_side = data_set[0][2].split("=", 1)
@@ -1548,6 +1584,7 @@ def wait_for_timer(data_set):
 
 
 @logger
+@deprecated
 def create_3d_list(data_set):
     """ Creates and appends a python list variable """
     # Note: List is created if it doesn't already exist
@@ -1709,6 +1746,21 @@ def download_ftp_file(data_set):
 
 @logger
 def send_mail(data_set):
+    """
+    This is the action to send a mail
+
+    Example:
+    Field	            Sub Field	            Value
+    smtp server         element parameter	    smtp.gmail.com
+    smtp port           element parameter       587
+    sender email        element parameter       sender@gmail.com
+    sender password     element parameter       sender_pass
+    receiver email      element parameter       receiver@gmail.com
+    subject             element parameter       mail_subject
+    body                element parameter       main content
+    send mail           common action           send mail
+    """
+
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
 
     try:
@@ -1767,6 +1819,21 @@ def send_mail(data_set):
 
 @logger
 def check_latest_mail(data_set):
+    """
+    This is the action to check sender's name, mail and subject of the latest mail
+
+    Example:
+    Field	                Sub Field	            Value
+    imap host               element parameter	    imap.gmail.com
+    imap port               element parameter       993
+    imap user               element parameter       user@gmail.com
+    imap password           element parameter       user_pass
+    select mailbox          element parameter       INBOX
+    subject to check        element parameter       mail_subject
+    sender mail to check    element parameter       sender@gmail.com
+    sender name to check    optional parameter      Sender Name
+    check latest mail       common action           check latest mail
+    """
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
 
     try:
@@ -1776,23 +1843,29 @@ def check_latest_mail(data_set):
         imap_pass = ""
         select_mailbox = ""
         subject_to_check = ""
-        sender_to_check = ""
+        sender_mail_to_check = ""
+        sender_name_to_check = ""
 
-        for row in data_set:
-            if str(row[0]).strip().lower() == "imap host":
-                imap_host = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "imap port":
-                imap_port = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "imap user":
-                imap_user = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "imap password":
-                imap_pass = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "select mailbox":
-                select_mailbox = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "subject to check":
-                subject_to_check = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "sender to check":
-                sender_to_check = str(row[2]).strip()
+        for left, mid, right in data_set:
+            left = left.lower()
+            right = right.strip()
+            if "imap host" in left:
+                imap_host = right
+            elif "imap port" in left:
+                imap_port = right
+            elif  "imap user" in left:
+                imap_user = right
+            elif "imap password" in left:
+                imap_pass = right
+            elif "select mailbox" in left:
+                select_mailbox = right
+            elif "subject to check" in left:
+                subject_to_check = right
+            elif "sender mail to check" in left:
+                sender_mail_to_check = right
+            elif "sender name to check" in left:
+                sender_name_to_check = right
+
 
         if imap_host == "" or imap_port == "" or imap_user == "" or imap_pass == "":
             CommonUtil.ExecLog(
@@ -1810,13 +1883,21 @@ def check_latest_mail(data_set):
             imap_pass,
             select_mailbox,
             subject_to_check,
-            sender_to_check,
+            sender_mail_to_check,
+            sender_name_to_check
         )
 
         if result:
+            if sender_name_to_check == "":
+                CommonUtil.ExecLog(sModuleInfo, "Subject and sender matched", 1)
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Subject, sender and name matched", 1)
             return "passed"
         else:
-            CommonUtil.ExecLog(sModuleInfo, "Subject and sender didn't match", 3)
+            if sender_name_to_check == "":
+                CommonUtil.ExecLog(sModuleInfo, "Subject and sender didn't match", 3)
+            else:
+                CommonUtil.ExecLog(sModuleInfo, "Subject, sender and name didn't match", 3)
             return "failed"
 
     except Exception:
@@ -1824,32 +1905,81 @@ def check_latest_mail(data_set):
 
 
 @logger
-def write_into_single_cell_in_excel(data_set):
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+def validate_schema(data_set):
+    """Validates a given JSON/Python object against a given JSON schema."""
+    
+    from jsonschema import validate, draft7_format_checker
 
     try:
+        schema = None
+        data = None
+        variable_name = None
+
+        for left, mid, right in data_set:
+            if "action" in mid:
+                variable_name = right.strip()
+            elif "schema" in left:
+                schema = right.strip()
+            elif "data" in left:
+                data = right.strip()
+
+        try:
+            data = CommonUtil.parse_value_into_object(data)
+            schema = CommonUtil.parse_value_into_object(schema)
+
+            validate(
+                instance=data,
+                schema=schema,
+                format_checker=draft7_format_checker,
+            )
+        except Exception as e:
+            sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                "Schema validation failed.\n%s" % e,
+                3,
+            )
+            return CommonUtil.Exception_Handler(sys.exc_info())
+
+        sr.Set_Shared_Variables(variable_name, True, print_variable=True)
+        return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+@deprecated
+@logger
+def write_into_single_cell_in_excel(data_set):
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo, "Try our new action named 'Write into excel'", 2)
+    try:
         sheet_name = ""
-        colmn = ""
-        colmun_number = ""
+        column = ""
+        column_number = ""
         value = ""
         excel_file_path = ""
 
-        for row in data_set:
-            if str(row[0]).strip().lower() == "sheet name":
-                sheet_name = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "column name":
-                colmn = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "column number":
-                colmun_number = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "text to write":
-                value = str(row[2]).strip()
-            elif str(row[0]).strip().lower() == "excel file path":
-                excel_file_path = str(row[2]).strip()
+        for left, mid, right in data_set:
+            left = left.lower()
+            right = right.strip()
+            if "sheet name" in left:
+                sheet_name = right
+            elif "column name" in left:
+                column = right
+            elif "column number" in left:
+                column_number = right
+            elif "text to write" in left:
+                value = right
+            elif "excel file path" in left:
+                excel_file_path = right
+                # Expand ~ (home directory of user) to absolute path.
+                if "~" in excel_file_path:
+                    excel_file_path = Path(os.path.expanduser(excel_file_path))
+                excel_file_path = Path(excel_file_path)
 
         if (
             sheet_name == ""
-            or colmn == ""
-            or colmun_number == ""
+            or column == ""
+            or column_number == ""
             or excel_file_path == ""
         ):
             CommonUtil.ExecLog(
@@ -1861,10 +1991,115 @@ def write_into_single_cell_in_excel(data_set):
 
         wb = xw.Book(excel_file_path)
         sheet = wb.sheets[sheet_name]
-        cell_value = "%s%s" % (colmn, colmun_number)
+        cell_value = "%s%s" % (column, column_number)
         sheet.range(cell_value).value = value
         wb.save(excel_file_path)
 
+        return "passed"
+    except Exception:
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+@logger
+def excel_write(data_set):
+    """
+    Action to write data into Excel file. To write hundreds of rows and column only one action is enough
+
+    Example 1:
+    Field	            Sub Field	        Value
+    file path           element parameter	F:\Automation Solutionz\a.xlsx
+    sheet name          element parameter	Sheet1
+    starting cell       element parameter	E2
+    expand              optional parameter	right
+    write into excel    common action   	["Expand to right",1.1021,"10.101"]
+
+    Example 2:
+    Field	            Sub Field	        Value
+    file path           element parameter	F:\Automation Solutionz\a.xlsx
+    sheet name          element parameter	Sheet1
+    starting cell       element parameter	E4
+    expand              optional parameter	down
+    write into excel    common action   	["Exapand down",1.10,"10.01"]
+
+    Example 3:
+    Field	            Sub Field	        Value
+    file path           element parameter	F:\Automation Solutionz\a.xlsx
+    sheet name          element parameter	Sheet1
+    starting cell       element parameter	F9
+    write into excel    common action   	Hello world
+
+    Example 4:
+    Field	            Sub Field	        Value
+    file path           element parameter	F:\Automation Solutionz\a.xlsx
+    sheet name          element parameter	Sheet1
+    starting cell       element parameter	F13
+    write into excel    common action   	[["Name","Dept","Salary"],["Mike","Marketing","1050.55 dollar"],
+                                            ["Fred","Sales",1040],["John","Developer",1040.55]]
+
+    Example 5:
+    Field	            Sub Field	        Value
+    file path           element parameter	F:\Automation Solutionz\a.xlsx
+    sheet name          element parameter	Sheet1
+    starting cell       element parameter	F9
+    write into excel    common action   	%|Excel_variable|%
+    """
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    try:
+        sheet_name = ""
+        cell = ""
+        expand = "right"
+        value = ""
+        excel_file_path = ""
+
+        for left, mid, right in data_set:
+            left = left.lower()
+            right = right.strip()
+            if "sheet name" in left:
+                sheet_name = right
+            elif "starting cell" in left:
+                cell = right
+            elif "expand" in left:
+                expand = right
+            elif "write into excel" in left:
+                value = right
+                value = CommonUtil.parse_value_into_object(value)
+                # print("......1......", type(value), ".......", value)
+            elif "file path" in left:
+                excel_file_path = right
+                # Expand ~ (home directory of user) to absolute path.
+                if "~" in excel_file_path:
+                    excel_file_path = Path(os.path.expanduser(excel_file_path))
+                excel_file_path = Path(excel_file_path)
+
+        if (
+            sheet_name == ""
+            or cell == ""
+            or excel_file_path == ""
+        ):
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                "Excel file info not given properly, please see action help",
+                3,
+            )
+            return "failed"
+
+        if expand.lower() == "down":
+            Transpose_condition = True
+        else:
+            expand = "right"
+            Transpose_condition = False
+
+        wb = xw.Book(excel_file_path)
+        sheet = wb.sheets[sheet_name]
+        sheet.range(cell).options(transpose=Transpose_condition).value = value
+        # print(type(sheet.range(cell).value),".....",sheet.range(cell).value)
+        wb.save(excel_file_path)
+
+        CommonUtil.ExecLog(
+            sModuleInfo,
+            "Excel Data has been written successfully starting from %s cell and expanded to %s" % (cell, expand),
+            1,
+        )
         return "passed"
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
@@ -1945,6 +2180,9 @@ def excel_read(data_set):
 
         # Save into shared variables
         sr.Set_Shared_Variables(var_name, cell_data)
+
+        # Save file so that we don't see the "Want to save" dailog.
+        wb.save()
 
         return "passed"
     except:
@@ -2112,7 +2350,6 @@ def split_string(data_set):
 
     try:
         var_name = None
-        idx = None
         split_expression = None
         source_string = None
 
@@ -2125,18 +2362,13 @@ def split_string(data_set):
                 source_string = right
             if "split expression" in left:
                 split_expression = right
-            if "index" in left:
-                idx = int(right.strip())
 
         # Validate data format.
-        if None in (var_name, idx, split_expression, source_string):
-            CommonUtil.ExecLog(sModuleInfo, "Invalid data format.", 3)
-            return "failed"
-        if idx < 0 or idx > 1:
-            CommonUtil.ExecLog(sModuleInfo, "Index must be between [0, 1]", 3)
+        if None in (var_name, split_expression, source_string):
+            CommonUtil.ExecLog(sModuleInfo, "Invalid/missing data format.", 3)
             return "failed"
 
-        result = source_string.split(split_expression)[idx]
+        result = source_string.split(split_expression)
 
         # Save into shared variables.
         sr.Set_Shared_Variables(var_name, result)
@@ -2350,459 +2582,7 @@ def voice_command_response(step_data):
         return "failed"
 
 
-#################### Database Actions ####################
-# Constant names for database related activities
-DB_TYPE = "db_type"
-DB_NAME = "db_name"
-DB_USER_ID = "db_user_id"
-DB_PASSWORD = "db_password"
-DB_HOST = "db_host"
-DB_PORT = "db_port"
-DB_ODBC_DRIVER = "odbc_driver"
-
-
-# [NON ACTION]
-@logger
-def find_odbc_driver(db_type="postgresql"):
-    """
-    Finds the ODBC driver to work with based on the given database type
-    :param db_type: type of database (e.g postgres, mysql, etc.)
-    :return: name of the driver (string)
-    """
-
-    import pyodbc
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    db_type = db_type.lower()
-
-    # Check to see if any ODBC driver is specified
-    selected_driver = sr.Get_Shared_Variables(DB_ODBC_DRIVER, log=False)
-
-    # If no ODBC driver is specified
-    if selected_driver == "failed":
-        # Driver list for pyodbc to connect through the ODBC standard
-        pyodbc_drivers = pyodbc.drivers()
-
-        # Sort to get unicode items first
-        pyodbc_drivers.sort(reverse=True, key=lambda x: "unicode" in x.lower())
-
-        for odbc_driver in pyodbc_drivers:
-            odbc_driver_lowercase = odbc_driver.lower()
-
-            if db_type == "postgresql":
-                if (
-                    "postgre" in odbc_driver_lowercase
-                    and "unicode" in odbc_driver_lowercase
-                ):
-                    selected_driver = odbc_driver
-                    # We usually want the unicode drivers, so break once we've found it
-                    break
-                elif (
-                    "postgre" in odbc_driver_lowercase
-                    and "ansi" in odbc_driver_lowercase
-                ):
-                    selected_driver = odbc_driver
-            elif db_type == "mariadb":
-                # mariadb has only one type of odbc driver
-                if "mariadb" in odbc_driver_lowercase:
-                    selected_driver = odbc_driver
-                    break
-            elif db_type == "mysql":
-                if (
-                    "mysql" in odbc_driver_lowercase
-                    and "unicode" in odbc_driver_lowercase
-                ):
-                    selected_driver = odbc_driver
-                    # We usually want the unicode drivers, so break once we've found it
-                    break
-                elif (
-                    "mysql" in odbc_driver_lowercase and "ansi" in odbc_driver_lowercase
-                ):
-                    selected_driver = odbc_driver
-
-    CommonUtil.ExecLog(sModuleInfo, "[Database ODBC DRIVER]: %s" % selected_driver, 0)
-    return selected_driver
-
-
-# [NON ACTION]
-@logger
-def db_get_connection():
-    """
-    Convenience function for getting the cursor for db access
-    :return: pyodbc.Cursor
-    """
-
-    import pyodbc
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    try:
-        # Alias for Shared_Resources.Get_Shared_Variables
-        g = sr.Get_Shared_Variables
-
-        # Get the values
-        db_type = g(DB_TYPE)
-        db_name = g(DB_NAME)
-        db_user_id = g(DB_USER_ID)
-        db_password = g(DB_PASSWORD)
-        db_host = g(DB_HOST)
-        db_port = g(DB_PORT)
-
-        # Get the driver for the ODBC connection
-        odbc_driver = find_odbc_driver(db_type)
-
-        # Construct the connection string
-        connection_str = f"DRIVER={{{odbc_driver}}};UID={db_user_id};PWD={db_password};DATABASE={db_name};SERVER={db_host};PORT={db_port}"
-
-        # Connect to db
-        db_con = pyodbc.connect(connection_str)
-
-        # This is just an example that works for PostgreSQL and MySQL, with Python 2.7.
-        db_con.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")
-        db_con.setdecoding(pyodbc.SQL_WCHAR, encoding="utf-8")
-        db_con.setencoding(encoding="utf-8")
-
-        # Get db_cursor
-        return db_con
-    except pyodbc.DataError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.DataError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.InternalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.InternalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.IntegrityError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.IntegrityError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.OperationalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.OperationalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.NotSupportedError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.NotSupportedError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.ProgrammingError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.ProgrammingError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except Exception:
-        traceback.print_exc()
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-@logger
-def connect_to_db(data_set):
-    """
-    This action just stores the different database specific configs into shared variables for use by other actions.
-    NOTE: The actual db connection does not happen here, connection to db is made inside the actions which require it.
-
-    db_type         input parameter         <type of db, ex: postgres, mysql>
-    db_name         input parameter         <name of db, ex: zeuz_db>
-    db_user_id      input parameter         <user id of the os who have access to the db, ex: postgres>
-    db_password     input parameter         <password of db, ex: mydbpass-mY1-t23z>
-    db_host         input parameter         <host of db, ex: localhost, 127.0.0.1>
-    db_port         input parameter         <port of db, ex: 5432 for postgres by default>
-    odbc_driver     optional parameter      <specify the odbc driver, optional, can be found from pyodbc.drivers()>
-    connect to db   common action           Connect to a database
-
-    :param data_set: Action data set
-    :return: string: "passed" or "failed" depending on the outcome
-    """
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    try:
-        for row in data_set:
-            if row[0] == DB_TYPE:
-                sr.Set_Shared_Variables(DB_TYPE, row[2])
-            if row[0] == DB_NAME:
-                sr.Set_Shared_Variables(DB_NAME, row[2])
-            if row[0] == DB_USER_ID:
-                sr.Set_Shared_Variables(DB_USER_ID, row[2])
-            if row[0] == DB_PASSWORD:
-                sr.Set_Shared_Variables(DB_PASSWORD, row[2], allowEmpty=True)
-            if row[0] == DB_HOST:
-                sr.Set_Shared_Variables(DB_HOST, row[2])
-            if row[0] == DB_PORT:
-                sr.Set_Shared_Variables(DB_PORT, row[2])
-            if row[0] == DB_ODBC_DRIVER:
-                sr.Set_Shared_Variables(DB_ODBC_DRIVER, row[2])
-
-        return "passed"
-    except Exception:
-        traceback.print_exc()
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-@logger
-def db_select(data_set):
-    """
-    This action performs a select query and stores the result of the query in the variable <var_name>
-    The result will be stored in the format: list of lists
-        [ [row1...], [row2...], ... ]
-
-    query               input parameter         <query: SELECT * FROM test_cases ORDER BY tc_id ASC LIMIT 10>
-    db: select     input parameter         <var_name: name of the variable to store the result of the query>
-
-    :param data_set: Action data set
-    :return: string: "passed" or "failed" depending on the outcome
-    """
-
-    import pyodbc
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    try:
-        variable_name = None
-        query = None
-
-        for row in data_set:
-            if row[0] == "query":
-                # Get the and query, and remove any whitespaces
-                query = row[2].strip()
-
-            if row[0] == "db: select":
-                variable_name = row[2].strip()
-
-        # Get db_cursor and execute
-        db_con = db_get_connection()
-        db_cursor = db_con.cursor()
-        db_cursor.execute(query)
-
-        # Fetch all rows and convert into list
-        db_rows = []
-        while True:
-            db_row = db_cursor.fetchone()
-            if not db_row:
-                break
-            db_rows.append(list(db_row))
-
-        # Set the rows as a shared variable
-        sr.Set_Shared_Variables(variable_name, db_rows)
-
-        CommonUtil.ExecLog(
-            sModuleInfo,
-            "Fetched %d rows and stored into variable: %s"
-            % (len(db_rows), variable_name),
-            0,
-        )
-        return "passed"
-    except pyodbc.DataError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.DataError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.InternalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.InternalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.IntegrityError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.IntegrityError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.OperationalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.OperationalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.NotSupportedError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.NotSupportedError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.ProgrammingError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.ProgrammingError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except Exception:
-        traceback.print_exc()
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-@logger
-def db_select_single_value(data_set):
-    """
-    This action performs a select query and stores the ONLY value (a single value) of the query in the variable <var_name>
-    NOTE: This is NOT equivalent to a row, it just stores the result of a single value, say the count(...) function
-    The result will be stored in the format: string
-        value
-
-    query                       input parameter    <query: SELECT count(*) FROM user_info>
-    db: select single value  input parameter    <var_name: name of the variable to store the result of the query>
-
-    :param data_set: Action data set
-    :return: string: "passed" or "failed" depending on the outcome
-    """
-
-    import pyodbc
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    try:
-        variable_name = None
-        query = None
-
-        for row in data_set:
-            if row[0] == "query":
-                # Get the query, and remove any whitespaces
-                query = row[2].strip()
-
-            if row[0] == "db: select single value":
-                variable_name = row[2].strip()
-
-        # Get db_cursor and execute
-        db_con = db_get_connection()
-        db_cursor = db_con.cursor()
-        db_cursor.execute(query)
-
-        # Fetch a single value
-        db_val = db_cursor.fetchval()
-
-        # Set the rows as a shared variable
-        sr.Set_Shared_Variables(variable_name, db_val)
-
-        CommonUtil.ExecLog(
-            sModuleInfo,
-            "Fetched single val and stored into - %s = %s" % (variable_name, db_val),
-            0,
-        )
-        return "passed"
-    except pyodbc.DataError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.DataError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.InternalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.InternalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.IntegrityError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.IntegrityError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.OperationalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.OperationalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.NotSupportedError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.NotSupportedError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.ProgrammingError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.ProgrammingError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except Exception:
-        traceback.print_exc()
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
-@logger
-def db_non_query(data_set):
-    """
-    This action performs a non-query (insert/update/delete) query and stores the "number of rows affected"
-    in the variable <var_name>
-
-    The result will be stored in the format: int
-        value
-
-    non query                            input parameter    <query: INSERT INTO table_name(col1, col2, ...) VALUES (val1, val2, ...)>
-    db: non query: insert/update/delete  input parameter    <var_name: name of the variable to store the no of rows affected>
-
-    :param data_set: Action data set
-    :return: string: "passed" or "failed" depending on the outcome
-    """
-
-    import pyodbc
-
-    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
-
-    try:
-        variable_name = None
-        query = None
-
-        for row in data_set:
-            if row[0] == "non query":
-                # Get the query, and remove any whitespaces
-                query = row[2].strip()
-
-            if row[0] == "db: non query: insert/update/delete":
-                variable_name = row[2].strip()
-
-        # Get db_cursor and execute
-        db_con = db_get_connection()
-        db_cursor = db_con.cursor()
-        db_cursor.execute(query)
-
-        # Commit the changes
-        db_con.commit()
-
-        # Fetch the number of rows affected
-        db_rows_affected = db_cursor.rowcount
-
-        # Set the rows as a shared variable
-        sr.Set_Shared_Variables(variable_name, db_rows_affected)
-
-        CommonUtil.ExecLog(
-            sModuleInfo, "Number of rows affected: %d" % db_rows_affected, 0
-        )
-        return "passed"
-    except pyodbc.DataError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.DataError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.InternalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.InternalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.IntegrityError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.IntegrityError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.OperationalError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.OperationalError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.NotSupportedError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.NotSupportedError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except pyodbc.ProgrammingError as e:
-        traceback.print_exc()
-        CommonUtil.ExecLog(sModuleInfo, "pyodbc.ProgrammingError", 3)
-        return CommonUtil.Exception_Handler(e)
-
-    except Exception:
-        traceback.print_exc()
-        return CommonUtil.Exception_Handler(sys.exc_info())
-
-
 # Gloabal variable actions
-
-
 @logger
 def get_global_list_variable(data_set):
     # get the global list variable content
@@ -2911,3 +2691,107 @@ def save_variable_by_list_difference(data_set):
         return sr.Set_Shared_Variables(saved_variable_name, variable_value)
     else:
         return "failed"
+
+@logger
+def validate_list_order(data_set):
+    """ To validate whether a list is in ascending or in descending order
+    Example 1:
+    Field	             Sub Field	            Value
+    order type           element parameter	    ascending
+    validate order       common action  	    [1,2,3.5]
+
+    Example 2:
+    Field	             Sub Field	            Value
+    order type           element parameter	    descending
+    validate order       common action  	    %|var|%
+
+    Example 3:
+    Field	             Sub Field	            Value
+    order type           element parameter	    descending
+    case sensitivity     optional parameter     False
+    validate order       common action  	    ["c","A","3","t"]
+    """
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+
+    case_sensitivity = True
+    order_type = ""
+    for left, mid, right in data_set:
+        left = left.strip().lower()
+        right = right.strip()
+        if left == "validate order":
+            try:
+                value = right
+                value = CommonUtil.parse_value_into_object(value)
+            except:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "Couldn't parse your list",
+                    3,
+                )
+                return "failed"
+        elif left == "case sensitivity":
+            case_sensitivity = False if right.lower() == "false" else True
+        elif left == "order type":
+            order_type = right.lower()
+
+    if isinstance(value[0], str) and not case_sensitivity:
+        try:
+            for i in range(len(value)):
+                value[i] = value[i].lower()
+        except:
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                'Please provide a simple list of numbers or list of strings.Such as [1, 2.5, 3] or ["c","a","t"]',
+                3
+            )
+            return "failed"
+
+    if order_type not in ("ascending", "descending"):
+        CommonUtil.ExecLog(
+            sModuleInfo,
+            "Order type should be provided between 'ascending' or 'descending' Taking 'ascending' by default ",
+            2
+        )
+        order_type = "ascending"
+
+    try:
+        if order_type == "ascending":
+            if sorted(value, reverse=False) == value:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    'Your list is in ascending order',
+                    1
+                )
+                return "passed"
+            else:
+                order = "descending" if sorted(value, reverse=True) == value else "random"
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    'Your list is not in ascending order. Its in %s order' % order,
+                    3
+                )
+                return "failed"
+        elif order_type == "descending":
+            if sorted(value, reverse=True) == value:
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    'Your list is in descending order',
+                    1
+                )
+                return "passed"
+            else:
+                order = "ascending" if sorted(value, reverse=False) == value else "random"
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    'Your list is not in descending order. Its in %s order' % order,
+                    3
+                )
+                return "failed"
+    except:
+        CommonUtil.ExecLog(
+            sModuleInfo,
+            'Please provide a simple list of numbers or list of strings.Such as [1, 2.5, 3] or ["c","a","t"]',
+            3
+        )
+        return "failed"
+

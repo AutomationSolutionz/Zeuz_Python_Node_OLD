@@ -23,13 +23,13 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import NoAlertPresentException
+from selenium.common.exceptions import NoAlertPresentException, ElementClickInterceptedException, WebDriverException, SessionNotCreatedException, TimeoutException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 import pyautogui
 from pyautogui import press, typewrite
-
+import driver_updater
 from Framework.Utilities import CommonUtil, ConfigModule
 from Framework.Built_In_Automation.Shared_Resources import (
     BuiltInFunctionSharedResources as Shared_Resources,
@@ -73,7 +73,7 @@ selenium_driver = None
 # Recall dependency, if not already set
 dependency = None
 if Shared_Resources.Test_Shared_Variables(
-    "dependency"
+        "dependency"
 ):  # Check if driver is already set in shared variables
     dependency = Shared_Resources.Get_Shared_Variables(
         "dependency"
@@ -83,7 +83,7 @@ else:
 
 
 @logger
-def Open_Browser(dependency, window_size_X=None, window_size_Y=None):
+def Open_Browser(dependency, window_size_X=None, window_size_Y=None, update_driver_on_fail = True):
     """ Launch browser and create instance """
 
     global selenium_driver
@@ -185,11 +185,11 @@ def Open_Browser(dependency, window_size_X=None, window_size_Y=None):
 
         elif "safari" in browser:
             os.environ["SELENIUM_SERVER_JAR"] = (
-                os.sys.prefix
-                + os.sep
-                + "Scripts"
-                + os.sep
-                + "selenium-server-standalone-2.45.0.jar"
+                    os.sys.prefix
+                    + os.sep
+                    + "Scripts"
+                    + os.sep
+                    + "selenium-server-standalone-2.45.0.jar"
             )
             desired_capabilities = DesiredCapabilities.SAFARI
             if "ios" in browser:
@@ -221,6 +221,31 @@ def Open_Browser(dependency, window_size_X=None, window_size_Y=None):
             )
             return "failed"
         # time.sleep(3)
+
+    except SessionNotCreatedException as exc:
+        if "This version" in exc.msg and "only supports" in exc.msg and update_driver_on_fail:
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                "Couldn't open the browser because the webdriver is backdated. Trying again after updating webdrivers",
+                2
+            )
+            driver_updater.main()
+            Open_Browser(dependency, window_size_X, window_size_Y, update_driver_on_fail=False)
+        else:
+            return CommonUtil.Exception_Handler(sys.exc_info())
+
+    except WebDriverException as exc:
+        if "needs to be in PATH" in exc.msg and update_driver_on_fail:
+            CommonUtil.ExecLog(
+                sModuleInfo,
+                "Couldn't open the browser because the webdriver is not installed. Trying again after installing webdrivers",
+                2
+            )
+            driver_updater.main()
+            Open_Browser(dependency, window_size_X, window_size_Y, update_driver_on_fail=False)
+        else:
+            return CommonUtil.Exception_Handler(sys.exc_info())
+
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -235,7 +260,7 @@ def Open_Browser_Wrapper(step_data):
         global dependency
         # Get the dependency again in case it was missed
         if Shared_Resources.Test_Shared_Variables(
-            "dependency"
+                "dependency"
         ):  # Check if driver is already set in shared variables
             dependency = Shared_Resources.Get_Shared_Variables(
                 "dependency"
@@ -275,7 +300,7 @@ def Go_To_Link(step_data, page_title=False):
             global dependency
             # Get the dependency again in case it was missed
             if Shared_Resources.Test_Shared_Variables(
-                "dependency"
+                    "dependency"
             ):  # Check if driver is already set in shared variables
                 dependency = Shared_Resources.Get_Shared_Variables(
                     "dependency"
@@ -316,80 +341,70 @@ def Go_To_Link(step_data, page_title=False):
 def Handle_Browser_Alert(step_data):
     # accepts browser alert
     """
-    handle alert   selenium action     get text = my_variable 
-    handle alert   selenium action     send text = my text to send to alert   
+    wait           optional parameter  5.0
+    handle alert   selenium action     get text = my_variable
+    handle alert   selenium action     send text = my text to send to alert
     handle alert   selenium action     accept, pass, yes, ok (any of these would work)
     handle alert   selenium action     reject, fail, no, cancel (any of these would work)
     """
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
 
+    wait = 5.0
+    choice, choice_lower = "", ""
     try:
-        choice = str(step_data[0][2])
-        choice_lower = choice.lower()
-        if (
-            choice_lower == "accept"
-            or choice == "pass"
-            or choice == "yes"
-            or choice == "ok"
-        ):
-            try:
-                selenium_driver.switch_to_alert().accept()
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert accepted", 1)
-                return "passed"
-            except NoAlertPresentException as e:
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 3)
-                return "failed"
-        elif (
-            choice_lower == "reject"
-            or choice == "fail"
-            or choice == "no"
-            or choice == "cancel"
-        ):
-            try:
-                selenium_driver.switch_to_alert().dismiss()
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert rejected", 1)
-                return "passed"
-            except NoAlertPresentException as e:
-                CommonUtil.ExecLog(sModuleInfo, "Browser alert not found", 3)
-                return "failed"
+        for left, mid, right in step_data:
+            left = left.lower()
+            if "handle alert" in left:
+                choice = right
+                choice_lower = right.strip().lower()
+            elif "wait" in left:
+                wait = float(right.strip())
 
-        elif "get text" in choice:
-            try:
-                alert_text = selenium_driver.switch_to_alert().text
-                selenium_driver.switch_to_alert().accept()
-                variable_name = (choice.split("="))[1]
-                result = Shared_Resources.Set_Shared_Variables(
-                    variable_name, alert_text
-                )
-                if result in failed_tag_list:
-                    CommonUtil.ExecLog(
-                        sModuleInfo,
-                        "Value of Variable '%s' could not be saved!!!" % variable_name,
-                        3,
-                    )
-                    return "failed"
-                else:
-                    Shared_Resources.Show_All_Shared_Variables()
-                    return "passed"
+    except Exception:
+        CommonUtil.ExecLog(sModuleInfo, "Failed to parse data", 3)
+        return "failed"
 
-            except NoAlertPresentException as e:
+    try:
+        CommonUtil.ExecLog("", "Waiting %s seconds max for the alert box to appear" % str(wait), 1)
+        WebDriverWait(selenium_driver, wait).until(EC.alert_is_present())
+        time.sleep(2)
+    except TimeoutException:
+        CommonUtil.ExecLog(sModuleInfo, "Waited %s seconds but no alert box appeared" % str(wait), 3)
+        return "failed"
+
+    try:
+        if choice_lower in ("accept", "pass", "yes", "ok"):
+            selenium_driver.switch_to_alert().accept()
+            CommonUtil.ExecLog(sModuleInfo, "Browser alert accepted", 1)
+            return "passed"
+
+        elif choice_lower in ("reject", "fail", "no", "cancel"):
+            selenium_driver.switch_to_alert().dismiss()
+            CommonUtil.ExecLog(sModuleInfo, "Browser alert rejected", 1)
+            return "passed"
+
+        elif "get text" in choice_lower:
+            alert_text = selenium_driver.switch_to_alert().text
+            selenium_driver.switch_to_alert().accept()
+            variable_name = (choice.split("="))[1]
+            result = Shared_Resources.Set_Shared_Variables(
+                variable_name, alert_text
+            )
+            if result in failed_tag_list:
                 CommonUtil.ExecLog(
-                    sModuleInfo, "Browser alert not found.  Unable to collect text", 3
+                    sModuleInfo,
+                    "Value of Variable '%s' could not be saved!!!" % variable_name,
+                    3,
                 )
                 return "failed"
-
-        elif "send text" in choice:
-            try:
-                text_to_send = (choice.split("="))[1]
-                selenium_driver.switch_to_alert().send_keys(text_to_send)
-                selenium_driver.switch_to_alert().accept()
+            else:
                 return "passed"
 
-            except NoAlertPresentException as e:
-                CommonUtil.ExecLog(
-                    sModuleInfo, "Unable to send text to alert pop up", 3
-                )
-                return "failed"
+        elif "send text" in choice_lower:
+            text_to_send = (choice.split("="))[1]
+            selenium_driver.switch_to_alert().send_keys(text_to_send)
+            selenium_driver.switch_to_alert().accept()
+            return "passed"
 
         else:
             CommonUtil.ExecLog(
@@ -482,21 +497,30 @@ def Enter_Text_In_Text_Box(step_data):
         delay = 0
         text_value = ""
         use_js = False
+        without_click = False
 
         global selenium_driver
         Element = LocateElement.Get_Element(step_data, selenium_driver)
         if Element != "failed":
-            for each in step_data:
-                if each[1] == "action":
-                    text_value = each[2]
-                elif each[0] == "delay":
-                    delay = float(each[2])
-                if "use js" in each[0].lower():
-                    use_js = each[2].strip().lower() in ("true", "yes", "1")
+            for left, mid, right in step_data:
+                mid = mid.strip().lower()
+                left = left.lower()
+                if "action" in mid:
+                    text_value = right
+                elif "delay" in left:
+                    delay = float(right.strip())
+                elif "use js" in left:
+                    use_js = right.strip().lower() in ("true", "yes", "1")
 
             if use_js:
-                # Click on element.
-                selenium_driver.execute_script("arguments[0].click();", Element)
+                try:
+                    selenium_driver.execute_script("arguments[0].click();", Element)
+                except:
+                    CommonUtil.ExecLog(
+                        sModuleInfo,
+                        "Entering text without clicking the element",
+                        2,
+                    )
 
                 # Fill up the value.
                 selenium_driver.execute_script(
@@ -506,7 +530,14 @@ def Enter_Text_In_Text_Box(step_data):
                 # Soemtimes text field becomes unclickable after entering text?
                 selenium_driver.execute_script("arguments[0].click();", Element)
             else:
-                Element.click()
+                try:
+                    Element.click()
+                except:
+                    CommonUtil.ExecLog(
+                        sModuleInfo,
+                        "Entering text without clicking the element",
+                        2,
+                    )
 
                 # Element.clear()
                 Element.send_keys(Keys.CONTROL, "a")
@@ -726,6 +757,25 @@ def Click_Element(data_set):
             CommonUtil.TakeScreenShot(sModuleInfo)
             CommonUtil.ExecLog(sModuleInfo, "Successfully clicked the element", 1)
             return "passed"
+
+        except ElementClickInterceptedException:
+            try:
+                selenium_driver.execute_script("arguments[0].click();", Element)
+                CommonUtil.TakeScreenShot(sModuleInfo)
+                CommonUtil.ExecLog(
+                    sModuleInfo,
+                    "Your element is overlapped with another sibling element. Executing JavaScript for clicking the element",
+                    2
+                )
+                return "passed"
+            except Exception:
+                element_attributes = Element.get_attribute("outerHTML")
+                CommonUtil.ExecLog(
+                    sModuleInfo, "Element Attributes: %s" % (element_attributes), 3
+                )
+                errMsg = "Could not select/click your element."
+                return CommonUtil.Exception_Handler(sys.exc_info(), None, errMsg)
+
         except Exception:
             element_attributes = Element.get_attribute("outerHTML")
             CommonUtil.ExecLog(
@@ -766,14 +816,14 @@ def Click_Element(data_set):
 
 @logger
 def Mouse_Click_Element(data_set):
-    """ 
-    This funciton will move the mouse to the element and then perform a physical mouse click 
-    
+    """
+    This funciton will move the mouse to the element and then perform a physical mouse click
+
     element_prop        element parameter          element_value
     mouse click        selenium action            click
-    
-    
-    
+
+
+
     """
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     global selenium_driver
@@ -818,7 +868,6 @@ def Mouse_Click_Element(data_set):
 # Method to click and hold on element; step data passed on by the user
 @logger
 def Click_and_Text(data_set):
-
     """ Click and enter text specially for dropdown box"""
 
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
@@ -1075,7 +1124,14 @@ def Save_Attribute(step_data):
             if "parameter" in each_step_data_item[1]:
                 variable_name = each_step_data_item[2]
                 attribute_name = each_step_data_item[0]
-        attribute_value = Element.get_attribute(attribute_name)
+
+        if attribute_name == "text":
+            attribute_value = Element.text
+        elif attribute_name == "tag":
+            attribute_value = Element.tag_name
+        else:
+            attribute_value = Element.get_attribute(attribute_name)
+
         result = Shared_Resources.Set_Shared_Variables(variable_name, attribute_value)
         if result in failed_tag_list:
             CommonUtil.ExecLog(
@@ -1287,15 +1343,22 @@ def save_attribute_values_in_list(step_data):
     This action will expect users to provide a parent element under which they are expecting
     to collect multiple objects.  Users can provide certain constrain to search their elements
     Sample data:
-    
-    aria-label                       element parameter       Calendar
-    aria-label                       target parameter        "Not available"
-    search by                        source parameter        class 
-    search contains                  attribute constrain     blocked_calendar  
-    search does not contain          attribute constrain     out_of_range
-    search does not contain          attribute constrain     CalendarDay__today
-    save attribute values in list    selenium action         list_name
-        
+
+    aria-label                       element parameter      Calendar
+
+    attributes                       target parameter       data-automation="productItemName",
+                                                            class="S58f2saa25a3w1",
+                                                            return="text",
+                                                            return_contains="128GB",
+                                                            return_does_not_contain="Windows 10",
+                                                            return_does_not_contain="Linux"
+
+    attributes                       target parameter       class="productPricingContainer_3gTS3",
+                                                            return="text",
+                                                            return_does_not_contain="99.99"
+
+    save attribute values in list    selenium action        list_name
+
     """
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     global selenium_driver
@@ -1309,70 +1372,92 @@ def save_attribute_values_in_list(step_data):
             )
             return "failed"
 
-        attribute_partial_value = ""
-        value = ""
-        search_contains = []
-        search_does_not_contain = []
-        lists_of_values = []
+        all_elements = []
+        target_index = 0
+        target = []
 
-        for each_step_data_item in step_data:
+        try:
+            for left, mid, right in step_data:
+                left = left.strip().lower()
+                mid = mid.strip().lower()
+                right = right.strip()
+                if "target parameter" in mid:
+                    target.append([[], [], [], []])
+                    temp = right.strip(",").split(",")
+                    data = []
+                    for each in temp:
+                        data.append(each.strip().split("="))
+                    for i in range(len(data)):
+                        for j in range(len(data[i])):
+                            data[i][j] = data[i][j].strip()
+                            if j == 1:
+                                data[i][j] = data[i][j].strip(
+                                    '"')  # do not add another strip here. dont need to strip inside cotation mark
 
-            if each_step_data_item[1].strip() == "target parameter":
-                attribute_name_to_save = each_step_data_item[0].strip()
-                attribute_partial_value = each_step_data_item[2].strip()
+                    for Left, Right in data:
+                        if Left == "return":
+                            target[target_index][1] = Right
+                        elif Left == "return_contains":
+                            target[target_index][2].append(Right)
+                        elif Left == "return_does_not_contain":
+                            target[target_index][3].append(Right)
+                        else:
+                            target[target_index][0].append((Left, 'element parameter', Right))
 
-            if each_step_data_item[0].strip() == "search by":
-                search_by_attribute = each_step_data_item[2].strip()
-
-            if each_step_data_item[0].strip() == "search contains":
-                search_contains.append(each_step_data_item[2].strip())
-            if each_step_data_item[0].strip() == "search does not contain":
-                search_does_not_contain.append(each_step_data_item[2].strip())
-
-            if each_step_data_item[0].strip() == "save attribute values in list":
-                list_name = each_step_data_item[2].strip()
-
-        xpathquery = '//*[contains(@%s, "%s")]' % (
-            attribute_name_to_save,
-            attribute_partial_value,
-        )
-
-        all_elements = selenium_driver.find_elements_by_xpath(xpathquery)
-
-        for each in all_elements:
-            try:
-                get_class_attr = each.get_attribute(search_by_attribute)
-                get_area_label_attr = each.get_attribute(attribute_name_to_save)
-            except:
-                True
-
-            try:
-                for each_contains in search_contains:
-                    if each_contains in get_class_attr:
-                        lists_of_values.append(get_area_label_attr)
-            except:
-                True
-            try:
-                for each_does_not_contains in search_does_not_contain:
-                    if each_does_not_contains in get_class_attr:
-                        lists_of_values.remove(get_area_label_attr)
-            except:
-                True
-
-        for value in lists_of_values:
-            result = Shared_Resources.Append_List_Shared_Variables(
-                list_name, value.strip()
+                    target_index = target_index + 1
+                elif left == "save attribute values in list":
+                    variable_name = right
+        except:
+            CommonUtil.ExecLog(
+                sModuleInfo, "Unable to parse data. Please write data in correct format", 3
             )
-            if result in failed_tag_list:
-                CommonUtil.ExecLog(
-                    sModuleInfo,
-                    "Value of Variable '%s' could not be saved!!!" % list_name,
-                    3,
-                )
-                return "failed"
-        else:
-            Shared_Resources.Show_All_Shared_Variables()
-            return "passed"
+            return "failed"
+
+        for each in target:
+            all_elements.append(LocateElement.Get_Element(each[0], Element, return_all_elements=True))
+
+        variable_value_size = 0
+        for each in all_elements:
+            variable_value_size = max(variable_value_size, len(each))
+
+        variable_value = []
+        for i in range(variable_value_size):
+            variable_value.append([])
+
+        i = 0
+        for each in all_elements:
+            search_by_attribute = target[i][1]
+            j = 0
+            for elem in each:
+                if search_by_attribute == "text":
+                    Attribute_value = elem.text
+                elif search_by_attribute == 'tag':
+                    Attribute_value = elem.tag_name
+                else:
+                    Attribute_value = elem.get_attribute(search_by_attribute)
+                try:
+                    for search_contain in target[i][2]:
+                        if not isinstance(search_contain,
+                                          type(Attribute_value)) or search_contain in Attribute_value or len(
+                                search_contain) == 0:
+                            pass
+                        else:
+                            Attribute_value = None
+
+                    for search_doesnt_contain in target[i][3]:
+                        if isinstance(search_doesnt_contain,
+                                      type(Attribute_value)) and search_doesnt_contain in Attribute_value:
+                            Attribute_value = None
+                except:
+                    CommonUtil.ExecLog(
+                        sModuleInfo, "Couldn't search by return_contains and return_does_not_contain", 2
+                    )
+                variable_value[j].append(Attribute_value)
+                j = j + 1
+            i = i + 1
+
+        Shared_Resources.Set_Shared_Variables(variable_name, variable_value)
+
     except Exception:
         return CommonUtil.Exception_Handler(sys.exc_info())
 
@@ -1527,7 +1612,7 @@ def Scroll(step_data):
             return "failed"
 
         if (
-            len(step_data) > 1
+                len(step_data) > 1
         ):  # element given scroll inside element, not on full window
             scroll_inside_element = True
             scroll_window_name = "arguments[0]"
@@ -1789,54 +1874,54 @@ def validate_table(data_set):
                     )
                     return "failed"
             elif (
-                subfield == "table parameter"
+                    subfield == "table parameter"
             ):  # Inspect the table parameters (element parameters go to a different section)
 
                 # Parse table instructions
                 if (
-                    field == "ignore row" or field == "ignore rows"
+                        field == "ignore row" or field == "ignore rows"
                 ):  # User specified list of rows to ignore
                     ignore_rows = value.split(
                         ","
                     )  # Get rows as comma delimited string and store in list
                     ignore_rows = list(map(int, ignore_rows))  # Convert to integers
                 elif (
-                    field == "ignore column" or field == "ignore columns"
+                        field == "ignore column" or field == "ignore columns"
                 ):  # User specified list of columns to ignore
                     ignore_cols = value.split(
                         ","
                     )  # Get columns as comma delimited string and store in list
                     ignore_cols = list(map(int, ignore_cols))  # Convert to integers
                 elif (
-                    field == "coordinates"
+                        field == "coordinates"
                 ):  # Check if user specifies if table coordinates should match
                     if (
-                        value.lower().strip() == "identical"
+                            value.lower().strip() == "identical"
                     ):  # Table coordinates should match
                         coordinates_exact = True
                     elif (
-                        value.lower().strip() == "nonidentical"
+                            value.lower().strip() == "nonidentical"
                     ):  # Table coordinates don't have to match
                         coordinates_exact = False
                 elif field == "case":  # User specified case sensitivity
                     if (
-                        value.lower().strip() == "exact"
-                        or value.lower().strip() == "sensitive"
+                            value.lower().strip() == "exact"
+                            or value.lower().strip() == "sensitive"
                     ):  # Sensitive match (default)
                         case_sensitive = True
                     elif (
-                        value.lower().strip() == "insensitive"
+                            value.lower().strip() == "insensitive"
                     ):  # Insensitive match - we'll convert everything to lower case
                         case_sensitive = False
                 elif field == "exact":  # User specified type of table matching
                     if (
-                        value.lower().strip() == "true"
-                        or value.lower().strip() == "yes"
+                            value.lower().strip() == "true"
+                            or value.lower().strip() == "yes"
                     ):  # Exact table match, but user can specify rows/columns to ignore
                         exact_table = True
                     elif (
-                        value.lower().strip() == "false"
-                        or value.lower().strip() == "no"
+                            value.lower().strip() == "false"
+                            or value.lower().strip() == "no"
                     ):  # Not an exact match for all cells, only match the ones the user specified
                         exact_table = False
                     else:
@@ -1855,17 +1940,17 @@ def validate_table(data_set):
                             ","
                         )  # Field should be in the format of ROW,COL
                         if (
-                            table_row != "" and table_col != ""
+                                table_row != "" and table_col != ""
                         ):  # Check to ensure this was a table cell identifier - may not be
                             if (
-                                case_sensitive == False
+                                    case_sensitive == False
                             ):  # User specified case insensitive serach
                                 value = (
                                     value.lower()
                                 )  # Prepare this table by setting all cell values to lowercase
                             user_table[
                                 "%s,%s" % (table_row, table_col)
-                            ] = value  # Save value using the row,col as an identifier
+                                ] = value  # Save value using the row,col as an identifier
                             have_table = True  # Indicate we have at least one cell of a table specified
                         else:
                             CommonUtil.ExecLog(
@@ -1921,19 +2006,19 @@ def validate_table(data_set):
     # If user did not specify any rows or columns to ignore, we will infer that rows and columns NOT defined are meant to be ignored
     # We do this by modifying the webpage table to remove rows and columns that don't match
     if (
-        exact_table == False and ignore_rows == [] and ignore_cols == []
+            exact_table == False and ignore_rows == [] and ignore_cols == []
     ):  # If user did not specify anything to ignore
         CommonUtil.ExecLog(
             sModuleInfo, "Inferring which cells from the webpage table to ignore", 0
         )
         unmatched_cells = []
         for (
-            ids
+                ids
         ) in (
-            webpage_table
+                webpage_table
         ):  # For each table cell on the user table - basically looking for items that are specified, but not found
             if (
-                ids not in user_table
+                    ids not in user_table
             ):  # if cell from user table not found in webpage table
                 unmatched_cells.append(
                     ids
@@ -1943,12 +2028,12 @@ def validate_table(data_set):
         )
         for ids in unmatched_cells:  # Remove these cells from the webpage table
             if (
-                ids in webpage_table
+                    ids in webpage_table
             ):  # Check if the ID exists in case the user specified something that's not actually in the webpage table
                 del webpage_table[ids]
 
     if (
-        coordinates_exact == False
+            coordinates_exact == False
     ):  # If user specifies that cells locations do not have to match
         unmatched_cells = []
         for ids in user_table:
@@ -1971,7 +2056,7 @@ def validate_table(data_set):
     for ids in webpage_table:  # For each table cell on the webpage table
         if ids in user_table:  # If that table cell is also in the user defined table
             if (
-                webpage_table[ids] != user_table[ids]
+                    webpage_table[ids] != user_table[ids]
             ):  # Check if the values of these two cells match
                 failed_matches.append(
                     '%s:"%s" != %s:"%s"'
@@ -1981,12 +2066,12 @@ def validate_table(data_set):
             failed_matches.append("Cell %s is not defined in the step data" % ids)
 
     for (
-        ids
+            ids
     ) in (
-        user_table
+            user_table
     ):  # For each table cell on the user table - basically looking for items that are specified, but not found
         if (
-            ids not in webpage_table
+                ids not in webpage_table
         ):  # if cell from user table not found in webpage table
             failed_matches.append("Cell %s is not found in the webpage table" % ids)
 
@@ -2116,7 +2201,7 @@ def validate_table_column_size(data_set):
                     "td"
                 )  # Get element list for all columns in this row
                 if (
-                    len(all_cols) == 0
+                        len(all_cols) == 0
                 ):  # No <TD> type columns, so check if there were header type columns, and use those instead
                     all_cols = all_rows[0].find_elements_by_tag_name(
                         "th"
@@ -2179,7 +2264,7 @@ def get_webpage_table_html(data_set, ignore_rows=[], ignore_cols=[], retain_case
                 "td"
             )  # Get element list for all columns in this row
             if (
-                len(td_list) == 0
+                    len(td_list) == 0
             ):  # No <TD> type columns, so check if there were header type columns, and use those instead
                 td_list = tr.find_elements_by_tag_name(
                     "th"
@@ -2193,7 +2278,7 @@ def get_webpage_table_html(data_set, ignore_rows=[], ignore_cols=[], retain_case
                     value = value.lower()  # change cell text to lower case
                 master_text_table[
                     "%s,%s" % (table_row, table_col)
-                ] = value  # Put value from cell in dictionary
+                    ] = value  # Put value from cell in dictionary
 
         return master_text_table  # Return table text as dictionary
     except Exception:
@@ -2242,7 +2327,7 @@ def get_webpage_table_css(data_set, ignore_rows=[], ignore_cols=[], retain_case=
                         for column_obj in col_element:  # For each column on the row
                             table_col += 1
                             if (
-                                table_col not in ignore_cols
+                                    table_col not in ignore_cols
                             ):  # Skip columns the user wants to ignore
                                 value = str(
                                     column_obj.text
@@ -2253,7 +2338,7 @@ def get_webpage_table_css(data_set, ignore_rows=[], ignore_cols=[], retain_case=
                                     )  # change cell text to lower case
                                 master_text_table[
                                     "%s,%s" % (table_row, table_col)
-                                ] = value  # Put value from cell in dictionary
+                                    ] = value  # Put value from cell in dictionary
 
                     except:  # This will crash for single column tables or lists
                         table_col = 1  # Likely only one column
@@ -2264,7 +2349,7 @@ def get_webpage_table_css(data_set, ignore_rows=[], ignore_cols=[], retain_case=
                             value = value.lower()  # change cell text to lower case
                         master_text_table[
                             "%s,%s" % (table_row, table_col)
-                        ] = value  # Put value from cell in dictionary
+                            ] = value  # Put value from cell in dictionary
 
         return master_text_table  # Return table text as dictionary
     except Exception:
@@ -2360,7 +2445,8 @@ def open_new_tab(step_data):
     try:
         time.sleep(2)
         CommonUtil.ExecLog(sModuleInfo, "Opening New Tab in Browser", 1)
-        selenium_driver.execute_script("""window.open(" ","_blank");""")
+        selenium_driver.execute_script("""window.open("");""")
+        selenium_driver.switch_to.window(selenium_driver.window_handles[-1])
 
         CommonUtil.ExecLog(sModuleInfo, "New Tab Opened Successfully in Browser", 1)
 
@@ -2370,9 +2456,11 @@ def open_new_tab(step_data):
 
 
 # Method to switch to a new tab
+@deprecated
 @logger
 def switch_tab(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo, "Try our new action named 'Switch window/tab'", 2)
     global selenium_driver
     try:
         tab = 1
@@ -2393,38 +2481,40 @@ def switch_tab(step_data):
 
 
 # Method to switch to a new tab
+@deprecated
 @logger
 def switch_window(step_data):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    CommonUtil.ExecLog(sModuleInfo, "Try our new action named 'Switch Window/Tab'", 2)
     global selenium_driver
     try:
+        switch_by_title_condition = False
+        switch_by_index_condition = False
+        for left, mid, right in step_data:
+            left = left.lower().strip()
+            if left == "window title":
+                switch_by_title = right
+                switch_by_title_condition = True
+            elif left == "window index":
+                switch_by_index = right.strip()
+                switch_by_index_condition = True
 
-        try:
-            switch_by_title = [x for x in step_data if "window title" == x[0]][0][2]
-        except:
-            switch_by_title = False
-
-        try:
-            switch_by_index = [x for x in step_data if "window index" == x[0]][0][2]
-        except:
-            switch_by_index = False
-
-        if switch_by_title != False:
+        if switch_by_title_condition:
             all_windows = selenium_driver.window_handles
             window_handles_found = False
             for each in all_windows:
                 selenium_driver.switch_to.window(each)
-                if switch_by_title in (selenium_driver.title):
+                if switch_by_title == (selenium_driver.title):
                     window_handles_found = True
                     CommonUtil.ExecLog(sModuleInfo, "switched your window", 1)
                     break
             if window_handles_found == False:
-                CommonUtil.ExecLog(sModuleInfo, "unable to switch your window", 3)
+                CommonUtil.ExecLog(sModuleInfo, "unable to find your given title among the windows", 3)
                 return False
             else:
                 return True
 
-        elif switch_by_index != False:
+        elif switch_by_index_condition:
             check_if_index = ["0", "1", "2", "3", "4", "5"]
             if switch_by_index in check_if_index:
                 window_index = int(switch_by_index)
@@ -2439,7 +2529,90 @@ def switch_window(step_data):
                 )
                 return False
         else:
-            CommonUtil.ExecLog(sModuleInfo, "unable to switch your window", 3)
+            CommonUtil.ExecLog(sModuleInfo, "Wrong data set provided. Choose between window title or window index", 3)
+            return False
+
+    except Exception:
+        CommonUtil.ExecLog(sModuleInfo, "unable to switch your window", 3)
+        return CommonUtil.Exception_Handler(sys.exc_info())
+
+
+@logger
+def switch_window_or_tab(step_data):
+    """
+    This action will switch tab/window in browser. Basically window and tabs are same in selenium.
+
+    Example 1:
+    Field	            Sub Field	        Value
+    *window title       element parameter	googl
+    switch window       selenium action 	switch window
+
+
+    Example 2:
+    Field	            Sub Field	        Value
+    window title        element parameter	google
+    switch window       selenium action 	switch window
+
+    Example 3:
+    Field	            Sub Field	        Value
+    window index        element parameter	9
+    switch window       selenium action 	switch window
+
+    """
+    sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
+    global selenium_driver
+    try:
+        title_condition = False
+        index_condition = False
+        partial_match = False
+        for left, mid, right in step_data:
+            left = left.lower().strip()
+            if left == "window title":
+                switch_by_title = right
+                title_condition = True
+            elif left == "*window title":
+                switch_by_title = right
+                partial_match = True
+                title_condition = True
+            elif left == "window index":
+                switch_by_index = right.strip()
+                index_condition = True
+                title_condition = False
+                break  # Index priority is highest so break the loop
+
+        if title_condition:
+            all_windows = selenium_driver.window_handles
+            window_handles_found = False
+            Tries = 3
+            for Try in range(Tries):
+                for each in all_windows:
+                    selenium_driver.switch_to.window(each)
+                    if (partial_match and switch_by_title in (selenium_driver.title)) or (
+                            not partial_match and switch_by_title == (selenium_driver.title)):
+                        window_handles_found = True
+                        CommonUtil.ExecLog(sModuleInfo, "switched your window", 1)
+                        break
+                else:
+                    CommonUtil.ExecLog(sModuleInfo, "Couldn't find the title. Trying again after 1 second delay", 2)
+                    time.sleep(1)
+                    continue  # only executed if the inner loop did not break
+                break  # only executed if the inner loop did break
+
+            if not window_handles_found:
+                CommonUtil.ExecLog(sModuleInfo,
+                                   "unable to find the title among the windows. If you want to match partially please use '*windows title'",
+                                   3)
+                return False
+            else:
+                return True
+
+        elif index_condition:
+            window_index = int(switch_by_index)
+            window_to_switch = selenium_driver.window_handles[window_index]
+            selenium_driver.switch_to.window(window_to_switch)
+            return True
+        else:
+            CommonUtil.ExecLog(sModuleInfo, "Wrong data set provided. Choose between window title or window index", 3)
             return False
 
     except Exception:

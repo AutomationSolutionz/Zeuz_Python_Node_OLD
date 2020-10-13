@@ -1,44 +1,29 @@
-# -*- coding: utf-8 -*-
-# -*- coding: cp1252 -*-
+# -- coding: utf-8 --
+# -- coding: cp1252 --
 
 from . import ConfigModule
 import requests
 import json
+from urllib3.exceptions import InsecureRequestWarning
 
 SERVER_TAG = "Authentication"
 SERVER_ADDRESS_TAG = "server_address"
 SERVER_PORT = "server_port"
 REQUEST_TIMEOUT = 2 * 60
 
+# Suppress the InsecureRequestWarning since we use verify=False parameter.
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
 
 def form_uri(resource_path):
     web_server_address = ConfigModule.get_config_value(SERVER_TAG, SERVER_ADDRESS_TAG)
-    web_server_port = ""
+    base_server_address = web_server_address
+    if len(resource_path) > 0:
+        if resource_path[0] == "/":
+            resource_path = resource_path[1:]
+        base_server_address += "/" + resource_path 
 
-    web_server_address = str(web_server_address).strip().strip("/")
-    web_server_port = str(web_server_port).strip()
-    if web_server_port == "":
-        if web_server_address.startswith("https://"):
-            web_server_port = "443"
-        else:
-            if web_server_address.startswith("http://"):
-                web_server_domain = web_server_address.split("//")[1]
-            else:
-                web_server_domain = web_server_address.split("//")[0]
-            if web_server_domain in ["localhost", "127.0.0.1"]:
-                web_server_port = "8000"
-            else:
-                web_server_port = "80"
-    ConfigModule.add_config_value("Authentication", "server_port", web_server_port)
-    if web_server_address.startswith("http://") or web_server_address.startswith(
-        "https://"
-    ):
-        base_server_address = "{}:{}/".format(web_server_address, web_server_port)
-    else:
-        base_server_address = "http://{}:{}/".format(
-            web_server_address, web_server_port
-        )
-    return base_server_address + resource_path
+    return base_server_address
 
 
 def Post(resource_path, payload=None):
@@ -56,14 +41,16 @@ def Post(resource_path, payload=None):
         return {}
 
 
-def Get(resource_path, payload=None):
+def Get(resource_path, payload=None,**kwargs):
     if payload is None:  # Removing default mutable argument
         payload = {}
     try:
         return requests.get(
-            form_uri(resource_path + "/"),
+            form_uri(resource_path ),
             params=json.dumps(payload),
             timeout=REQUEST_TIMEOUT,
+            verify=False,
+            **kwargs
         ).json()
 
     except requests.exceptions.RequestException:
@@ -85,7 +72,10 @@ def UpdatedGet(resource_path, payload=None):
         payload = {}
     try:
         return requests.get(
-            form_uri(resource_path + "/"), params=payload, timeout=REQUEST_TIMEOUT
+            form_uri(resource_path + "/"),
+            params=payload,
+            timeout=REQUEST_TIMEOUT,
+            verify=False,
         ).json()
 
     except requests.exceptions.RequestException as e:
@@ -104,7 +94,7 @@ def UpdatedGet(resource_path, payload=None):
 def Head(resource_path):
     try:
         uri = form_uri(resource_path)
-        return requests.head(uri, timeout=REQUEST_TIMEOUT)
+        return requests.head(uri, timeout=REQUEST_TIMEOUT, verify=False)
 
     except requests.exceptions.RequestException:
         print(
