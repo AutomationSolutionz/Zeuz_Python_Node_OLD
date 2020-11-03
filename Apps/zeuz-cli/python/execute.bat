@@ -2,7 +2,8 @@ python deploy.py ^
     --host "https://zeuz.zeuz.ai" ^
     --api_key "12345" ^
     --test_set_name "CLI Deployment" ^
-    --email "hello@world.com" ^
+    --email "foo@test.com, bar@test.com" ^
+    --email_pref "onfail" ^
     --objective "Deploy from cli with runtime params" ^
     --project "PROJ-17" ^
     --team "2" ^

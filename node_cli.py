@@ -7,12 +7,38 @@ from getpass import getpass
 
 from Framework.module_installer import install_missing_modules
 from Framework.Utilities import ConfigModule
-from utils import input_with_timeout, TimeoutExpired
 
 PROJECT_ROOT = os.path.abspath(os.curdir)
 
 # Append correct paths so that it can find the configuration files and other modules
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "Framework"))
+
+# kill any process that is running  from the same node folder
+pid = os.getpid()
+
+try:
+    #try to read to see if file exists 
+    pidfile = (os.path.realpath(__file__).split("node_cli.py")[0]+'pid.txt')
+except:
+    True
+try:
+    import psutil
+    pidfile_read = open(pidfile)
+    pidNumber = pidfile_read.read()
+    pidNumber = int("".join(pidNumber.split()))
+    print (pidNumber)
+    p = psutil.Process(pidNumber)
+    p.terminate() 
+    
+except:
+    True
+try: 
+    f = open(pidfile, "w")
+    f.write(str(os.getpid()))
+    f.close()
+except: 
+    True
+
 
 
 if not os.path.exists(
@@ -63,7 +89,13 @@ def password_hash(encrypt, key, pw):
     # Zeuz_Node.py has a similar function that will need to be updated if this is changed
 
     try:
-        from node_gui import pass_encode
+        def pass_encode(key, clear):
+            enc = []
+            for i in range(len(clear)):
+                key_c = key[i % len(key)]
+                enc_c = (ord(clear[i]) + ord(key_c)) % 256
+                enc.append(enc_c)
+            return base64.urlsafe_b64encode(bytes(enc))
 
         result = pass_encode(key, pw)
 
@@ -179,7 +211,7 @@ def Login(cli=False):
 
     if api:
         if not server_name:
-            print("Please provide server url with --server")
+            print("Please provide server url with --server and --api-key or type  -h for more info")
             return
 
         url = '/api/auth/token/verify?api_key=%s' % (api)
@@ -254,7 +286,7 @@ def Login(cli=False):
                 if api_flag:
                     r = RequestFormatter.Get("login_api", user_info_object)
 
-                if (isinstance(r,dict) and r['status']==200) or r:
+                if r or (isinstance(r,dict) and r['status']==200):
                     CommonUtil.ExecLog(
                         "",
                         f"Authentication successful: USER='{username}', "
@@ -815,7 +847,7 @@ def command_line_args():
         else:
             CommonUtil.ExecLog(
                 "AUTHENTICATION FAILED",
-                "Enter the command line arguments in correct format",
+                "Enter the command line arguments in correct format.  Type -h for help.",
                 3,
             )
             sys.exit()  # exit and let the user try again from command line

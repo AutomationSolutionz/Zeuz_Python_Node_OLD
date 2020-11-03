@@ -19,7 +19,12 @@ def req(req_type, host, url, payload=dict(), headers=dict(), params=dict()):
     url = host + url
 
     response = requests.request(
-        req_type, url, headers=headers, params=params, data=payload
+        req_type,
+        url,
+        headers=headers,
+        params=params,
+        data=payload,
+        verify=False
     )
     return response
 
@@ -94,7 +99,7 @@ def extract_runtime_parameters(param_str: str) -> str:
 
     Returns:
         A dictionary of the following format:
-        
+
           {
               "key1": {
                   "field": "key1",
@@ -141,6 +146,9 @@ def main():
 
     SLEEP_TIMEOUT = 30
 
+    # Disable SSL warnings.
+    requests.packages.urllib3.disable_warnings()
+
     # Collect arguments from the command line
     try:
         parser = argparse.ArgumentParser(description="Zeuz CLI Tool")
@@ -149,6 +157,11 @@ def main():
         parser.add_argument("--test_set_name", help="Name of the test set")
         parser.add_argument(
             "--email", help="Email address where the report will be delivered"
+        )
+        parser.add_argument(
+            "--email_pref",
+            default="always",
+            help="Email preference after deployment is complete. example: onfail/always (default: always)",
         )
         parser.add_argument("--objective", help="Objective of the deployment")
         parser.add_argument("--project", help="Project ID, example: PROJ-10")
@@ -180,6 +193,7 @@ def main():
         api_key = args.api_key
         test_set_name = args.test_set_name
         email = args.email
+        email_pref = args.email_pref
         objective = args.objective
         project = args.project
         team = args.team
@@ -203,11 +217,18 @@ def main():
     else:
         runtime_parameters = {}
 
+
+    # Parse emails
+    emails = [e.strip() for e in email.split(",")]
+
     # Get token for the given API key
     token = get_token_from_api(api_key, host)
     if "status" in token and token["status"] == 404:
         print("Invalid API key")
         return EXIT_CODE_INVALID_API
+
+    # Extract token from request
+    token = token["token"]
 
     # Verify test set
     r = get_test_set(token, host, project, team, test_set_name)
@@ -229,17 +250,22 @@ def main():
 
     # If 'any' is specified as the parameter for machine,
     machine_list = list()
-    if machine == "any":
-        for _ in range(machine_timeout):
-            machine_list = get_available_machines(token, host, project, team)
-            if len(machine_list) == 0:
-                time.sleep(SLEEP_TIMEOUT)
-                machine_list = None
-            else:
+    machine_name = machine
+    for _ in range(machine_timeout):
+        machine_list = get_available_machines(token, host, project, team)
+        if len(machine_list) == 0:
+            time.sleep(SLEEP_TIMEOUT)
+        else:
+            if machine_name == "any":
                 machine = machine_list[0]["id"]
-                break
+            else:
+                machine = next(
+                    (m["id"] for m in machine_list if m["name"] == machine_name),
+                    None
+                )
+            break
 
-    if machine_list == None:
+    if len(machine_list) == 0 or machine is None:
         print("Could not find any available automated machine... exiting")
         return EXIT_CODE_ERR_NO_MACHINES
 
@@ -247,7 +273,8 @@ def main():
         {
             "test_set_name": test_set_name,
             "dependency": {"Brower": "Chrome", "OS": "Windows"},
-            "email_receiver": [email,],
+            "email_receiver": emails,
+            "email_pref": email_pref,
             "objective": objective,
             "milestone": milestone,
             "project_id": project,
