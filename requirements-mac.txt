@@ -29,7 +29,7 @@ pyaudio
 imutils
 https://github.com/AutomationSolutionz/PyGetWindow-0.0.5/archive/master.zip
 appscript
-webdrivermanager
+webdriver_manager
 jsonschema
 webcolors
 jsonpointer
@@ -38,3 +38,4 @@ rfc3986-validator
 idna
 pyrsistent
 attrs
+pytest==6.1.2

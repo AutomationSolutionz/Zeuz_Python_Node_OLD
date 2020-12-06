@@ -577,7 +577,7 @@ def Handle_While_Loop_Action(step_data, data_set_no):
                 loop_this_data_sets = get_data_set_nums(row[2].strip())
                 outer_skip += loop_this_data_sets
             elif row[0].strip().lower() == "repeat":
-                max_no_of_loop = int(row[2].strip())
+                max_no_of_loop = int(sr.get_previous_response_variables_in_strings(row[2]).strip())
             elif row[0].strip().lower() == "exit loop":
                 value = row[2].strip()
                 if "pass" in value.lower():
@@ -594,7 +594,7 @@ def Handle_While_Loop_Action(step_data, data_set_no):
                     deprecate_log = False
                     CommonUtil.ExecLog(
                         sModuleInfo,
-                        "Use 'optional loop setting' instead of 'loop settings' to get our updated feature. Try the simple syntax format writen in document",
+                        "Use 'optional loop settings' instead of 'loop settings' to get our updated feature. Try the simple syntax format writen in document",
                         2,
                     )
         if loop_this_data_sets == []:
@@ -732,13 +732,13 @@ def Run_Sequential_Actions(
                 )
                 continue  # If this data set is in the skip list, do not process it
 
-            if (
-                CommonUtil.check_offline()
-            ):  # Check if user initiated offline command from GUI
-                CommonUtil.ExecLog(
-                    sModuleInfo, "User requested Zeuz Node to go offline.", 2
-                )
-                return "failed", skip_for_loop
+            # if (
+            #     CommonUtil.check_offline()
+            # ):  # Check if user initiated offline command from GUI
+            #     CommonUtil.ExecLog(
+            #         sModuleInfo, "User requested Zeuz Node to go offline.", 2
+            #     )
+            #     return "failed", skip_for_loop
 
             for row in data_set:  # For each row of the data set
                 action_name = row[1]  # Get Sub-Field
@@ -1424,13 +1424,13 @@ def Loop_Action_Handler(data, row, dataset_cnt):
                 for ndc in range(
                     len(new_step_data)
                 ):  # For each data set in the sub-set
-                    if (
-                        CommonUtil.check_offline()
-                    ):  # Check if user initiated offline command from GUI
-                        CommonUtil.ExecLog(
-                            sModuleInfo, "User requested Zeuz Node to go Offline", 2
-                        )
-                        return "failed", skip
+                    # if (
+                    #     CommonUtil.check_offline()
+                    # ):  # Check if user initiated offline command from GUI
+                    #     CommonUtil.ExecLog(
+                    #         sModuleInfo, "User requested Zeuz Node to go Offline", 2
+                    #     )
+                    #     return "failed", skip
 
                     # Build the sub-set and execute
                     result = build_subset([new_step_data[ndc]])
@@ -1923,12 +1923,12 @@ def Action_Handler(_data_set, action_row):
         0,
     )
 
-    sr.Set_Shared_Variables(
-        "screen_capture", screenshot.lower().strip()
-    )  # Save the screen capture type
-    CommonUtil.set_screenshot_vars(
-        sr.Shared_Variable_Export()
-    )  # Get all the shared variables, and pass them to CommonUtil
+    # sr.Set_Shared_Variables(
+    #     "screen_capture", screenshot.lower().strip()
+    # )  # Save the screen capture type
+    # CommonUtil.set_screenshot_vars(
+    #     sr.Shared_Variable_Export()
+    # )  # Get all the shared variables, and pass them to CommonUtil
 
     if (
         module in failed_tag_list or module == "" or function == ""
@@ -1963,6 +1963,9 @@ def Action_Handler(_data_set, action_row):
     data_set = []
     for row in _data_set:
         new_row = list(row)
+        if "optional parameter" in row[1] and "screen capture" == row[0].strip().lower():
+            screenshot = row[2].strip().lower()
+            continue
         if "optional" in row[1]:
             new_row[1] = new_row[1].replace("optional", "").strip()
         if "bypass" in row[1]:
@@ -1972,6 +1975,9 @@ def Action_Handler(_data_set, action_row):
         if original_module != "" and original_module in row[1]:
             new_row[1] = new_row[1].replace(original_module, "").strip()
         data_set.append(tuple(new_row))
+
+    sr.Set_Shared_Variables("screen_capture", screenshot.lower().strip())
+    CommonUtil.set_screenshot_vars(sr.Shared_Variable_Export())
 
     # Convert shared variables to their string equivelent
     if action_name not in skip_conversion_of_shared_variable_for_actions:
@@ -1992,6 +1998,7 @@ def Action_Handler(_data_set, action_row):
         result = run_function(
             data_set
         )  # Execute function, providing all rows in the data set
+        CommonUtil.TakeScreenShot(function)
         return result  # Return result to sequential_actions()
 
     except Exception:

@@ -193,7 +193,7 @@ def Exception_Handler(exec_info, temp_q=None, UserMessage=None):
         )
         sModuleInfo = Function_Name + ":" + File_Name
         ExecLog(sModuleInfo, "Following exception occurred: %s" % (Error_Detail), 3)
-        TakeScreenShot(Function_Name + "~" + File_Name)
+        # TakeScreenShot(Function_Name + "~" + File_Name)
         if UserMessage != None:
             ExecLog(
                 sModuleInfo, "Following error message is custom: %s" % (UserMessage), 3
@@ -507,15 +507,15 @@ def Thread_ScreenShot(ImageName, local_run=False):
     sModuleInfo = inspect.currentframe().f_code.co_name + " : " + MODULE_NAME
     ExecLog(sModuleInfo, "Function start", 0)
     chars_to_remove = [
-        "?",
-        "*",
-        '"',
-        "<",
-        ">",
-        "|",
-        "\\",
-        "\/",
-        ":",
+        r"?",
+        r"*",
+        r'"',
+        r"<",
+        r">",
+        r"|",
+        r"\\",
+        r"\/",
+        r":",
     ]  # Symbols that can't be used in filename
     picture_quality = 20  # Quality of picture
     picture_size = 800, 600  # Size of image (for reduction in file size)
@@ -530,8 +530,12 @@ def Thread_ScreenShot(ImageName, local_run=False):
     image_folder = ConfigModule.get_config_value(
         "sectionOne", "screen_capture_folder", temp_config
     )  # Get screen capture directory from temporary config file that is dynamically created
-    if not os.path.exists(image_folder):
-        os.mkdir(image_folder)
+
+    try:
+        if not os.path.exists(image_folder):
+            os.mkdir(image_folder)
+    except:
+        pass
 
     # Decide if screenshot should be captured
     if (
@@ -545,10 +549,9 @@ def Thread_ScreenShot(ImageName, local_run=False):
         )
         return
     print(
-        "************* ImageName ****************: {}, type: {}".format(
-            ImageName, type(ImageName)
-        )
+        "*********** Screen captured in separate thread for Action: %s Method: %s ***********" % (ImageName, screen_capture_type)
     )
+    image_name_log = ImageName
     # Adjust filename and create full path (remove invalid characters, convert spaces to underscore, remove leading and trailing spaces)
     trans_table = str.maketrans(
         dict.fromkeys("".join(chars_to_remove))
@@ -625,10 +628,8 @@ def Thread_ScreenShot(ImageName, local_run=False):
             )
 
     except:
-        ExecLog(
-            sModuleInfo,
-            "Unable To Capture image.  Device Maybe Blocking Screen Capture.",
-            1,
+        print(
+            "*********** Screen couldn't be captured for Action: %s Method: %s ***********" % (image_name_log, screen_capture_type)
         )
 
 
